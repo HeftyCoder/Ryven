@@ -8,7 +8,8 @@ from qtpy.QtWidgets import (
     QHBoxLayout,
     QTabWidget,
     QDockWidget,
-    QUndoView
+    QUndoView,
+    QTabBar
 )
 from qtpy.QtCore import Qt, QByteArray
 
@@ -19,7 +20,7 @@ from ryvencore import Flow
 from ryven.gui.code_editor.CodePreviewWidget import CodePreviewWidget
 from ryven.gui.uic.ui_flow_window import Ui_FlowWindow
 from ryvencore_qt.src.flows.FlowView import FlowView
-from ryvencore_qt.src.flows.nodes.InspectorGUI import BaseNodeInspector, InspectorWidget
+from ryvencore_qt.src.flows.nodes.NodeInspector import InspectorView
 from typing import List
 
 
@@ -63,8 +64,12 @@ class FlowUI(QMainWindow):
         for i in range(1, len(right_area_widgets)):
             self.tabifyDockWidget(right_area_widgets[i - 1], right_area_widgets[i])
         
-        # inspector dock first
         
+        tab_bars: QTabBar = self.findChildren(QTabBar)
+        for tab_bar in tab_bars:
+            tab_bar.setStyleSheet("QTabBar::tab { min-width: 65px; }")
+        
+        # inspector dock first
         self.ui.inspector_dock.raise_()
 
         self.flow.algorithm_mode_changed.sub(self.flow_alg_mode_changed)
@@ -94,7 +99,7 @@ class FlowUI(QMainWindow):
         self.ui.source_dock.setWidget(self.code_preview_widget)
         
         # inspector widget
-        self.inspector_widget = InspectorWidget(self.flow_view)
+        self.inspector_widget = InspectorView(self.flow_view)
         self.ui.inspector_dock.setWidget(self.inspector_widget)
         
         #undo history widget
