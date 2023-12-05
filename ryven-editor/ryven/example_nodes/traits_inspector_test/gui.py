@@ -47,14 +47,12 @@ class RandNodeInspector(NodeInspectorWidget, QWidget):
                 self.node.set_output_val(0, Data(value))
             return _undo_redo
         
-        self.flow_view._push_undo(
-            Delegate_Command(self.flow_view, f'Update {prev_val} -> {new_val}', undo_redo(prev_val), undo_redo(new_val))
-        )
+        self.push_undo(f'Update {prev_val} -> {new_val}', undo_redo(prev_val), undo_redo(new_val))
     
     def on_trait_changed(self, trait_event):
         print(f'Trait "{trait_event.name}" changed from {trait_event.old} to {trait_event.new}')
         # otherwise an enter event for a text editor wouldn't stop text editing
-        self.flow_view.setFocus()
+        self.node_gui.flow_view().setFocus()
         if trait_event.name == trait_event.new:
             return
 
@@ -68,9 +66,7 @@ class RandNodeInspector(NodeInspectorWidget, QWidget):
 
             return _undo_redo
 
-        self.flow_view._push_undo(
-            Delegate_Command(self.flow_view, f'Config Change {trait_event.name} {trait_event.old} -> {trait_event.new}', undo_redo(trait_event.old), undo_redo(trait_event.new))
-        )
+        self.push_undo(f'Config Change {trait_event.name} {trait_event.old} -> {trait_event.new}', undo_redo(trait_event.old), undo_redo(trait_event.new))
 
 @node_gui(RandNode)
 class RandNodeGUI(NodeGUI):
