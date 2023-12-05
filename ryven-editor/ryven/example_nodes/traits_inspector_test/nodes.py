@@ -47,11 +47,12 @@ class RandNode(Node):
     init_outputs = [NodeOutputType(label='out')]
 
     def __init__(self, params):
+        print('XDsdsad')
         self.config = RandNode.RandNodeConfig()
         self.config._node = self
         self.config.allow_notifications()
         self.val = None
-        super().__init__(params)
+        Node.__init__(self, params)
     
     def place_event(self): # must be here (there should be one output value)
         self.update()

@@ -1,19 +1,19 @@
 from .nodes import *
-from ryven.gui_env import inspector_gui
-from ryvencore_qt.src.flows.nodes.InspectorGUI import NodeInspector
+from ryven.gui_env import *
 from traitsui.api import View, Item, ButtonEditor, Group
 from ryvencore_qt.src.flows.FlowCommands import Delegate_Command
 from collections import deque
+from qtpy.QtWidgets import QVBoxLayout, QWidget
 
-@inspector_gui(RandNode)
-class RandNodeInspector(NodeInspector):
-    @property
-    def config(self):
-        return self.node.config
-
-    def attach_inspector(self, parent):
+class RandNodeInspector(NodeInspectorWidget, QWidget):
+    
+    def __init__(self, params):
+        QWidget.__init__(self)
+        NodeInspectorWidget.__init__(self, params)
+        
+        self.setLayout(QVBoxLayout())
         self.node: RandNode = self.node  # help with auto-complete
-
+        
         view = self.config.trait_view()
         # This could be None, but wanted to a label and a border
         view = View(
@@ -25,11 +25,15 @@ class RandNodeInspector(NodeInspector):
             )
         )
         self.ui = self.config.edit_traits(
-            parent=parent.layout(), kind='subpanel', view=view
+            parent=self.layout(), kind='subpanel', view=view
         ).control
         self.config.on_trait.append(self.on_trait_changed)
         self.config.on_val.append(self.on_val_changed)
-        parent.layout().addWidget(self.ui)
+        self.layout().addWidget(self.ui)
+    
+    @property
+    def config(self):
+        return self.node.config
 
     def unload(self):
         self.config.on_trait.remove(self.on_trait_changed)
@@ -68,8 +72,7 @@ class RandNodeInspector(NodeInspector):
             Delegate_Command(self.flow_view, f'Config Change {trait_event.name} {trait_event.old} -> {trait_event.new}', undo_redo(trait_event.old), undo_redo(trait_event.new))
         )
 
-    # def create_inspector(self, parent: QWidget):
-    #    node: RandNode = self.node
-    #
-    #    ui = node.config.edit_traits(parent=parent.layout(), kind = 'subpanel').control
-    #    parent.layout().addWidget(ui) # or simply return ui
+@node_gui(RandNode)
+class RandNodeGUI(NodeGUI):
+    inspector_widget_class = RandNodeInspector
+    wrap_inspector_in_default = True
