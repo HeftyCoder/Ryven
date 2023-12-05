@@ -98,7 +98,8 @@ class NodesEnvRegistry:
     def current_package_id(cls):
         if cls.current_package is None:
             raise Exception(
-                "Attempted node export outside of a nodes package."
+                f'Unexpected nodes export. '
+                f'Nodes export is only allowed when the nodes package is imported. '
             )
         return cls.current_package.name
 
@@ -144,6 +145,10 @@ def export_nodes(
             *n_cls.legacy_identifiers,
             n_cls.identifier if n_cls.identifier else n_cls.__name__,
         ]
+    
+    # same for data types
+    for d_cls in data_types:
+        d_cls.identifier = f'{pkg_name}.{d_cls.identifier}'
 
     NodesEnvRegistry.exported_nodes_legacy.append(node_types)
     NodesEnvRegistry.exported_data_types_legacy.append(data_types)

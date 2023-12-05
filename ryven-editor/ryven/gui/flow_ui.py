@@ -9,7 +9,7 @@ from qtpy.QtWidgets import (
     QTabWidget,
     QDockWidget,
     QUndoView,
-    QTabBar
+    QAction
 )
 from qtpy.QtCore import Qt, QByteArray
 
@@ -50,6 +50,11 @@ class FlowUI(QMainWindow):
         # should be list[QDockWidget] in 3.9+
         all_dock_widgets: List[QDockWidget] = [d for d in self.findChildren(QDockWidget)]
         windows_menu = flow_view.menu().addMenu("Windows")
+        open_all_action = QAction('Open All', self)
+        open_all_action.triggered.connect(self.open_docks)
+        close_all_action = QAction('Close All Tabs', self)
+        close_all_action.triggered.connect(self.close_docks)
+        windows_menu.addActions([open_all_action, close_all_action])
         for w in all_dock_widgets:
             windows_menu.addAction(w.toggleViewAction())
 
@@ -63,11 +68,6 @@ class FlowUI(QMainWindow):
         ]
         for i in range(1, len(right_area_widgets)):
             self.tabifyDockWidget(right_area_widgets[i - 1], right_area_widgets[i])
-        
-        
-        tab_bars: QTabBar = self.findChildren(QTabBar)
-        for tab_bar in tab_bars:
-            tab_bar.setStyleSheet("QTabBar::tab { min-width: 65px; }")
         
         # inspector dock first
         self.ui.inspector_dock.raise_()
@@ -117,6 +117,15 @@ class FlowUI(QMainWindow):
             self.add_logger_widget(logger)
         logging.log_created.sub(self.add_logger_widget)
 
+    def open_docks(self, docks):
+        for dock in self.findChildren(QDockWidget):
+            dock.show()
+    
+    def close_docks(self, dock):
+        for dock in self.findChildren(QDockWidget):
+            if not dock.isFloating():
+                dock.close()
+            
     # created to avoid __del__
     def unload(self):
         """Disconnects the flow ui from the design or main application signals"""

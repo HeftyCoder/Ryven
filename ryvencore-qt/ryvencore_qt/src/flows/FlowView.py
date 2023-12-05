@@ -84,8 +84,8 @@ class _SelectionMode(Enum):
     """
 
     INSTANT = 1
-    UNDO_CLICK = 2
-    UNDO_DRAG = 3
+    UNDOABLE_CLICK = 2
+    UNDOABLE_RUBBERBANDDRAG = 3
 
 
 class FlowView(GUIBase, QGraphicsView):
@@ -110,8 +110,6 @@ class FlowView(GUIBase, QGraphicsView):
         GUIBase.__init__(self, representing_component=flow)
         QGraphicsView.__init__(self, parent=parent)
 
-        self.selection_mode: _SelectionMode = _SelectionMode.UNDO_CLICK
-
         # UNDO STACK
         self._undo_stack = QUndoStack(self)
         self._undo_action = self._undo_stack.createUndoAction(self, 'undo')
@@ -131,6 +129,7 @@ class FlowView(GUIBase, QGraphicsView):
         self.node_items__cache: dict = {}
         self.connection_items: dict = {}  # {Connection: ConnectionItem}
         self.connection_items__cache: dict = {}
+        self.selection_mode: _SelectionMode = _SelectionMode.UNDOABLE_CLICK
 
         # PRIVATE FIELDS
         self._loaded_state = None # h and v scrollbars are changed on import, so we need to defer
@@ -186,7 +185,7 @@ class FlowView(GUIBase, QGraphicsView):
         self.setRenderHint(QPainter.Antialiasing)
         self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
         self.setDragMode(QGraphicsView.RubberBandDrag)
-        scene.selectionChanged.connect(self._scene_selection_changed)
+        self._watch_scene_selection()
         self.setAcceptDrops(True)
 
         self.centerOn(QPointF(self.viewport().width() / 2, self.viewport().height() / 2))
@@ -314,18 +313,6 @@ class FlowView(GUIBase, QGraphicsView):
         )
         return result
 
-    def _connect_on_selection(self):
-        try:
-            self.scene().selectionChanged.connect(self._scene_selection_changed)
-        except:
-            pass
-
-    def _disconnect_on_selection(self):
-        try:
-            self.scene().selectionChanged.disconnect(self._scene_selection_changed)
-        except:
-            pass
-
     def _init_shortcuts(self):
         place_new_node_shortcut = QShortcut(QKeySequence('Shift+P'), self)
         place_new_node_shortcut.activated.connect(self._place_new_node_by_shortcut)
@@ -370,31 +357,7 @@ class FlowView(GUIBase, QGraphicsView):
         self.viewport().update()
         self.scene().update(self.sceneRect())
 
-    def _scene_selection_changed(self):
-        if self.selection_mode == _SelectionMode.INSTANT:
-            self._current_selected = self.scene().selectedItems()
-            self.emit_selected_items()
-        elif self.selection_mode == _SelectionMode.UNDO_CLICK:
-            self.create_selection_cmd()
-
-    def emit_selected_items(self, item_list: list = None):
-        selected = item_list if item_list else self.scene().selectedItems()
-        self.nodes_selection_changed.emit(self.selected_nodes(selected))
-
-    def contextMenuEvent(self, event):
-        QGraphicsView.contextMenuEvent(self, event)
-        # in the case of the menu already being shown by a widget under the mouse, the event is accepted here
-        if event.isAccepted():
-            return
-        
-        for i in self.items(event.pos()):
-            if isinstance(i, NodeItem):
-                ni: NodeItem = i
-                menu: QMenu = ni.get_context_menu()
-                menu.exec_(event.globalPos())
-                event.accept()
-
-    def _push_undo(self, cmd: FlowUndoCommand):
+    def push_undo(self, cmd: FlowUndoCommand):
         self._undo_stack.push(cmd)
         cmd.activate()
 
@@ -408,24 +371,20 @@ class FlowView(GUIBase, QGraphicsView):
         self._undo_stack.redo()
         self.viewport().update()
 
-    def mouseDoubleClickEvent(self, event):
-        # Only allow double clicking over an item
-        if self.itemAt(event.pos()):
-            QGraphicsView.mousePressEvent(self, event)
-
     def mousePressEvent(self, event):
         # InfoMsgs.write('mouse press event received, point:', event.pos())
 
-        self._set_selection_mode(_SelectionMode.UNDO_CLICK)
+        self._set_selection_mode(_SelectionMode.UNDOABLE_CLICK)
+
         # to catch tablet events (for some reason, it results in a mousePrEv too)
         if self.mouse_event_taken:
             self.mouse_event_taken = False
             return
 
-        # This allows to chain the selection event when multi-selecting
+        # this allows to chain the selection event when multi-selecting
         hover_item = self.itemAt(event.pos())
-        if not hover_item:
-            self._set_selection_mode(_SelectionMode.UNDO_DRAG)
+        if hover_item is None:
+            self._set_selection_mode(_SelectionMode.UNDOABLE_RUBBERBANDDRAG)
 
         if event.button() != Qt.RightButton:
             QGraphicsView.mousePressEvent(self, event)
@@ -434,7 +393,7 @@ class FlowView(GUIBase, QGraphicsView):
         # this includes node items, node port pins, proxy widgets etc.
         if self.mouse_event_taken:
             self.mouse_event_taken = False
-            self._set_selection_mode(_SelectionMode.UNDO_CLICK)
+            self._set_selection_mode(_SelectionMode.UNDOABLE_CLICK)
             return
 
         if event.button() == Qt.LeftButton:
@@ -477,7 +436,7 @@ class FlowView(GUIBase, QGraphicsView):
         if self.mouse_event_taken:
             self.mouse_event_taken = False
             self.viewport().repaint()
-            self._set_selection_mode(_SelectionMode.UNDO_CLICK)
+            self._set_selection_mode(_SelectionMode.UNDOABLE_CLICK)
             return
 
         elif self._panning:
@@ -487,7 +446,7 @@ class FlowView(GUIBase, QGraphicsView):
             self._right_mouse_pressed_in_flow = False
             if self._mouse_press_pos == self._last_mouse_move_pos and not self.itemAt(event.pos()):
                 self.show_place_node_widget(event.pos())
-                self._set_selection_mode(_SelectionMode.UNDO_CLICK)
+                self._set_selection_mode(_SelectionMode.UNDOABLE_CLICK)
                 return
 
         if self._dragging_connection:
@@ -521,13 +480,13 @@ class FlowView(GUIBase, QGraphicsView):
         # if event.button() == Qt.LeftButton:
         #     self._left_mouse_pressed_in_flow = False
         elif event.button() != Qt.RightButton:
-            if self.selection_mode == _SelectionMode.UNDO_DRAG:
-                self.create_selection_cmd()
+            if self.selection_mode == _SelectionMode.UNDOABLE_RUBBERBANDDRAG:
+                self._select__cmd()
 
         else:
             self._right_mouse_pressed_in_flow = False
 
-        self._set_selection_mode(_SelectionMode.UNDO_CLICK)
+        self._set_selection_mode(_SelectionMode.UNDOABLE_CLICK)
         self.viewport().repaint()
 
     def keyPressEvent(self, event):
@@ -540,7 +499,7 @@ class FlowView(GUIBase, QGraphicsView):
             self.setFocus()
             return True
 
-        elif event.key() == Qt.Key_Delete and self.selection_mode != _SelectionMode.UNDO_DRAG:
+        elif event.key() == Qt.Key_Delete and self.selection_mode != _SelectionMode.UNDOABLE_RUBBERBANDDRAG:
             self.remove_selected_components__cmd()
 
     def wheelEvent(self, event):
@@ -713,6 +672,19 @@ class FlowView(GUIBase, QGraphicsView):
             self.setFocus()
         except Exception:
             pass
+    
+    def contextMenuEvent(self, event):
+        QGraphicsView.contextMenuEvent(self, event)
+        # in the case of the menu already being shown by a widget under the mouse, the event is accepted here
+        if event.isAccepted():
+            return
+        
+        for i in self.items(event.pos()):
+            if isinstance(i, NodeItem):
+                ni: NodeItem = i
+                menu: QMenu = ni.get_context_menu()
+                menu.exec_(event.globalPos())
+                event.accept()
 
     # PAINTING
     def drawBackground(self, painter, rect):
@@ -989,7 +961,7 @@ class FlowView(GUIBase, QGraphicsView):
 
     # NODES
     def create_node__cmd(self, node_class):
-        self._push_undo(PlaceNode_Command(self, node_class, self._node_place_pos))
+        self.push_undo(PlaceNode_Command(self, node_class, self._node_place_pos))
 
     def add_node(self, node):
         # create item
@@ -1083,17 +1055,17 @@ class FlowView(GUIBase, QGraphicsView):
 
             if self.flow.graph_adj_rev[inp] not in (None, out): # out connected to something else
                 # remove existing connection
-                self._push_undo(
+                self.push_undo(
                     ConnectPorts_Command(self, out=self.flow.graph_adj_rev[inp], inp=inp)
                 )
 
             if self.flow.connected_output(inp) == out:
                 # if the exact connection exists, we want to remove it by command
-                self._push_undo(
+                self.push_undo(
                     ConnectPorts_Command(self, out=self.flow.connected_output(inp), inp=inp)
                 )
             else:
-                self._push_undo(ConnectPorts_Command(self, out=out, inp=inp))
+                self.push_undo(ConnectPorts_Command(self, out=out, inp=inp))
 
     def add_connection(self, c: Tuple[NodeOutput, NodeInput]):
         out, inp = c
@@ -1209,7 +1181,7 @@ class FlowView(GUIBase, QGraphicsView):
     def _create_and_place_drawing__cmd(self, posF, data=None):
         new_drawing_obj = self.create_drawing(data)
         place_command = PlaceDrawing_Command(self, posF, new_drawing_obj)
-        self._push_undo(place_command)
+        self.push_undo(place_command)
         return new_drawing_obj
 
     # ADDING/REMOVING COMPONENTS
@@ -1231,18 +1203,17 @@ class FlowView(GUIBase, QGraphicsView):
 
     def remove_selected_components__cmd(self):
         if self._current_selected:
-            self._push_undo(RemoveComponents_Command(self, self._current_selected))
+            self.push_undo(RemoveComponents_Command(self, self._current_selected))
 
         self.viewport().update()
 
     # MOVING COMPONENTS
-    def _move_selected_copmonents__cmd(self, x, y):
-        new_rel_pos = QPointF(x, y)
+    def _move_selected_copmonents__cmd(self, pos_diff: QPointF, already_moved=False):
 
         # if one node item would leave the scene (f.ex. pos.x < 0), stop
         left = False
         for i in self.scene().selectedItems():
-            new_pos = i.pos() + new_rel_pos
+            new_pos = i.pos() + pos_diff
             w = i.boundingRect().width()
             h = i.boundingRect().height()
             if (
@@ -1256,16 +1227,17 @@ class FlowView(GUIBase, QGraphicsView):
 
         if not left:
             # moving the items
-            items_group = self.scene().createItemGroup(self.scene().selectedItems())
-            items_group.moveBy(new_rel_pos.x(), new_rel_pos.y())
-            self.scene().destroyItemGroup(items_group)
+            if not already_moved:
+                items_group = self.scene().createItemGroup(self.scene().selectedItems())
+                items_group.moveBy(pos_diff.x(), pos_diff.y())
+                self.scene().destroyItemGroup(items_group)
 
             # saving the command
-            self._push_undo(
+            self.push_undo(
                 MoveComponents_Command(
                     self,
                     self.scene().selectedItems(),
-                    p_from=-new_rel_pos,
+                    p_from=-pos_diff,
                     p_to=QPointF(0, 0),
                 )
             )
@@ -1273,32 +1245,45 @@ class FlowView(GUIBase, QGraphicsView):
         self.viewport().repaint()
 
     def _move_selected_comps_left(self):
-        self._move_selected_copmonents__cmd(-40, 0)
+        self._move_selected_copmonents__cmd(QPointF(-40, 0))
 
     def _move_selected_comps_up(self):
-        self._move_selected_copmonents__cmd(0, -40)
+        self._move_selected_copmonents__cmd(QPointF(0, -40))
 
     def _move_selected_comps_right(self):
-        self._move_selected_copmonents__cmd(+40, 0)
+        self._move_selected_copmonents__cmd(QPointF(+40, 0))
 
     def _move_selected_comps_down(self):
-        self._move_selected_copmonents__cmd(0, +40)
+        self._move_selected_copmonents__cmd(QPointF(0, +40))
 
     # SELECTION
+    def _scene_selection_changed(self):
+        if self.selection_mode == _SelectionMode.INSTANT:
+            self._current_selected = self.scene().selectedItems()
+            self.emit_selected_items()
+        elif self.selection_mode == _SelectionMode.UNDOABLE_CLICK:
+            self._select__cmd()
+
+    def _watch_scene_selection(self):
+        self.scene().selectionChanged.connect(self._scene_selection_changed)
+
+    def _unwatch_scene_selection(self):
+        self.scene().selectionChanged.disconnect(self._scene_selection_changed)
+
+    def emit_selected_items(self):
+        """Emits signals indicating selection changes."""
+
+        self.nodes_selection_changed.emit(self.selected_nodes())
+
     def _set_selection_mode(self, mode: _SelectionMode):
         self.selection_mode = mode
 
-    def create_selection_cmd(self):
-        selected_now = self.scene().selectedItems()
-        if selected_now != self._current_selected:
-            self._push_undo(SelectComponents_Command(self, selected_now, self._current_selected))
-
-    def selected_components_moved(self, pos_diff):
-        items_list = self.scene().selectedItems()
-
-        self._push_undo(
-            MoveComponents_Command(self, items_list, p_from=-pos_diff, p_to=QPointF(0, 0))
-        )
+    def _select__cmd(self):
+        items = self.scene().selectedItems()
+        if items != self._current_selected:
+            self.push_undo(
+                SelectComponents_Command(self, items, self._current_selected)
+            )
 
     def selected_node_items(self, item_list: list = None) -> [NodeItem]:
         """Returns a list of the currently selected NodeItems."""
@@ -1307,7 +1292,9 @@ class FlowView(GUIBase, QGraphicsView):
         return [node_item for node_item in search_list if isinstance(node_item, NodeItem)]
 
     def selected_nodes(self, item_list: list = None) -> [Node]:
-        return [item.node for item in self.selected_node_items(item_list)]
+        """Returns a list of the currently selected nodes."""
+        
+        return [node_item.node for node_item in self.selected_node_items(item_list)]
 
     def selected_drawings(self) -> [DrawingObject]:
         """Returns a list of the currently selected drawings."""
@@ -1319,31 +1306,37 @@ class FlowView(GUIBase, QGraphicsView):
         ]
 
     def select_items(self, items: list):
+        """
+        Selects a list of items in the scene.
+        It always clears the current selection
+        Does not cause any command to be pushed to the undo stack.
+        Emits signals indicating selection changes.
+        """
+        
+        self._unwatch_scene_selection()
         self._current_selected = items
-        self._disconnect_on_selection()
+        for i in self.scene().items():
+            if i.flags() & QGraphicsItem.ItemIsSelectable != 0:
+                i.setSelected(False)
+                
         for i in items:
-            if i.ItemIsSelectable:
+            if i.flags() & QGraphicsItem.ItemIsSelectable != 0:
                 i.setSelected(True)
-        self.emit_selected_items(items)
+        self.emit_selected_items()
         self.viewport().repaint()
-        self._connect_on_selection()
+        self._watch_scene_selection()
 
     def select_all(self):
         self.select_items(self.scene().items())
 
     def clear_selection(self):
-        self.scene().clearSelection()
-
-    def select_components(self, comps):
-        self.scene().clearSelection()
-        for c in comps:
-            c.setSelected(True)
+        self.select_items([])
 
     # ACTIONS
     def _select_all_action(self):  # ctrl+a
         all_items = self.scene().items()
         if all_items != self._current_selected:
-            self._push_undo(SelectComponents_Command(self, all_items, self._current_selected))
+            self.push_undo(SelectComponents_Command(self, all_items, self._current_selected))
 
     def _copy(self):  # ctrl+c
         data = {
@@ -1363,7 +1356,7 @@ class FlowView(GUIBase, QGraphicsView):
         QGuiApplication.clipboard().setText(json.dumps(data))
         self.remove_selected_components__cmd()
 
-    def _paste(self):
+    def _paste(self):  # ctrl+v
         data = {}
         try:
             data = json.loads(QGuiApplication.clipboard().text())
@@ -1402,7 +1395,7 @@ class FlowView(GUIBase, QGraphicsView):
 
             offset_for_middle_pos = self._last_mouse_move_pos - rect.center()
 
-        self._push_undo(Paste_Command(self, data, offset_for_middle_pos))
+        self.push_undo(Paste_Command(self, data, offset_for_middle_pos))
 
     # DATA
     def complete_data(self, data: dict):

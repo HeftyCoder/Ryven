@@ -117,6 +117,8 @@ All output will be printed in the terminal, not the editor console.
 The editor console can still be used for commands.
               '''
             )
+            # hide the console in verbose mode
+            self.ui.consoleDock.hide()
 
         # Setup ryvencore Session and load project
 
@@ -218,6 +220,11 @@ CONTROLS
 
         # add widget actions to menu
         all_dock_widgets: list[QDockWidget] = [d for d in self.findChildren(QDockWidget)]
+        open_all_docks = QAction('Open All', self)
+        open_all_docks.triggered.connect(self.open_docks)
+        close_all_docks = QAction('Close All Tabs', self)
+        close_all_docks.triggered.connect(self.close_docks)
+        self.ui.menuDocks.addActions([open_all_docks, close_all_docks])
         self.ui.menuDocks.addActions([w.toggleViewAction() for w in all_dock_widgets])
         # tabify all left tabs at a fresh project
         left_widgets = [
@@ -226,6 +233,15 @@ CONTROLS
         for i in range(1, len(left_widgets)):
             self.tabifyDockWidget(left_widgets[i - 1], left_widgets[i])
 
+    def open_docks(self):
+        for dock in self.findChildren(QDockWidget):
+            dock.show()
+    
+    def close_docks(self):
+        for dock in self.findChildren(QDockWidget):
+            if not dock.isFloating():
+                dock.close()
+            
     def setup_menu_actions(self):
         # flow designs
         light_themes_menu = QMenu('light')
