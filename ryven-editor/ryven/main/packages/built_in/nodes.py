@@ -1,5 +1,6 @@
 from ryvencore import Node, NodeInputType, NodeOutputType, Data
 from ryven.node_env import export_nodes, on_gui_load
+from cognix.base_nodes import TransformNode, StartNode, FrameNode
 
 class NodeBase(Node):
     def have_gui(self):
@@ -53,7 +54,7 @@ class GetVar_Node(NodeBase):
         self.set_output_val(0, Data(self.get_var_val(self.var_name)))
 
 
-class Result_Node(NodeBase):
+class Result_Node(TransformNode):
     """Simply shows a value converted to str"""
 
     version = 'v0.2'
@@ -72,11 +73,12 @@ class Result_Node(NodeBase):
 
     def update_event(self, input_called=-1):
         self.val = self.input(0).payload
+        print(self.val)
         if self.have_gui():
             self.gui.main_widget().show_val(self.val)
 
 
-class Val_Node(NodeBase):
+class Val_Node(FrameNode):
     """Evaluates a string from the input field"""
 
     version = 'v0.2'
@@ -98,6 +100,10 @@ class Val_Node(NodeBase):
     def place_event(self):
         self.update()
 
+    def frame_update(self):
+        self.set_output_val(0, self.val)
+        return super().frame_update(-1)
+    
     def update_event(self, input_called=-1):
         self.set_output_val(0, self.val)
 

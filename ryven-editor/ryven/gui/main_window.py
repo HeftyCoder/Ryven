@@ -35,7 +35,7 @@ import ryvencore_qt as rc
 import ryvencore_qt.src.widgets as rc_GUI
 
 from ryvencore import InfoMsgs, Flow
-
+from cognix.graph_player import CognixPlayer
 
 class MainWindow(QMainWindow):
 

@@ -74,7 +74,7 @@ from .drawings.DrawingObject import DrawingObject
 
 from ..Design import Design
 from enum import Enum
-
+from cognix.graph_player import GraphPlayer, GraphState
 
 class _SelectionMode(Enum):
     """
@@ -106,7 +106,10 @@ class FlowView(GUIBase, QGraphicsView):
 
     viewport_update_mode_changed = Signal(str)
 
-    def __init__(self, session_gui, flow, parent=None):
+    def __init__(self, session_gui, graph_player: GraphPlayer, parent=None):
+        self._graph_player = graph_player
+        flow = graph_player.flow
+        
         GUIBase.__init__(self, representing_component=flow)
         QGraphicsView.__init__(self, parent=parent)
 
@@ -242,13 +245,13 @@ class FlowView(GUIBase, QGraphicsView):
         self.set_stylus_proxy_pos()
         self.setAttribute(Qt.WA_TabletTracking)
 
-        # MENU
-        self._menu = QMenu()
-        
         # just to add some space for the button
         menu_layout_widget = self._create_no_background_widget("FlowMenu")
-        # just to add some space for the button
         menu_layout_widget.setLayout(QHBoxLayout())
+        
+        # MENU
+        self._menu = QMenu()
+    
         menu_button = QPushButton("Menu")
         self._menu_button = menu_button
         menu_layout_widget.layout().addWidget(menu_button)
@@ -268,6 +271,16 @@ class FlowView(GUIBase, QGraphicsView):
         self._menu_widget = menu_button
         self._menu_layout_proxy = menu_layout_proxy
         self.set_menu_proxy_pos()
+        
+        # PLAY button
+        play_button = QPushButton("Play")
+        self._play_button = play_button
+        menu_layout_widget.layout().addWidget(play_button)
+        
+        def play_button_clicked():
+            print('Playing graph player')
+            self._graph_player.play()
+        play_button.clicked.connect(play_button_clicked)
 
         # # TOUCH GESTURES
         # recognizer = PanGestureRecognizer()
@@ -297,6 +310,10 @@ class FlowView(GUIBase, QGraphicsView):
         for c in [(o, i) for o, conns in self.flow.graph_adj.items() for i in conns]:
             self.add_connection(c)
 
+    # placeholder, might stay like this though
+    def silent_on_connecting(self):
+        return True
+    
     def menu(self) -> QMenu:
         """The menu for this flow view"""
         return self._menu
@@ -1056,16 +1073,16 @@ class FlowView(GUIBase, QGraphicsView):
             if self.flow.graph_adj_rev[inp] not in (None, out): # out connected to something else
                 # remove existing connection
                 self.push_undo(
-                    ConnectPorts_Command(self, out=self.flow.graph_adj_rev[inp], inp=inp)
+                    ConnectPorts_Command(self, out=self.flow.graph_adj_rev[inp], inp=inp, silent=self.silent_on_connecting())
                 )
 
             if self.flow.connected_output(inp) == out:
                 # if the exact connection exists, we want to remove it by command
                 self.push_undo(
-                    ConnectPorts_Command(self, out=self.flow.connected_output(inp), inp=inp)
+                    ConnectPorts_Command(self, out=self.flow.connected_output(inp), inp=inp, silent=self.silent_on_connecting())
                 )
             else:
-                self.push_undo(ConnectPorts_Command(self, out=out, inp=inp))
+                self.push_undo(ConnectPorts_Command(self, out=out, inp=inp, silent=self.silent_on_connecting()))
 
     def add_connection(self, c: Tuple[NodeOutput, NodeInput]):
         out, inp = c
@@ -1203,7 +1220,7 @@ class FlowView(GUIBase, QGraphicsView):
 
     def remove_selected_components__cmd(self):
         if self._current_selected:
-            self.push_undo(RemoveComponents_Command(self, self._current_selected))
+            self.push_undo(RemoveComponents_Command(self, self._current_selected, self.silent_on_connecting()))
 
         self.viewport().update()
 

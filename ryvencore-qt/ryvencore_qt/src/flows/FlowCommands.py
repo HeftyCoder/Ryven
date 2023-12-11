@@ -209,11 +209,12 @@ class SelectComponents_Command(FlowUndoCommand):
 
 
 class RemoveComponents_Command(FlowUndoCommand):
-    def __init__(self, flow_view, items):
+    def __init__(self, flow_view, items, silent: bool = False):
         super().__init__(flow_view)
         self.items = items
         self.selection = flow_view._current_selected
         self.setText(undo_text_multi(self.items, 'Delete'))
+        self.silent = silent
         
         self.broken_connections = (
             set()
@@ -293,27 +294,27 @@ class RemoveComponents_Command(FlowUndoCommand):
 
     def restore_internal_connections(self):
         for c in self.internal_connections:
-            self.flow.add_connection(c)
+            self.flow.add_connection(c, self.silent)
 
     def remove_internal_connections(self):
         for c in self.internal_connections:
-            self.flow.remove_connection(c)
+            self.flow.remove_connection(c, self.silent)
 
     def restore_broken_connections(self):
         for c in self.broken_connections:
-            self.flow.add_connection(c)
+            self.flow.add_connection(c, self.silent)
 
     def remove_broken_connections(self):
         for c in self.broken_connections:
-            self.flow.remove_connection(c)
+            self.flow.remove_connection(c, self.silent)
 
 
 class ConnectPorts_Command(FlowUndoCommand):
-    def __init__(self, flow_view, out, inp):
+    def __init__(self, flow_view, out, inp, silent: bool = False):
         super().__init__(flow_view)
 
         # CAN ALSO LEAD TO DISCONNECT INSTEAD OF CONNECT!!
-
+        self.silent = silent
         self.out = out
         self.inp = inp
         self.connection = None
@@ -327,24 +328,24 @@ class ConnectPorts_Command(FlowUndoCommand):
     def undo_(self):
         if self.connecting:
             # remove connection
-            self.flow.remove_connection(self.connection)
+            self.flow.remove_connection(self.connection, self.silent)
         else:
             # recreate former connection
-            self.flow.add_connection(self.connection)
+            self.flow.add_connection(self.connection, self.silent)
 
     def redo_(self):
         if self.connecting:
             if self.connection:
-                self.flow.add_connection(self.connection)
+                self.flow.add_connection(self.connection, self.silent)
             else:
                 # connection hasn't been created yet
-                self.connection = self.flow.connect_nodes(self.out, self.inp)
+                self.connection = self.flow.connect_nodes(self.out, self.inp, self.silent)
             self.setText(f'Connect {self.flow_view.connection_items[self.connection]}')
             
         else:
             # remove existing connection
             self.setText(f'Disconnect {self.flow_view.connection_items[self.connection]}')
-            self.flow.remove_connection(self.connection)
+            self.flow.remove_connection(self.connection, self.silent)
         
 
 class Paste_Command(FlowUndoCommand):
