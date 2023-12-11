@@ -1,5 +1,6 @@
 from ryvencore.Base import Base
 from qtpy.QtWidgets import QGraphicsObject, QGraphicsItem
+from qtpy.QtCore import QTimer
 
   
 class GUIBase:
@@ -80,3 +81,18 @@ class QGraphicsItemAnimated(QGraphicsObject):
     
     def paint(self, painter, option, widget):
         return self.item.paint(painter, option, widget)
+
+
+class AnimationTimer:
+    """A simple wrapper over QTimer to aid with controlling animations"""
+    
+    def __init__(self, obj, dur: int, on_restart, on_timeout):
+        self.timer = QTimer(obj)
+        self.timer.setInterval(dur)
+        self.timer.timeout.connect(on_timeout)
+        self.on_restart = on_restart
+        
+    def restart(self):
+        self.timer.stop()
+        self.timer.start()
+        self.on_restart()

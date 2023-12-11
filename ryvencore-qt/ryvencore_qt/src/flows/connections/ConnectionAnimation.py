@@ -162,7 +162,17 @@ class ConnPathItemsAnimationScaled:
 
         self.to_scalar_group.finished.connect(self._on_scalar_ended)
         self.to_zero_group.finished.connect(self._on_zero_ended)
-        
+    
+    def start(self):
+        if (self.state == ConnPathItemsAnimationScaled.State.NOT_RUNNING or 
+            self.state == ConnPathItemsAnimationScaled.State.TO_ZERO):
+            self.toggle()
+    
+    def stop(self):
+        if (self.state == ConnPathItemsAnimationScaled.State.RUNNING or
+            self.state == ConnPathItemsAnimationScaled.State.TO_SCALE):
+            self.toggle()
+            
     def toggle(self):
         if self.state == ConnPathItemsAnimationScaled.State.NOT_RUNNING:
             self._run_scalar()
@@ -180,7 +190,7 @@ class ConnPathItemsAnimationScaled:
             self._run_scalar()
             self.state = ConnPathItemsAnimationScaled.State.TO_SCALE
     
-    def _stop(self):
+    def force_stop(self):
         self.to_zero_group.stop()
         self.to_scalar_group.stop()
     

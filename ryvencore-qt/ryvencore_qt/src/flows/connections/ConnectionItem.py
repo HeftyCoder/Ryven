@@ -1,6 +1,6 @@
 # import math
 from typing import List
-from qtpy.QtCore import QPointF, Qt
+from qtpy.QtCore import QPointF, Qt, Signal, QObject, QTimer
 from qtpy.QtGui import QPainter, QColor, QRadialGradient, QPainterPath, QPen
 from qtpy.QtWidgets import (
     QGraphicsPathItem,
@@ -9,20 +9,24 @@ from qtpy.QtWidgets import (
     QGraphicsEllipseItem,
 )
 
-from ...GUIBase import GUIBase
+from ...GUIBase import GUIBase, AnimationTimer
 from ...utils import sqrt
 from ...utils import pythagoras
 from ...flows.nodes.PortItem import PortItem
 from .ConnectionAnimation import ConnPathItemsAnimation, ConnPathItemsAnimationScaled
+from ryvencore_qt.src.Design import Design
+from ryvencore.Node import NodeOutput, NodeInput, Data, Node
 
-
-class ConnectionItem(GUIBase, QGraphicsPathItem):
+class ConnectionItem(GUIBase, QGraphicsPathItem, QObject):
     """The GUI representative for a connection. The classes ExecConnectionItem and DataConnectionItem will be ready
     for reimplementation later, so users can add GUI for the enhancements of DataConnection and ExecConnection,
     like input fields for weights."""
+    
+    data_signal = Signal(Data) # tuple[NodeOutput, NodeInput]
 
-    def __init__(self, connection, session_design):
+    def __init__(self, connection: tuple, session_design: Design):
         QGraphicsPathItem.__init__(self)
+        QObject.__init__(self)
 
         self.setAcceptHoverEvents(True)
 
@@ -38,10 +42,14 @@ class ConnectionItem(GUIBase, QGraphicsPathItem):
         self.session_design.flow_theme_changed.connect(self.recompute)
         self.session_design.performance_mode_changed.connect(self.recompute)
 
+        # data signal
+        self.data_signal.connect(self.__on_data_signal)
+        
         # for rendering flow pictures
         self.setCacheMode(QGraphicsItem.DeviceCoordinateCache)
         self.setFlag(QGraphicsItem.ItemIsSelectable)
 
+        # connection animation
         diam = 12.5
         self.num_dots = 40
         self.dots = [
@@ -51,13 +59,34 @@ class ConnectionItem(GUIBase, QGraphicsPathItem):
         for dot in self.dots:
             dot.setVisible(False)
 
-        # TODO: the connection animation is currently unused because we need a 
-        #       signel for when the node output is updated
         self.items_path_animation = ConnPathItemsAnimation(self.dots, self)
-        self.connection_animation = ConnPathItemsAnimationScaled(self.items_path_animation)
+        scale_dur = 350
+        self.connection_animation = ConnPathItemsAnimationScaled(self.items_path_animation, duration=scale_dur)
 
+        self._anim_timer = AnimationTimer(
+            obj=self, 
+            dur=1000 + scale_dur, 
+            on_restart=self.connection_animation.start, 
+            on_timeout=self.connection_animation.stop
+        )
+        # to keep the animation alive for at least 1 sec
+        
         self.recompute()
 
+    def node(self) -> Node:
+        return self.connection[0].node
+        
+    def __on_data_signal(self, data: Data):
+        """Called when the data signal is emitted"""
+        if self.session_design.animations_enabled:
+            self._anim_timer.restart()
+    
+    def __on_data(self, out: NodeOutput, data: Data):
+        """Emits the data changed signal for this connection item"""
+        output, _ = self.connection
+        if out == output:
+            self.data_signal.emit(data)
+    
     def __str__(self):
         out, inp = self.connection
         node_in_name = f'{inp.node.gui.item}'
@@ -145,10 +174,21 @@ class ConnectionItem(GUIBase, QGraphicsPathItem):
         return self.inp_item.pin.get_scene_center_pos()
 
     def itemChange(self, change, value):
+        # for highlights
         if change == QGraphicsItem.ItemSelectedHasChanged or (
             change == QGraphicsItem.ItemVisibleHasChanged and self.isVisible()
         ):
             self.set_highlighted(self.isSelected())
+        
+        # for data event
+        node = self.node()
+        if change == QGraphicsItem.ItemSceneChange and hasattr(node, 'output_changed'):
+            # if connection is added to the scene, subscribe to data change event
+            if value:
+                node.output_changed.sub(self.__on_data)
+            else:
+                node.output_changed.unsub(self.__on_data)
+                
         return QGraphicsItem.itemChange(self, change, value)
 
     def set_highlighted(self, b: bool):

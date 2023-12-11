@@ -74,7 +74,9 @@ from .drawings.DrawingObject import DrawingObject
 
 from ..Design import Design
 from enum import Enum
+
 from cognix.graph_player import GraphPlayer, GraphState
+from threading import Thread
 
 class _SelectionMode(Enum):
     """
@@ -273,13 +275,18 @@ class FlowView(GUIBase, QGraphicsView):
         self.set_menu_proxy_pos()
         
         # PLAY button
-        play_button = QPushButton("Play")
+        play_button = QPushButton('Play')
         self._play_button = play_button
         menu_layout_widget.layout().addWidget(play_button)
         
         def play_button_clicked():
-            print('Playing graph player')
-            self._graph_player.play()
+            if self._graph_player.state == GraphState.STOPPED:
+                #play_button.setText('Stop')
+                t = Thread(target=self._graph_player.play)
+                t.start()
+            else:
+                self._graph_player.stop()
+                
         play_button.clicked.connect(play_button_clicked)
 
         # # TOUCH GESTURES

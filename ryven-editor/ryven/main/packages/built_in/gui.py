@@ -8,14 +8,22 @@ from qtpy.QtWidgets import QLineEdit, QDialog, QDialogButtonBox, QMessageBox, QP
 
 
 class Result_Node_MainWidget(NodeMainWidget, QLineEdit):
+    
+    update_value = Signal(object)
+    
     def __init__(self, params):
         NodeMainWidget.__init__(self, params)
         QLineEdit.__init__(self)
 
         self.setReadOnly(True)
         self.setFixedWidth(120)
+        self.node: Node = self.node
+        self.update_value.connect(self.show_val) 
+        self.node.updated.sub(self.on_update)
 
-
+    def on_update(self, inp):
+        self.update_value.emit(self.node.val)
+        
     def show_val(self, new_val):
         self.setText(str(new_val))
         self.setCursorPosition(0)

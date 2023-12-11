@@ -73,9 +73,6 @@ class Result_Node(TransformNode):
 
     def update_event(self, input_called=-1):
         self.val = self.input(0).payload
-        print(self.val)
-        if self.have_gui():
-            self.gui.main_widget().show_val(self.val)
 
 
 class Val_Node(FrameNode):
@@ -102,7 +99,7 @@ class Val_Node(FrameNode):
 
     def frame_update(self):
         self.set_output_val(0, self.val)
-        return super().frame_update(-1)
+        return super().frame_update()
     
     def update_event(self, input_called=-1):
         self.set_output_val(0, self.val)

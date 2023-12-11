@@ -1,9 +1,32 @@
-from ryvencore import Node
+from ryvencore import Node, Flow
+from ryvencore.Base import Event
+from ryvencore.Node import NodeInput, NodeOutput
 from abc import ABCMeta, abstractmethod
 
+from ryvencore.Data import Data
+
+# the additions over normal ryven can probably be made into PRs
 class CognixNode(Node, metaclass=ABCMeta):
     """The basic building block of a Cognix Graph"""
     
+    def __init__(self, params):
+        super().__init__(params)
+        # events that ryvencore doesn't have
+        self.updated = Event(int)
+        self.output_changed = Event(NodeOutput, Data)
+        # for type hinting...
+        self.flow: Flow = self.flow
+        
+    def update(self, inp=-1):
+        """Overrides ryvencore to add an updated event"""
+        super().update(inp)
+        self.updated.emit(inp)
+    
+    def set_output_val(self, index: int, data: Data):
+        """Overrides ryvencore to add an on_output_changed event"""
+        super().set_output_val(index, data)
+        self.output_changed.emit(self.outputs[index], data)
+        
     def reset(self):
         """
         VIRTUAL
@@ -40,7 +63,7 @@ class FrameNode(CognixNode):
     @abstractmethod
     def frame_update(self):
         """Called on every frame. Data might have been passed from other nodes"""
-        self.updating.emit()
+        self.updating.emit(-1)
 
 
 class TransformNode(CognixNode):

@@ -114,9 +114,8 @@ class CognixPlayer(GraphPlayer):
             start_time = time.perf_counter()
             for node in self._frame_nodes:
                 node.frame_update()
-            wait_time = self.frame_dur() - time.perf_counter - start_time
+            wait_time = self.frame_dur() - (time.perf_counter() - start_time)
             
-            print(wait_time)
             if wait_time > 0:
                 time.sleep(wait_time)
                 
