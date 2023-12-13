@@ -1,4 +1,5 @@
 from ryvencore import Node, Flow
+from ryvencore.InfoMsgs import InfoMsgs
 from ryvencore.Base import Event
 from ryvencore.Node import NodeInput, NodeOutput
 from abc import ABCMeta, abstractmethod
@@ -17,6 +18,13 @@ class CognixNode(Node, metaclass=ABCMeta):
         # for type hinting...
         self.flow: Flow = self.flow
         
+        from .graph_player import GraphPlayer # to avoid circular imports
+        self._player: GraphPlayer = None
+    
+    @property
+    def player(self):
+        return self._player
+    
     def update(self, inp=-1):
         """Overrides ryvencore to add an updated event"""
         super().update(inp)
@@ -59,11 +67,26 @@ class FrameNode(CognixNode):
     
     def __init__(self, params):
         super().__init__(params)
+        # Setting this will stop the node from updating
+        self._is_finished = False
     
-    @abstractmethod
+    @property
+    def is_finished(self):
+        return self._is_finished
+    
     def frame_update(self):
-        """Called on every frame. Data might have been passed from other nodes"""
+        """Wraps the frame_update_event with internal calls."""
         self.updating.emit(-1)
+        self.frame_update_event()
+        
+    @abstractmethod
+    def frame_update_event(self):
+        """Called on every frame. Data might have been passed from other nodes"""
+        pass
+    
+    def reset(self):
+        self._is_finished = False
+        return super().reset()
 
 
 class TransformNode(CognixNode):

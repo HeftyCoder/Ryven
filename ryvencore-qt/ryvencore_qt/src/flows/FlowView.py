@@ -34,6 +34,8 @@ from qtpy.QtWidgets import (
     QUndoStack,
     QPushButton,
     QHBoxLayout,
+    QVBoxLayout,
+    QLabel,
     QWidget,
 )
 
@@ -93,6 +95,8 @@ class _SelectionMode(Enum):
 class FlowView(GUIBase, QGraphicsView):
     """Manages the GUI of flows"""
 
+    graph_state_changed = Signal(GraphState, GraphState)
+    
     nodes_selection_changed = Signal(list)
     node_placed = Signal(Node)
 
@@ -247,9 +251,16 @@ class FlowView(GUIBase, QGraphicsView):
         self.set_stylus_proxy_pos()
         self.setAttribute(Qt.WA_TabletTracking)
 
-        # just to add some space for the button
+        topleft_widget = self._create_no_background_widget("Topleft")
+        topleft_widget.setLayout(QVBoxLayout())
+        topleft_proxy = init_proxy_widget(topleft_widget, FlowViewProxyWidget(self))
+        self.topleft_proxy = topleft_proxy
+        self.set_topleft_proxy_pos()
+        
         menu_layout_widget = self._create_no_background_widget("FlowMenu")
         menu_layout_widget.setLayout(QHBoxLayout())
+        menu_layout_widget.layout().setContentsMargins(0,0,0,0)
+        topleft_widget.layout().addWidget(menu_layout_widget)
         
         # MENU
         self._menu = QMenu()
@@ -259,20 +270,15 @@ class FlowView(GUIBase, QGraphicsView):
         menu_layout_widget.layout().addWidget(menu_button)
 
         def menu_button_clicked():
-            point = self._menu_layout_proxy.scenePos()
-            view_pos = self.mapFromScene(point.toPoint())
-            # apply offset after
-            global_pos = self.viewport().mapToGlobal(
-                view_pos) + QPoint(8, self._menu_layout_proxy.widget().height()
-            ) 
+            global_pos = (
+                self._menu_button.mapToGlobal(self._menu_button.pos()) + 
+                QPoint(5, self._menu_button.height())
+            )
             self._menu.exec_(global_pos)
 
         menu_button.clicked.connect(menu_button_clicked)
 
-        menu_layout_proxy = init_proxy_widget(menu_layout_widget, FlowViewProxyWidget(self))
         self._menu_widget = menu_button
-        self._menu_layout_proxy = menu_layout_proxy
-        self.set_menu_proxy_pos()
         
         # PLAY button
         play_button = QPushButton('Play')
@@ -288,7 +294,53 @@ class FlowView(GUIBase, QGraphicsView):
                 self._graph_player.stop()
                 
         play_button.clicked.connect(play_button_clicked)
-
+        
+        # PAUSE button
+        pause_button = QPushButton('Pause')
+        pause_button.setEnabled(False)
+        self._pause_button = pause_button
+        menu_layout_widget.layout().addWidget(pause_button)
+        
+        def pause_button_clicked():
+            if self._graph_player.state == GraphState.PLAYING:
+                self._graph_player.pause()
+            elif self._graph_player.state == GraphState.PAUSED:
+                self._graph_player.resume()
+        pause_button.clicked.connect(pause_button_clicked)
+        
+        # FPS label 
+        fps_label = QLabel('')
+        topleft_widget.layout().addWidget(fps_label)
+        copy_font = QFont(fps_label.font())
+        copy_font.setPointSizeF(copy_font.pointSizeF() * 1.25)
+        fps_label.setFont(copy_font)
+        fps_timer = QTimer(self)
+        def refresh_fps():
+            gt = self._graph_player.graph_time
+            fps_label.setText(f'FPS: avg: {int(gt.avg_fps())}, current: {int(gt.current_fps())}, count: {gt.frame_count}')
+            
+        fps_timer.timeout.connect(refresh_fps)
+        fps_timer.setInterval(200)
+        fps_timer.start()
+        
+        # Graph States - We're doing this here so that
+        # it works remotely as well
+        def on_graph_state_changed(old_state: GraphState, new_state: GraphState):
+            play_button.setEnabled(True)
+            if new_state == GraphState.PLAYING:
+                play_button.setText('Stop')
+                pause_button.setEnabled(True)
+                pause_button.setText('Pause')
+            elif new_state == GraphState.PAUSED:
+                pause_button.setText('Resume')
+            else:
+                play_button.setText('Play')
+                pause_button.setText('Pause')
+                pause_button.setEnabled(False)
+                
+        self.graph_state_changed.connect(on_graph_state_changed)        
+        self._graph_player.graph_events.sub_state_changed(self.graph_state_changed.emit)
+        
         # # TOUCH GESTURES
         # recognizer = PanGestureRecognizer()
         # pan_gesture_id = QGestureRecognizer.registerRecognizer(recognizer) <--- CRASH HERE
@@ -741,7 +793,7 @@ class FlowView(GUIBase, QGraphicsView):
 
         # has to be called here instead of in drawForeground to prevent lagging
         self.set_stylus_proxy_pos()
-        self.set_menu_proxy_pos()
+        self.set_topleft_proxy_pos()
         # self.set_zoom_proxy_pos()
 
     def drawForeground(self, painter, rect):
@@ -843,17 +895,17 @@ class FlowView(GUIBase, QGraphicsView):
         )
         # self.mapToScene(self.viewport().width() - self._stylus_modes_widget.width() - self._zoom_widget.width(), 0))
     
-    def set_menu_proxy_pos(self):
-        self._menu_layout_proxy.setPos(self.mapToScene(0, 0))
+    def set_topleft_proxy_pos(self):
+        self.topleft_proxy.setPos(self.mapToScene(0, 0))
         
     def hide_proxies(self):
         self._stylus_modes_proxy.hide()
-        self._menu_layout_proxy.hide()
+        self.topleft_proxy.hide()
         # self._zoom_proxy.hide()
 
     def show_proxies(self):
         self._stylus_modes_proxy.show()
-        self._menu_layout_proxy.show()
+        self.topleft_proxy.show()
         # self._zoom_proxy.show()
 
     # PLACE NODE WIDGET

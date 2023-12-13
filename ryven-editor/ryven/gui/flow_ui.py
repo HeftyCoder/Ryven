@@ -128,9 +128,13 @@ class FlowUI(QMainWindow):
             
     # created to avoid __del__
     def unload(self):
-        """Disconnects the flow ui from the design or main application signals"""
+        """
+        Disconnects the flow ui from the design or main application signals.
+        Also stops the graph player if it's active.
+        """
         self.flow_view.design.performance_mode_changed.disconnect(self.set_performance_mode)
         self.flow_view._undo_stack.clear()
+        self.flow_view._graph_player.stop()
 
     def set_performance_mode(self, mode: str):
         if mode == 'fast':

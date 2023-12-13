@@ -97,9 +97,8 @@ class Val_Node(FrameNode):
     def place_event(self):
         self.update()
 
-    def frame_update(self):
+    def frame_update_event(self):
         self.set_output_val(0, self.val)
-        return super().frame_update()
     
     def update_event(self, input_called=-1):
         self.set_output_val(0, self.val)
