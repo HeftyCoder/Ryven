@@ -38,7 +38,7 @@ class LSLInput(FrameNode):
             
             while True:
                 print('Searching data')
-                results = resolve_bypred('type=EEG', 1, 3)
+                results = resolve_bypred("type='EEG'", 1, 3)
                 if results or self.force_stop:
                     break
             if results:
