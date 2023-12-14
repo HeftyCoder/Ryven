@@ -1,3 +1,4 @@
+from typing import Optional
 from ryvencore import Node, Flow
 from ryvencore.InfoMsgs import InfoMsgs
 from ryvencore.Base import Event
@@ -26,13 +27,23 @@ class CognixNode(Node, metaclass=ABCMeta):
         return self._player
     
     def update(self, inp=-1):
-        """Overrides ryvencore to add an updated event"""
-        super().update(inp)
+        """Overrides ryvencore to add an updated event and silence InfoMsgs"""
+        if self.block_updates:
+            return
+        
+        self.updating.emit(inp)
+        self.flow.executor.update_node(self, inp)
         self.updated.emit(inp)
     
+    def input(self, index: int):
+        """Overriden to silence InfoMsgs"""
+        return self.flow.executor.input(self, index)
+    
     def set_output_val(self, index: int, data: Data):
-        """Overrides ryvencore to add an on_output_changed event"""
-        super().set_output_val(index, data)
+        """Overrides ryvencore to add an on_output_changed event and silence InfoMsgs"""
+        
+        assert isinstance(data, Data), "Output value must be of type ryvencore.Data"
+        self.flow.executor.set_output_val(self, index, data)
         self.output_changed.emit(self.outputs[index], data)
         
     def reset(self):

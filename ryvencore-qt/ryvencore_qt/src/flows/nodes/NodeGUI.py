@@ -114,7 +114,6 @@ class NodeGUI(QObject):
             o = self.node.flow.connected_output(self.node.inputs[inp])
             if o is not None:
                 self.item.inputs[inp].widget.val_update_event(o.val)
-
         self.updating.emit()
 
     def _on_new_input_added(self, _, index, inp):

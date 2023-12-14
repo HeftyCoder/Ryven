@@ -19,7 +19,7 @@ class NodeItemAnimator(QObject):
         # transform
         self.scale_animation = QPropertyAnimation(self.node_item, b'scale')
         self.scale_animation.setDuration(700)
-        self.scalar = 1.04
+        self.scalar = 1.05
         
         self.animation = QParallelAnimationGroup()
         self.animation.addAnimation(self.title_activation_animation)

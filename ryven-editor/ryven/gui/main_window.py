@@ -299,24 +299,42 @@ CONTROLS
         self.session_gui.design.set_performance_mode(self.config.performance_mode)
 
         # animations
-        self.ac_anims_active = QAction('Enabled', self)
-        self.ac_anims_active.setCheckable(True)
-
-        self.ac_anims_inactive = QAction('Disabled', self)
-        self.ac_anims_inactive.setCheckable(True)
-
-        anims_ag = QActionGroup(self)
-        anims_ag.addAction(self.ac_anims_active)
-        anims_ag.addAction(self.ac_anims_inactive)
-
-        self.ac_anims_active.setChecked(self.session_gui.design.animations_enabled)
-        self.ac_anims_inactive.setChecked(not self.session_gui.design.animations_enabled)
-
-        anims_ag.triggered.connect(self.on_animation_enabling_changed)
-
+        design = self.session_gui.design
+        self.ac_anims_active = QAction('Enable All', self)
+        self.ac_anims_inactive = QAction('Disable All', self)
+        
+        self.scale_animation_action = QAction('Node Scale', self)
+        self.scale_animation_action.setCheckable(True)
+        self.scale_animation_action.setChecked(design.node_animation_enabled)
+        def on_scale_check(check):
+            design.node_animation_enabled = check
+        self.scale_animation_action.triggered.connect(on_scale_check)
+        
+        self.connection_animation_action = QAction('Connection Path', self)
+        self.connection_animation_action.setCheckable(True)
+        self.connection_animation_action.setChecked(design.connection_animation_enabled)
+        def on_conn_check(check):
+            design.connection_animation_enabled = check
+        self.connection_animation_action.triggered.connect(on_conn_check)
+        
+        # for individual settings
+        self._animation_specific_actions = [self.scale_animation_action, self.connection_animation_action] 
+        def enable_animations(enable: bool):
+            def _enable_animations():
+                for ac in self._animation_specific_actions:
+                    # trigger is as if the user clicks it, hence the not
+                    ac.setChecked(not enable)
+                    ac.trigger()
+            return _enable_animations
+                    
+        self.ac_anims_active.triggered.connect(enable_animations(True))
+        self.ac_anims_inactive.triggered.connect(enable_animations(False))
+        
         animations_menu = QMenu('Animations', self)
         animations_menu.addAction(self.ac_anims_active)
         animations_menu.addAction(self.ac_anims_inactive)
+        animations_menu.addAction(self.scale_animation_action)
+        animations_menu.addAction(self.connection_animation_action)
 
         self.ui.menuView.addMenu(animations_menu)
 
@@ -370,12 +388,6 @@ CONTROLS
             self.session_gui.design.set_performance_mode('fast')
         else:
             self.session_gui.design.set_performance_mode('pretty')
-
-    def on_animation_enabling_changed(self, action):
-        if action == self.ac_anims_active:
-            self.session_gui.design.animations_enabled = True
-        else:
-            self.session_gui.design.animations_enabled = False
 
     def on_design_action_triggered(self):
         index = self.flow_view_theme_actions.index(self.sender())

@@ -57,6 +57,7 @@ class ConnectionItem(GUIBase, QGraphicsPathItem, QObject):
             for _ in range(self.num_dots)
         ]
         for dot in self.dots:
+            dot.setCacheMode(QGraphicsItem.DeviceCoordinateCache)
             dot.setVisible(False)
 
         self.items_path_animation = ConnPathItemsAnimation(self.dots, self)
@@ -65,11 +66,10 @@ class ConnectionItem(GUIBase, QGraphicsPathItem, QObject):
 
         self._anim_timer = AnimationTimer(
             obj=self, 
-            dur=1000 + scale_dur, 
+            interval=250 + scale_dur, 
             on_restart=self.connection_animation.start, 
             on_timeout=self.connection_animation.stop
         )
-        # to keep the animation alive for at least 1 sec
         
         self.recompute()
 
@@ -78,13 +78,15 @@ class ConnectionItem(GUIBase, QGraphicsPathItem, QObject):
         
     def __on_data_signal(self, data: Data):
         """Called when the data signal is emitted"""
-        if self.session_design.animations_enabled:
+        if self.session_design.connection_animation_enabled:
             self._anim_timer.restart()
+        else:
+            self._anim_timer.stop()
     
     def __on_data(self, out: NodeOutput, data: Data):
         """Emits the data changed signal for this connection item"""
         output, _ = self.connection
-        if out == output:
+        if out == output and (self.session_design.connection_animation_enabled or self._anim_timer.is_running):
             self.data_signal.emit(data)
     
     def __str__(self):
@@ -104,7 +106,6 @@ class ConnectionItem(GUIBase, QGraphicsPathItem, QObject):
 
     def recompute(self):
         """Updates scene position and recomputes path, pen, gradient and dots"""
-
         # dots
         self.items_path_animation.recompute()
 

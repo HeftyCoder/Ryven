@@ -80,6 +80,7 @@ from enum import Enum
 from cognix.graph_player import GraphPlayer, GraphState
 from threading import Thread
 
+            
 class _SelectionMode(Enum):
     """
     Determines how selection change events will be handled.
@@ -287,7 +288,6 @@ class FlowView(GUIBase, QGraphicsView):
         
         def play_button_clicked():
             if self._graph_player.state == GraphState.STOPPED:
-                #play_button.setText('Stop')
                 t = Thread(target=self._graph_player.play)
                 t.start()
             else:
@@ -1020,7 +1020,7 @@ class FlowView(GUIBase, QGraphicsView):
             ):
                 self.scale(by, by)
                 self._current_scale *= by
-
+        
         w = self.viewport().width()
         h = self.viewport().height()
         wf = self.mapToScene(QPoint(w - 1, 0)).x() - self.mapToScene(QPoint(0, 0)).x()

@@ -140,13 +140,13 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
     # UI STUFF
 
     def node_updating(self):
-        if self.session_design.animations_enabled:
+        if self.session_design.node_animation_enabled:
             if not self.animator.running():
                 self.animator.start()
             elif self.animator.fading_out():
                 self.animator.set_animation_max()
-
-        self.update()
+            
+            self.update()
 
     def display_error(self, e):
         self.error_indicator.set_error(e)
@@ -276,10 +276,9 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
         self.widget.update_shape()
         self.update_conn_pos()
         self.flow_view.viewport().update()
-
+        
     def update_design(self):
         """Loads the shadow effect option and causes redraw with active theme."""
-
         if self.session_design.node_item_shadows_enabled:
             self.shadow_effect = QGraphicsDropShadowEffect()
             self.shadow_effect.setXOffset(12)
@@ -343,16 +342,15 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
         self.update_shape()
 
     #   PAINTING
-
+        
     def paint(self, painter, option, widget=None):
         """All painting is done by NodeItemPainter"""
-
         # in order to access a meaningful geometry of GraphicsWidget contents in update_shape(), the paint event
         # has to be called once.
         # https://forum.qt.io/topic/117179/force-qgraphicsitem-to-update-immediately-wait-for-update-event/4
         if not self.painted_once:
             # Since I am using a NodeItemWidget, calling self.update_design() here (again)
-            # leads to a QT crash without error, which is strange. In pronciple, calling update_design multiple times
+            # leads to a QT crash without error, which is strange. In principle, calling update_design multiple times
             # shouldn't be a problem. It's not necessary anymore, so I removed it.
             # self.update_design()
 
@@ -427,7 +425,7 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
             self.update_conn_pos()
 
         return QGraphicsItem.itemChange(self, change, value)
-
+    
     def on_move(self):
         self.update_conn_pos()
     

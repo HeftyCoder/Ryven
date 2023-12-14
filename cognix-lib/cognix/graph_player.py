@@ -205,7 +205,7 @@ class GraphPlayer(ABC):
 class CognixPlayer(GraphPlayer):
     """The default implementation of a Graph Player in CogniX"""
     
-    def __init__(self, flow: Flow, frames: int = 30):
+    def __init__(self, flow: Flow, frames: int = 35):
         super().__init__(flow, frames)
         self._start_nodes: list[StartNode] = []
         self._frame_nodes: list[FrameNode] = []

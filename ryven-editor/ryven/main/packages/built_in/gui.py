@@ -25,8 +25,10 @@ class Result_Node_MainWidget(NodeMainWidget, QLineEdit):
         self.update_value.emit(self.node.val)
         
     def show_val(self, new_val):
-        self.setText(str(new_val))
-        self.setCursorPosition(0)
+        new_val_st = str(new_val)
+        if self.text() != new_val_st:
+            self.setText(str(new_val))
+            self.setCursorPosition(0)
 
 @node_gui(Result_Node)
 class ResultGui(NodeGUI):

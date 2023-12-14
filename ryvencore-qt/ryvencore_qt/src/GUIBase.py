@@ -2,6 +2,7 @@ from ryvencore.Base import Base
 from qtpy.QtWidgets import QGraphicsObject, QGraphicsItem
 from qtpy.QtCore import QTimer
 
+import time
   
 class GUIBase:
     """Base class for GUI items that represent specific core components"""
@@ -86,13 +87,35 @@ class QGraphicsItemAnimated(QGraphicsObject):
 class AnimationTimer:
     """A simple wrapper over QTimer to aid with controlling animations"""
     
-    def __init__(self, obj, dur: int, on_restart, on_timeout):
+    def __init__(self, obj, interval: int, on_restart, on_timeout):
         self.timer = QTimer(obj)
-        self.timer.setInterval(dur)
-        self.timer.timeout.connect(on_timeout)
+        self.timer.setInterval(interval)
+        self.timer.timeout.connect(self.__on_timeout_internal)
         self.on_restart = on_restart
+        self.on_timeout = on_timeout
+        self.is_running = False
+        self.interval_ms = interval
+        self._current_time = 0.0
         
     def restart(self):
-        self.timer.stop()
-        self.timer.start()
+        if not self.is_running:
+            self.timer.start()
+            self.is_running = True
+            
         self.on_restart()
+        self._current_time = time.perf_counter()
+            
+    def stop(self):
+        if self.on_timeout and self.is_running:
+            self.on_timeout()
+            self.timer.stop()
+            self.is_running = False
+
+    # avoid calling qt functions for performance
+    def __on_timeout_internal(self):
+        now = time.perf_counter()
+        if now - self._current_time >= self.interval_ms / 1000:
+            self.on_timeout()
+            self._current_time = now
+            self.timer.stop()
+            self.is_running = False

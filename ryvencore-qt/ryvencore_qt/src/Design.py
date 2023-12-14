@@ -25,8 +25,11 @@ class Design(QObject):
         self.default_flow_size = None
         self.performance_mode: str = None
         self.node_item_shadows_enabled: bool = None
-        self.animations_enabled: bool = None
         self.node_selection_stylesheet: str = None
+        
+        # animations
+        self.node_animation_enabled: bool = False
+        self.connection_animation_enabled: bool = False
 
         # load standard default values
         self._default_flow_theme = self.flow_themes[-1]
@@ -104,7 +107,8 @@ class Design(QObject):
         self.performance_mode_changed.emit(self.performance_mode)
 
     def set_animations_enabled(self, b: bool):
-        self.animations_enabled = b
+        self.node_animation_enabled = b
+        self.connection_animation_enabled = b
 
     def set_node_item_shadows(self, b: bool):
         self.node_item_shadows_enabled = b

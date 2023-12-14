@@ -43,6 +43,7 @@ class ConnPathItemsAnimation(QGraphicsObject):
         self.between = between
         self.speed = speed
         self.visible_items = []
+        self.__visible_flag = True
         
         self.setParentItem(self.connection)
         
@@ -88,11 +89,16 @@ class ConnPathItemsAnimation(QGraphicsObject):
             self.recompute()
 
     def recompute(self):
-        for item in self.items:
-            item.setVisible(False)
+        
+        if self.__visible_flag:
+            for item in self.items:
+                item.setVisible(False)
+            self.__visible_flag = False
 
         if self.timeline.state() == QTimeLine.State.NotRunning:
             return
+        
+        self.__visible_flag = True
 
         path_len = self.connection.path().length()
         num_points = max(3, min(self.connection.num_dots, int(path_len / self.between)))
