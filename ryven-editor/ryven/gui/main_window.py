@@ -122,7 +122,7 @@ The editor console can still be used for commands.
 
         # Setup ryvencore Session and load project
 
-        self.import_nodes(path=abs_path_from_package_dir('main/packages/cognix/'))
+        self.import_nodes(path=abs_path_from_package_dir('main/packages/cognix_library/'))
 
         # Requested packages take precedence over other packages
         print('importing requested packages...')
