@@ -253,3 +253,10 @@ export_nodes([
 @on_gui_load
 def load_gui():
     from . import gui
+    
+
+# testing
+
+from cognix.input.input_nodes import all_input_nodes, input_nodes_pkg
+
+export_nodes(all_input_nodes, sub_pkg_name=input_nodes_pkg)
