@@ -126,6 +126,8 @@ class FlowView(GUIBase, QGraphicsView):
         self._undo_action.setShortcuts(QKeySequence.Undo)
         self._redo_action = self._undo_stack.createRedoAction(self, 'redo')
         self._redo_action.setShortcuts(QKeySequence.Redo)
+        
+        self._saved_undo_index = 0
 
         # SHORTCUTS
         self._init_shortcuts()
@@ -328,12 +330,16 @@ class FlowView(GUIBase, QGraphicsView):
         def on_graph_state_changed(old_state: GraphState, new_state: GraphState):
             play_button.setEnabled(True)
             if new_state == GraphState.PLAYING:
+                # save the state only if the graph has just started
+                if old_state == GraphState.STOPPED:
+                    self.save_undo_stack()
                 play_button.setText('Stop')
                 pause_button.setEnabled(True)
                 pause_button.setText('Pause')
             elif new_state == GraphState.PAUSED:
                 pause_button.setText('Resume')
             else:
+                self.restore_undo_stack()
                 play_button.setText('Play')
                 pause_button.setText('Pause')
                 pause_button.setEnabled(False)
@@ -433,6 +439,14 @@ class FlowView(GUIBase, QGraphicsView):
         self.viewport().update()
         self.scene().update(self.sceneRect())
 
+    def save_undo_stack(self):
+        self._saved_undo_index = self._undo_stack.index()
+    
+    def restore_undo_stack(self):
+        for i in range(self._saved_undo_index + 1, self._undo_stack.count()):
+            self._undo_stack.command(i).setObsolete(True)
+        self._undo_stack.setIndex(self._saved_undo_index)
+            
     def push_undo(self, cmd: FlowUndoCommand):
         self._undo_stack.push(cmd)
         cmd.activate()
@@ -1287,36 +1301,37 @@ class FlowView(GUIBase, QGraphicsView):
     def _move_selected_copmonents__cmd(self, pos_diff: QPointF, already_moved=False):
 
         # if one node item would leave the scene (f.ex. pos.x < 0), stop
-        left = False
-        for i in self.scene().selectedItems():
-            new_pos = i.pos() + pos_diff
-            w = i.boundingRect().width()
-            h = i.boundingRect().height()
-            if (
-                new_pos.x() - w / 2 < 0
-                or new_pos.x() + w / 2 > self.scene().width()
-                or new_pos.y() - h / 2 < 0
-                or new_pos.y() + h / 2 > self.scene().height()
-            ):
-                left = True
-                break
+        # buggy as hell
+        # left = False
+        # for i in self.scene().selectedItems():
+        #    new_pos = i.pos() + pos_diff
+        #    w = i.boundingRect().width()
+        #    h = i.boundingRect().height()
+        #    if (
+        #        new_pos.x() - w / 2 < 0
+        #        or new_pos.x() + w / 2 > self.viewport().width()
+        #        or new_pos.y() - h / 2 < 0
+        #        or new_pos.y() + h / 2 > self.viewport().height()
+        #    ):
+        #        left = True
+        #        break
+        
+        # if not left:
+        # moving the items
+        if not already_moved:
+            items_group = self.scene().createItemGroup(self.scene().selectedItems())
+            items_group.moveBy(pos_diff.x(), pos_diff.y())
+            self.scene().destroyItemGroup(items_group)
 
-        if not left:
-            # moving the items
-            if not already_moved:
-                items_group = self.scene().createItemGroup(self.scene().selectedItems())
-                items_group.moveBy(pos_diff.x(), pos_diff.y())
-                self.scene().destroyItemGroup(items_group)
-
-            # saving the command
-            self.push_undo(
-                MoveComponents_Command(
-                    self,
-                    self.scene().selectedItems(),
-                    p_from=-pos_diff,
-                    p_to=QPointF(0, 0),
-                )
+        # saving the command
+        self.push_undo(
+            MoveComponents_Command(
+                self,
+                self.scene().selectedItems(),
+                p_from=-pos_diff,
+                p_to=QPointF(0, 0),
             )
+        )
 
         self.viewport().repaint()
 
