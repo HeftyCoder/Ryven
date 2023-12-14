@@ -54,6 +54,9 @@ class CognixNode(Node, metaclass=ABCMeta):
         """
         pass
     
+    def on_start(self):
+        pass
+    
     def on_stop(self):
         pass
     
@@ -87,11 +90,11 @@ class FrameNode(CognixNode):
     
     def frame_update(self):
         """Wraps the frame_update_event with internal calls."""
-        self.updating.emit(-1)
-        self.frame_update_event()
+        if self.frame_update_event():
+            self.updating.emit(-1)
         
     @abstractmethod
-    def frame_update_event(self):
+    def frame_update_event(self) -> bool:
         """Called on every frame. Data might have been passed from other nodes"""
         pass
     

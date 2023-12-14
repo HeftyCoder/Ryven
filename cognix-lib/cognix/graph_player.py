@@ -232,6 +232,9 @@ class CognixPlayer(GraphPlayer):
         
         for node in self._nodes:
             node.reset()
+        
+        for node in self._nodes:
+            node.on_start()
             
         for start_node in self._start_nodes:
             start_node.update()
