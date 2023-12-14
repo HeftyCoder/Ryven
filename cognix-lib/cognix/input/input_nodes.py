@@ -42,7 +42,7 @@ class LSLInput(FrameNode):
                 if results or self.force_stop:
                     break
             if results:
-                self.inlet = results[0]
+                self.inlet = StreamInlet(results[0])
                 print('Found Stream!!')
                 self.set_output_val(0, Data(self.inlet))
         
