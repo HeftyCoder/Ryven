@@ -2,8 +2,8 @@ import pathlib
 import os
 from typing import Optional, Literal, List, Dict, Set, Union
 
-from ryven import NodesPackage
-from ryven.gui.styling.window_theme import WindowTheme
+from .. import NodesPackage
+from ..gui.styling.window_theme import WindowTheme
 
 
 class Config:
@@ -39,7 +39,7 @@ class Config:
     window_title: str = 'CogniX'
     qt_api: str = 'pyside6'
     src_code_edits_enabled: bool = False
-    defer_code_loading: bool = False
+    defer_code_loading: bool = True
 
     @staticmethod
     def get_available_window_themes() -> Set[str]:
