@@ -36,7 +36,7 @@ class Config:
     performance_mode: str = 'pretty'
     animations: bool = True
     window_geometry: Optional[str] = None
-    window_title: str = 'Ryven'
+    window_title: str = 'CogniX'
     qt_api: str = 'pyside2'
     src_code_edits_enabled: bool = False
     defer_code_loading: bool = False

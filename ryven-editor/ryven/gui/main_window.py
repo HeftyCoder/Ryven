@@ -84,7 +84,7 @@ class MainWindow(QMainWindow):
         self.setup_menu_actions()
 
         self.setWindowTitle(self.config.window_title)
-        self.setWindowIcon(QIcon(abs_path_from_package_dir('resources/pics/Ryven_icon.png')))
+        self.setWindowIcon(QIcon(abs_path_from_package_dir('resources/pics/cognix/cognix_icon_small.png')))
         self.ui.flows_tab_widget.removeTab(0)  # remove placeholder tab
 
         # Configure window-wide Shortcuts

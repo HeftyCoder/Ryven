@@ -127,7 +127,7 @@ class ShowCommandDialog(QDialog):
             self,
             'select config file',
             ryven_dir_path(),
-            'ryven config files (*.cfg)',
+            'cognix config files (*.cfg)',
         )[0]
 
         if file != '':
@@ -184,17 +184,14 @@ class StartupDialog(QDialog):
         info_text_edit = QTextEdit()
         info_text_edit.setHtml(f'''
             <div style="font-family: Corbel; font-size: large;">
-                <img style="float:right;" height=120 src="{abs_path_from_package_dir('resources/pics/Ryven_icon_blurred.png')}"
-                >Ryven is not a stable piece of software, it's experimental, and nothing is
+                <img style="float:right;" height=120 src="{abs_path_from_package_dir('resources/pics/cognix/cognix_icon.png')}"
+                >CogniX Editor is not a stable piece of software, it's experimental, and nothing is
                 guaranteed to work as expected. Make sure to save frequently, and to
                 different files. If you spot an issue, please report it on the 
-                <a href="https://github.com/leon-thomm/ryven/issues">GitHub page</a>.
+                <a href="">GitHub page</a>.
                 <br><br>
-                Ryven doesn't come with batteries (nodes) included. It provides some
-                small examples but nothing more. Development of large node packages
-                is not part of the Ryven editor project itself.
-                See the GitHub for a quickstart guide.
-                Cheers.
+                CogniX comes with built-in libraries tailored for signal processing,
+                mainly for EEG and Eye Gaze. Currently it's at an early development stage.
             </div>
         ''')
         info_text_edit.setReadOnly(True)
@@ -229,7 +226,7 @@ class StartupDialog(QDialog):
         project_buttons_widget.addButton(load_project_button, QDialogButtonBox.ActionRole)
 
         load_example_project_button = QPushButton('Example')
-        load_example_project_button.setToolTip('Load a Ryven example')
+        load_example_project_button.setToolTip('Load a CogniX example')
         load_example_project_button.clicked.connect(self.on_load_example_project_button_clicked)
         project_buttons_widget.addButton(load_example_project_button, QDialogButtonBox.ActionRole)
 
@@ -378,7 +375,7 @@ class StartupDialog(QDialog):
             f'''Choose whether verbose output should be displayed. 
             Verbose output prevents stdout and stderr from being
             displayed in the in-editor console, that usually means
-            all output goes to the terminal from which Ryven was
+            all output goes to the terminal from which CogniX Editor was
             launched. Also, it causes lots of debug info to be 
             printed.'''
         )
@@ -453,9 +450,9 @@ class StartupDialog(QDialog):
         defer_code_cb.setChecked(self.conf.defer_code_loading)
         
         # Set window title and icon
-        self.setWindowTitle('Ryven')
+        self.setWindowTitle('CogniX')
         self.setWindowIcon(
-            QIcon(abs_path_from_package_dir('resources/pics/Ryven_icon.png'))
+            QIcon(abs_path_from_package_dir('resources/pics/cognix/cognix_icon_small.png'))
         )
 
     #
@@ -471,7 +468,7 @@ class StartupDialog(QDialog):
 
     def on_load_project_button_clicked(self):
         """Call-back method, whenever the 'Load' button was clicked."""
-        # Load a saved project, starting in the user's ryven directory
+        # Load a saved project, starting in the user's cognix directory
         project_path = self.get_project(abs_path_from_ryven_dir('saves'))
 
         if project_path is not None:
@@ -479,9 +476,9 @@ class StartupDialog(QDialog):
 
     def on_load_example_project_button_clicked(self):
         """Call-back method, whenever the 'Example' button was clicked."""
-        # Load an example project, starting in the ryven's example directory
+        # Load an example project, starting in the cognix's example directory
         project_path = self.get_project(
-            abs_path_from_package_dir('examples_projects'), title='Select Ryven example'
+            abs_path_from_package_dir('examples_projects'), title='Select CogniX example'
         )
 
         if project_path is not None:
@@ -509,7 +506,7 @@ class StartupDialog(QDialog):
 
     def on_import_package_clicked(self):
         """Call-back method, whenever the 'Import' button was clicked."""
-        # Import a nodes package, starting in the user's ryven directory
+        # Import a nodes package, starting in the user's cognix directory
         file_name = QFileDialog.getOpenFileName(
             self,
             'Select',
