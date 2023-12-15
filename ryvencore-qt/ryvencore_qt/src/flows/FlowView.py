@@ -31,13 +31,18 @@ from qtpy.QtWidgets import (
     QShortcut,
     QMenu,
     QGraphicsItem,
-    QUndoStack,
     QPushButton,
     QHBoxLayout,
     QVBoxLayout,
     QLabel,
     QWidget,
 )
+
+# for compatibility between qt5 and qt6
+try:
+    from qtpy.QtGui import QUndoStack
+except ImportError:
+    from qtpy.QtWidgets import QUndoStack
 
 from ryvencore.Flow import Flow
 from ryvencore.Node import Node
@@ -273,11 +278,11 @@ class FlowView(GUIBase, QGraphicsView):
         menu_layout_widget.layout().addWidget(menu_button)
 
         def menu_button_clicked():
-            global_pos = (
-                self._menu_button.mapToGlobal(self._menu_button.pos()) + 
-                QPoint(5, self._menu_button.height())
-            )
-            self._menu.exec_(global_pos)
+            # prob not entirely correct, since menu is part of a layout
+            # but since it's the first item, it's the same
+            menu_pos = self._menu_button.pos()
+            menu_pos = self.mapToGlobal(menu_pos) + QPoint(8, self._menu_button.height() + 10)
+            self._menu.exec_(menu_pos)
 
         menu_button.clicked.connect(menu_button_clicked)
 
@@ -595,14 +600,16 @@ class FlowView(GUIBase, QGraphicsView):
     def wheelEvent(self, event):
         if event.modifiers() & Qt.ControlModifier:
             event.accept()
+            
+            view_pos = event.position()
+            self._zoom_data['viewport pos'] = view_pos
+            self._zoom_data['scene pos'] = self.mapToScene(view_pos.toPoint())
+            
+            y_delta = event.angleDelta().y()
+            self._zoom_data['delta'] += y_delta
 
-            self._zoom_data['viewport pos'] = event.posF()
-            self._zoom_data['scene pos'] = pointF_mapped(self.mapToScene(event.pos()), event.posF())
-
-            self._zoom_data['delta'] += event.delta()
-
-            if self._zoom_data['delta'] * event.delta() < 0:
-                self._zoom_data['delta'] = event.delta()
+            if self._zoom_data['delta'] * y_delta < 0:
+                self._zoom_data['delta'] = y_delta
 
             anim = QTimeLine(100, self)
             anim.setUpdateInterval(10)

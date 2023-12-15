@@ -8,10 +8,15 @@ from os import environ
 from os.path import normpath, join, dirname, abspath, expanduser
 import pathlib
 import importlib
+import importlib.util
 from typing import Union, Optional, Tuple
 from packaging.version import Version
 
 from ryvencore import InfoMsgs
+
+def is_package_available(package_name:str ):
+    return importlib.util.find_spec(package_name) is not None
+
 
 def in_gui_mode() -> bool:
     return environ['RYVEN_MODE'] == 'gui'

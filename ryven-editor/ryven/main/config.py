@@ -37,7 +37,7 @@ class Config:
     animations: bool = True
     window_geometry: Optional[str] = None
     window_title: str = 'CogniX'
-    qt_api: str = 'pyside2'
+    qt_api: str = 'pyside6'
     src_code_edits_enabled: bool = False
     defer_code_loading: bool = False
 

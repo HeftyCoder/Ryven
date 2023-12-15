@@ -22,6 +22,7 @@ from qtpy.QtWidgets import (
     QStyleOptionFrame,
     QStyle,
     QLineEdit,
+    QWidget,
 )
 from qtpy.QtCore import Qt, QSize
 from qtpy.QtGui import QIcon, QPainter
@@ -36,6 +37,7 @@ from ryven.main.utils import (
 from ryven.main.packages.nodes_package import process_nodes_packages
 from ryven.gui.styling.window_theme import apply_stylesheet
 
+from ...main.utils import is_package_available
 
 LBL_CREATE_PROJECT = '<create new project>'
 LBL_DEFAULT_FLOW_THEME = '<default>'
@@ -71,7 +73,8 @@ class ElideLabel(QLabel):
 
     def sizeHint(self):
         hint = self.fontMetrics().boundingRect(self.text()).size()
-        l, t, r, b = self.getContentsMargins()
+        c_margins = self.contentsMargins()
+        l, t, r, b = c_margins.left(), c_margins.top(), c_margins.right(), c_margins.bottom()
         margin = self.margin() * 2
         return QSize(
             min(100, hint.width()) + l + r + margin,
@@ -83,7 +86,8 @@ class ElideLabel(QLabel):
         opt = QStyleOptionFrame()
         self.initStyleOption(opt)
         self.style().drawControl(QStyle.CE_ShapedFrame, opt, qp, self)
-        l, t, r, b = self.getContentsMargins()
+        c_margins = self.contentsMargins()
+        l, t, r, b = c_margins.left(), c_margins.top(), c_margins.right(), c_margins.bottom()
         margin = self.margin()
         try:
             # since Qt >= 5.11
@@ -180,22 +184,40 @@ class StartupDialog(QDialog):
 
         layout = QVBoxLayout()
 
+        info_widget = QWidget()
+        info_widget.setLayout(QHBoxLayout())
+        layout.addWidget(info_widget)
+        
+        # qt api availability
+        qt_api = config.qt_api
+        qt_available = f'Qt API: {qt_api}. Available in your system: [ '
+        for api_string in ['PySide2', 'PySide6', 'PyQt5', 'PyQt6']:
+            if is_package_available(api_string):
+                qt_available += f'{api_string.lower()} '
+        qt_available += ' ]. Restart with arg --qt-api <your_api> if you need another API.'
+        
         # Top info text edit
         info_text_edit = QTextEdit()
         info_text_edit.setHtml(f'''
             <div style="font-family: Corbel; font-size: large;">
-                <img style="float:right;" height=120 src="{abs_path_from_package_dir('resources/pics/cognix/cognix_icon.png')}"
-                >CogniX Editor is not a stable piece of software, it's experimental, and nothing is
-                guaranteed to work as expected. Make sure to save frequently, and to
-                different files. If you spot an issue, please report it on the 
-                <a href="">GitHub page</a>.
+                CogniX Editor is not a stable piece of software, it's experimental, and nothing is
+                guaranteed to work as expected. Make sure to save frequently. 
+                If you spot an issue, please report it on the 
+                <a href="">GitHub page [to be added]</a>.
                 <br><br>
                 CogniX comes with built-in libraries tailored for signal processing,
                 mainly for EEG and Eye Gaze. Currently it's at an early development stage.
-            </div>
+                <br><br>
+                {qt_available}
+            <div>
         ''')
         info_text_edit.setReadOnly(True)
-        layout.addWidget(info_text_edit)
+        icon_label = QLabel(f'''
+            <img style="float:right;" height=100 src="{abs_path_from_package_dir('resources/pics/cognix/cognix_icon.png')}">
+                ''')
+        
+        info_widget.layout().addWidget(icon_label)
+        info_widget.layout().addWidget(info_text_edit)
 
         # The form with the configuration options
         fbox = QFormLayout()
@@ -314,7 +336,7 @@ class StartupDialog(QDialog):
         packages_layout.addWidget(packages_buttons_widget)
 
         fbox.addRow(packages_label, packages_layout)
-
+        
         # Window theme
         windowtheme_label = QLabel('Window theme:')
         windowtheme_layout = QHBoxLayout()

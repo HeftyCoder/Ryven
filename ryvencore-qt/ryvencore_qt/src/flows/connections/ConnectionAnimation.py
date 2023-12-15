@@ -4,7 +4,8 @@ from enum import Enum
 from qtpy.QtCore import (
     QTimeLine, 
     QPropertyAnimation, 
-    QParallelAnimationGroup, 
+    QParallelAnimationGroup,
+    QEasingCurve, 
 )
 from qtpy.QtGui import (
     QPen,
@@ -49,7 +50,7 @@ class ConnPathItemsAnimation(QGraphicsObject):
         
         self.timeline = QTimeLine()
         self.timeline.setFrameRange(0, frames)
-        self.timeline.setCurveShape(QTimeLine.LinearCurve)
+        self.timeline.setEasingCurve(QEasingCurve.Type.Linear)
         self.timeline.valueChanged.connect(self._update_items)
         self.timeline.setLoopCount(0)
 
