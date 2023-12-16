@@ -311,9 +311,6 @@ class RedirectOutput:
         self.func(line)
 
 
-
-
-
 def init_main_console(window_theme):
 
     MainConsole.instance = MainConsole(window_theme)

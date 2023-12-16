@@ -6,15 +6,16 @@ from qtpy.QtWidgets import (
     QTreeView,
     QSplitter,
     QAbstractItemView,
-    QListView,
     QLabel,
+    QApplication,
+    QStyle
 )
 
 from qtpy.QtCore import Qt, Signal, QModelIndex, QSortFilterProxyModel
-from qtpy.QtGui import QStandardItemModel, QStandardItem, QFont
+from qtpy.QtGui import QStandardItemModel, QStandardItem, QIcon
 
 from ryvencore import Node
-from .utils import search, sort_nodes, inc, dec
+from .utils import search, sort_nodes, inc, dec, text_font
 from ..node_list_widget.NodeWidget import NodeWidget
 from statistics import median
 from typing import List
@@ -198,6 +199,8 @@ class NodeListWidget(QWidget):
                     if not current_path in h_dict:
                         item = QStandardItem(s)
                         item.setFont(font)
+                        # https://specifications.freedesktop.org/icon-naming-spec/latest/ar01s04.html
+                        item.setIcon(QIcon.fromTheme('folder', self.style().standardIcon(QStyle.SP_DirIcon)))
                         item.setDragEnabled(False)
                         self.tree_items.append(item)
                         item.setEditable(False)
@@ -334,6 +337,3 @@ class NodeListWidget(QWidget):
         node = self.current_nodes[node_index]
         self.node_chosen.emit(node)
         self.escaped.emit()
-
-def text_font():
-    return QFont('Source Code Pro', 9)

@@ -3,7 +3,7 @@ import json
 from qtpy.QtWidgets import QLineEdit, QWidget, QLabel, QGridLayout, QHBoxLayout, QSpacerItem, QSizePolicy, QStyleOption, QStyle
 from qtpy.QtGui import QFont, QPainter, QColor, QDrag
 from qtpy.QtCore import Signal, Qt, QMimeData
-
+from .utils import text_font
 
 class NodeWidget(QWidget):
 
@@ -39,7 +39,7 @@ class NodeWidget(QWidget):
                 super().__init__(text)
 
                 self.setReadOnly(True)
-                self.setFont(QFont('Source Code Pro', 8))
+                self.setFont(text_font())
             def mouseMoveEvent(self, ev):
                 self_.custom_focused_from_inside.emit()
                 ev.ignore()

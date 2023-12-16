@@ -138,7 +138,8 @@ def run(*args_,
     # Adjust flow theme if not set
     if conf.flow_theme is None:
         from ..gui.styling.window_theme import WindowThemeType
-        if conf.window_theme == WindowThemeType.QDARKSTYLE_DARK or WindowThemeType.RYVEN_DARK:
+        if (conf.window_theme == WindowThemeType.QDARKSTYLE_DARK or 
+            conf.window_theme == WindowThemeType.RYVEN_DARK):
             conf.flow_theme = 'pure dark'
         else:
             conf.flow_theme = 'pure light'

@@ -1,5 +1,5 @@
 import textdistance
-
+from qtpy.QtGui import QFont
 
 def dec(i: int, length: int) -> int:
     if i != 0:
@@ -44,3 +44,10 @@ def search(items: dict, text: str) -> dict:
         distances[item] = min_dist
 
     return sort_by_val(distances)
+
+
+__text_font = QFont('Source Code Pro', 9)
+__text_font.setPointSizeF(__text_font.pointSizeF() * 1.15)
+
+def text_font():
+    return __text_font
