@@ -15,40 +15,51 @@ class RandNodeInspector(NodeInspectorWidget, QWidget):
         self.node: RandNode = self.node  # help with auto-complete
         
         view = self.config.trait_view()
-        # This could be None, but wanted to a label and a border
-        view = View(
-            Group(
+        g1 = Group(
                 *tuple(Item(name) for name in self.config.visible_traits()),
                 Item("generate", show_label=False, editor=ButtonEditor(label="Generate!")),
-                Item(
-                    'con',
-                    style='custom',
-                ),
                 label="Config",
-                show_border=True,
-            ),
-            Item(
-                'con',
-                 style='custom',
-            ),
+            )
+        g2 = Group(
+                *tuple(Item(name) for name in self.config.visible_traits()),
+                Item("generate", show_label=False, editor=ButtonEditor(label="Generate!")),
+                label="Config2",
+            )
+        g3 = Group(
+                *tuple(Item(name) for name in self.config.visible_traits()),
+                Item("generate", show_label=False, editor=ButtonEditor(label="Generate!")),
+                label="Config2",
+            )
+        g4 = Group(
+                *tuple(Item(name) for name in self.config.visible_traits()),
+                Item("generate", show_label=False, editor=ButtonEditor(label="Generate!")),
+                label="Config2",
+            ) 
+        self.view = View(
+            Group(g1, g2, g3, g4, show_border=True, layout='tabbed'),
+            resizable=True
         )
-        self.ui = self.config.edit_traits(
-            parent=self.layout(), kind='subpanel', view=view
-        ).control
-        self.config.on_trait.append(self.on_trait_changed)
-        self.config.on_val.append(self.on_val_changed)
-        self.layout().addWidget(self.ui)
     
     @property
     def config(self):
         return self.node.config
 
+    def load(self):
+        self.ui = self.config.edit_traits(parent=self, kind='subpanel', view=self.view).control
+        self.ui.setVisible(False)
+        self.layout().addWidget(self.ui)
+        self.ui.setVisible(True)
+        self.config.on_trait.append(self.on_trait_changed)
+        self.config.on_val.append(self.on_val_changed)
+    
     def unload(self):
         self.config.on_trait.remove(self.on_trait_changed)
         self.config.on_val.remove(self.on_val_changed)
+        self.ui.deleteLater()
         self.ui.setParent(None)
-        super().unload()
-
+        self.ui.setVisible(False)
+        self.ui = None
+        
     def on_val_changed(self, prev_val, new_val):
         def undo_redo(value):
             def _undo_redo():
