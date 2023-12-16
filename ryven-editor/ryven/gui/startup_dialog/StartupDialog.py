@@ -27,17 +27,17 @@ from qtpy.QtWidgets import (
 from qtpy.QtCore import Qt, QSize
 from qtpy.QtGui import QIcon, QPainter
 
-from ryven.main.args_parser import unparse_sys_args
-from ryven.main.config import Config
-from ryven.main.utils import (
+from ...main.args_parser import unparse_sys_args
+from ...main.config import Config
+from ...main.utils import (
     abs_path_from_package_dir,
     abs_path_from_ryven_dir,
     ryven_dir_path,
+    is_package_available,
 )
-from ryven.main.packages.nodes_package import process_nodes_packages
-from ryven.gui.styling.window_theme import apply_stylesheet
+from ...main.packages.nodes_package import process_nodes_packages
+from ...gui.styling.window_theme import apply_stylesheet
 
-from ...main.utils import is_package_available
 
 LBL_CREATE_PROJECT = '<create new project>'
 LBL_DEFAULT_FLOW_THEME = '<default>'
@@ -342,7 +342,7 @@ class StartupDialog(QDialog):
         windowtheme_layout = QHBoxLayout()
         windowtheme_button_group = QButtonGroup(windowtheme_layout)
         self.window_theme_rbs = {
-            theme: QRadioButton(theme)
+            theme.value: QRadioButton(theme.value)
             for theme in self.conf.get_available_window_themes()
         }
         for rb in self.window_theme_rbs.values():

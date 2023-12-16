@@ -14,29 +14,24 @@ class RandNodeInspector(NodeInspectorWidget, QWidget):
         self.setLayout(QVBoxLayout())
         self.node: RandNode = self.node  # help with auto-complete
         
-        view = self.config.trait_view()
         g1 = Group(
+                *tuple(Item(name) for name in self.config.visible_traits()),
+                *tuple(Item(name) for name in self.config.visible_traits()),
+                *tuple(Item(name) for name in self.config.visible_traits()),
+                *tuple(Item(name) for name in self.config.visible_traits()),
+                *tuple(Item(name) for name in self.config.visible_traits()),
+                *tuple(Item(name) for name in self.config.visible_traits()),
                 *tuple(Item(name) for name in self.config.visible_traits()),
                 Item("generate", show_label=False, editor=ButtonEditor(label="Generate!")),
                 label="Config",
+                scrollable=True
             )
-        g2 = Group(
-                *tuple(Item(name) for name in self.config.visible_traits()),
-                Item("generate", show_label=False, editor=ButtonEditor(label="Generate!")),
-                label="Config2",
-            )
-        g3 = Group(
-                *tuple(Item(name) for name in self.config.visible_traits()),
-                Item("generate", show_label=False, editor=ButtonEditor(label="Generate!")),
-                label="Config2",
-            )
-        g4 = Group(
-                *tuple(Item(name) for name in self.config.visible_traits()),
-                Item("generate", show_label=False, editor=ButtonEditor(label="Generate!")),
-                label="Config2",
-            ) 
         self.view = View(
-            Group(g1, g2, g3, g4, show_border=True, layout='tabbed'),
+            Group(g1, g1, g1, g1, 
+                  show_border=True, 
+                  layout='tabbed', 
+                  scrollable=True,
+                  label='Configuration'),
             resizable=True
         )
     

@@ -3,7 +3,7 @@ import os
 from typing import Optional, Literal, List, Dict, Set, Union
 
 from .. import NodesPackage
-from ..gui.styling.window_theme import WindowTheme
+from ..gui.styling.window_theme import RyvenWindowTheme, WindowThemeType
 
 
 class Config:
@@ -31,7 +31,7 @@ class Config:
     verbose: bool = False
     nodes: Union[Set[pathlib.Path], Set[NodesPackage]] = []
     example: Optional[str] = None
-    window_theme: Union[str, WindowTheme] = 'dark'
+    window_theme: Union[str, WindowThemeType] = WindowThemeType.QDARKSTYLE_DARK.value
     flow_theme: Optional[str] = None  # None means it depends on window_theme
     performance_mode: str = 'pretty'
     animations: bool = True
@@ -42,8 +42,14 @@ class Config:
     defer_code_loading: bool = True
 
     @staticmethod
-    def get_available_window_themes() -> Set[str]:
-        return {'dark', 'light', 'plain'}
+    def get_available_window_themes() -> List[WindowThemeType]:
+        return [
+            WindowThemeType.PLAIN,
+            WindowThemeType.QDARKSTYLE_DARK,
+            WindowThemeType.QDARKSTYLE_LIGHT,
+            WindowThemeType.RYVEN_DARK,
+            WindowThemeType.RYVEN_LIGHT,
+        ]
 
     @staticmethod
     def get_available_flow_themes() -> Set[str]:

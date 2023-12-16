@@ -1,10 +1,10 @@
 import os
 import sys
 
-import ryven.main.packages.nodes_package
-from ryven.main import utils
-from ryven.main.config import Config
-from ryven.main.args_parser import process_args
+from .packages import nodes_package
+from . import utils
+from .config import Config
+from .args_parser import process_args
 
 
 def run(*args_,
@@ -74,15 +74,15 @@ def run(*args_,
     # Init environment
     os.environ['RYVEN_MODE'] = 'gui'
     os.environ['QT_API'] = conf.qt_api
-    from ryven.node_env import init_node_env
-    from ryven.gui_env import init_node_guis_env  # Qt dependency
+    from ..node_env import init_node_env
+    from ..gui_env import init_node_guis_env  # Qt dependency
     init_node_env()
     init_node_guis_env()
 
     # Import GUI sources (must come after setting `os.environ['QT_API']`)
-    from ryven.gui.main_console import init_main_console
-    from ryven.gui.main_window import MainWindow
-    from ryven.gui.styling.window_theme import apply_stylesheet
+    from ..gui.main_console import init_main_console
+    from ..gui.main_window import MainWindow
+    from ..gui.styling.window_theme import apply_stylesheet
 
     # Init Qt application
     if qt_app is None:
@@ -114,7 +114,7 @@ def run(*args_,
 
     # Startup dialog
     if conf.show_dialog:
-        from ryven.gui.startup_dialog.StartupDialog import StartupDialog
+        from ..gui.startup_dialog.StartupDialog import StartupDialog
 
         # Get packages and project file interactively and update arguments accordingly
 
@@ -125,19 +125,20 @@ def run(*args_,
 
     # Replace node directories with `NodePackage` instances
     if conf.nodes:
-        conf.nodes, pkgs_not_found, _ = ryven.main.packages.nodes_package.process_nodes_packages(list(conf.nodes))
+        conf.nodes, pkgs_not_found, _ = nodes_package.process_nodes_packages(list(conf.nodes))
         if pkgs_not_found:
             sys.exit(
                 f'Error: Nodes packages not found: {", ".join([str(p) for p in pkgs_not_found])}')
 
         # editor_config['requested packages'] = conf.nodes
 
-    # Store WindowTheme object
-    conf.window_theme = apply_stylesheet(conf.window_theme)
+    # Store WindowThemeType object
+    conf.window_theme, ryven_window_theme = apply_stylesheet(conf.window_theme)
 
     # Adjust flow theme if not set
     if conf.flow_theme is None:
-        if conf.window_theme.name == 'dark':
+        from ..gui.styling.window_theme import WindowThemeType
+        if conf.window_theme == WindowThemeType.QDARKSTYLE_DARK or WindowThemeType.RYVEN_DARK:
             conf.flow_theme = 'pure dark'
         else:
             conf.flow_theme = 'pure light'
@@ -149,7 +150,7 @@ def run(*args_,
 
     # Get packages required by the project
     if conf.project:
-        pkgs, pkgs_not_found, project_dict = ryven.main.packages.nodes_package.process_nodes_packages(
+        pkgs, pkgs_not_found, project_dict = nodes_package.process_nodes_packages(
             conf.project, requested_packages=list(conf.nodes))
 
         if pkgs_not_found:
@@ -177,7 +178,7 @@ def run(*args_,
 
     # Init main console
     (console_stdout_redirect, console_errout_redirect) = \
-        init_main_console(conf.window_theme)
+        init_main_console(ryven_window_theme)
 
     # Init main window
     editor = MainWindow(

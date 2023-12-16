@@ -1,5 +1,6 @@
-from ryven.main.utils import abs_path_from_package_dir
-
+from ...main.utils import abs_path_from_package_dir
+from qdarkstyle import load_stylesheet, LightPalette
+from enum import Enum
 
 def hex_to_rgb(hex: str):
     if hex is None:
@@ -8,8 +9,21 @@ def hex_to_rgb(hex: str):
         return tuple(int(hex[i:i + 2], 16) for i in (1, 3, 5))
 
 
-class WindowTheme:
-
+class WindowThemeType(Enum):
+    PLAIN = 'plain'
+    RYVEN_DARK = 'ryven-dark'
+    RYVEN_LIGHT = 'ryven-light'
+    QDARKSTYLE_DARK = 'qdarkstyle-dark'
+    QDARKSTYLE_LIGHT = 'qdarkstyle-light'
+     
+     
+class RyvenWindowTheme:
+    """
+    A class for a custom window theme. Should be combined with a corresponding
+    WindowThemeType if the stylesheet is created from scratch. Otherwise, this
+    is not needed.
+    """
+    
     name = ''
     colors = {}
     rules = {}
@@ -33,7 +47,7 @@ class WindowTheme:
         }
 
 
-class WindowTheme_Dark(WindowTheme):
+class WindowTheme_Dark(RyvenWindowTheme):
     name = 'dark'
     colors = {
         'primaryColor': '#448aff',
@@ -49,7 +63,7 @@ class WindowTheme_Dark(WindowTheme):
     }
 
 
-class WindowTheme_Light(WindowTheme):
+class WindowTheme_Light(RyvenWindowTheme):
     name = 'light'
     colors = {
         'primaryColor': '#448aff',
@@ -65,7 +79,7 @@ class WindowTheme_Light(WindowTheme):
     }
 
 
-class WindowTheme_Plain(WindowTheme):
+class WindowTheme_Plain(RyvenWindowTheme):
     name = 'plain'
     colors = {
         'primaryColor': None,
@@ -79,11 +93,10 @@ class WindowTheme_Plain(WindowTheme):
         'warning': None,
         'success': None,
     }
-
-
+    
 def apply_stylesheet(style: str):
     from qtpy.QtWidgets import QApplication
-
+    
     # set to None if not used
     icons_dir = abs_path_from_package_dir('resources/stylesheets/icons')
     if icons_dir is not None:
@@ -91,13 +104,21 @@ def apply_stylesheet(style: str):
         d = QDir()
         d.setSearchPaths('icon', [icons_dir])
 
-    if style in (None, 'plain'):
+    if not isinstance(style, WindowThemeType):
+        try:
+            style = WindowThemeType(style)
+        except:
+            style = None
+    
+    if style in (None, WindowThemeType.PLAIN):
         window_theme = WindowTheme_Plain()
         stylesheet = None
-    else:
-        if style == 'dark':
+    
+    # ryven originals
+    elif style in (WindowThemeType.RYVEN_DARK, WindowThemeType.RYVEN_LIGHT):
+        if style == WindowThemeType.RYVEN_DARK:
             window_theme = WindowTheme_Dark()
-        elif style == 'light':
+        elif style == WindowThemeType.RYVEN_LIGHT:
             window_theme = WindowTheme_Light()
         else:
             raise ValueError(
@@ -111,8 +132,17 @@ def apply_stylesheet(style: str):
             jinja_template = Template(f.read())
 
         stylesheet = jinja_template.render(window_theme.rules)
-
+    
+    # qdarkstyle
+    else:
+        if style == WindowThemeType.QDARKSTYLE_DARK:
+            stylesheet = load_stylesheet()
+            window_theme = WindowTheme_Dark()
+        elif style == WindowThemeType.QDARKSTYLE_LIGHT:
+            stylesheet = load_stylesheet(palette=LightPalette)
+            window_theme = WindowTheme_Light()
+            
     app = QApplication.instance()
     app.setStyleSheet(stylesheet)
-
-    return window_theme
+    
+    return (style, window_theme)
