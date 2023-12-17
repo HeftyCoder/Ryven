@@ -133,16 +133,11 @@ def run(*args_,
         # editor_config['requested packages'] = conf.nodes
 
     # Store WindowThemeType object
-    conf.window_theme, ryven_window_theme = apply_stylesheet(conf.window_theme)
+    conf.window_theme, ryven_palette, flow_theme = apply_stylesheet(conf.window_theme)
 
     # Adjust flow theme if not set
     if conf.flow_theme is None:
-        from ..gui.styling.window_theme import WindowThemeType
-        if (conf.window_theme == WindowThemeType.QDARKSTYLE_DARK or 
-            conf.window_theme == WindowThemeType.RYVEN_DARK):
-            conf.flow_theme = 'pure dark'
-        else:
-            conf.flow_theme = 'pure light'
+        conf.flow_theme = flow_theme
 
     # Note:
     #   At this point, the Config is fully populated with exact types
@@ -179,7 +174,7 @@ def run(*args_,
 
     # Init main console
     (console_stdout_redirect, console_errout_redirect) = \
-        init_main_console(ryven_window_theme)
+        init_main_console(ryven_palette)
 
     # Init main window
     editor = MainWindow(

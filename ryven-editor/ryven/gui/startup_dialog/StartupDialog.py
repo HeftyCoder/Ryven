@@ -339,17 +339,13 @@ class StartupDialog(QDialog):
         
         # Window theme
         windowtheme_label = QLabel('Window theme:')
-        windowtheme_layout = QHBoxLayout()
-        windowtheme_button_group = QButtonGroup(windowtheme_layout)
-        self.window_theme_rbs = {
-            theme.value: QRadioButton(theme.value)
-            for theme in self.conf.get_available_window_themes()
-        }
-        for rb in self.window_theme_rbs.values():
-            windowtheme_button_group.addButton(rb)
-            windowtheme_layout.addWidget(rb)
-        windowtheme_button_group.buttonToggled.connect(self.on_window_theme_toggled)
-        fbox.addRow(windowtheme_label, windowtheme_layout)
+        windowtheme_widget = QComboBox()
+        windowtheme_widget.setToolTip(
+            'Select the main CogniX theme.'
+        )
+        windowtheme_widget.addItems([theme.value for theme in self.conf.get_available_window_themes()])
+        windowtheme_widget.currentTextChanged.connect(self.on_window_theme_toggled)
+        fbox.addRow(windowtheme_label, windowtheme_widget)
 
         # Flow theme
         flowtheme_label = QLabel('Flow theme:')
@@ -445,8 +441,7 @@ class StartupDialog(QDialog):
         self.update_packages_lists()
 
         # Set window theme
-        for theme, rb in self.window_theme_rbs.items():
-            rb.setChecked(self.conf.window_theme == theme)
+        windowtheme_widget.setCurrentText(self.conf.window_theme)
 
         # Set performance mode
         for mode, rb in self.perf_mode_rbs.items():
@@ -563,14 +558,10 @@ class StartupDialog(QDialog):
 
     # Window theme
 
-    def on_window_theme_toggled(self):
+    def on_window_theme_toggled(self, theme):
         """Call-back method, whenever a window theme radio button was toggled."""
         # Apply the selected window theme
-        for theme, rb in self.window_theme_rbs.items():
-            if rb.isChecked():
-                self.conf.window_theme = theme
-                break
-
+        self.conf.window_theme = theme            
         # Set the StartupDialog to the selected theme
         apply_stylesheet(self.conf.window_theme)
 
