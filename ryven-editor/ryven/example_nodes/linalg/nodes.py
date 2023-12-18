@@ -1,7 +1,7 @@
 from typing import Optional, List
 
 import ryvencore.addons.Variables
-
+from cognix.base_nodes import StartNode
 from ryven.node_env import *
 guis = import_guis(__file__)
 
@@ -292,7 +292,7 @@ class SolveLEq(MatrixNodeBase):
         )
 
 
-class EditMatrixNode(Node):
+class EditMatrixNode(StartNode):
     """
     A special node for hand-designing matrices with specific
     numerical values. It also supports Ryven variables and
