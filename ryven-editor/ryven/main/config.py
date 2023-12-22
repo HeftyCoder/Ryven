@@ -33,7 +33,7 @@ class Config:
     example: Optional[str] = None
     window_theme: Union[str, WindowThemeType] = WindowThemeType.QDARKTHEME_DARK.value
     flow_theme: Optional[str] = None  # None means it depends on window_theme
-    performance_mode: str = 'pretty'
+    performance_mode: str = 'fast'
     animations: bool = True
     window_geometry: Optional[str] = None
     window_title: str = 'CogniX'

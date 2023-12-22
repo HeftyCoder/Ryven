@@ -225,10 +225,7 @@ class FlowView(GUIBase, QGraphicsView):
         self._node_list_widget.node_chosen.connect(self.create_node__cmd)
 
         self._node_list_widget_proxy = FlowViewProxyWidget(self)
-        self._node_list_widget_proxy.setZValue(1000)
-        self._node_list_widget_proxy.setWidget(self._node_list_widget)
-        self.scene().addItem(self._node_list_widget_proxy)
-
+        self.init_proxy_widget(self._node_list_widget, self._node_list_widget_proxy)
         self.hide_node_list_widget()
 
         # ZOOM WIDGET
@@ -240,20 +237,13 @@ class FlowView(GUIBase, QGraphicsView):
         # self.scene().addItem(self._zoom_proxy)
         # self.set_zoom_proxy_pos()
 
-        def init_proxy_widget(widget: QWidget, proxy: FlowViewProxyWidget):
-            proxy.setFlag(QGraphicsItem.ItemIgnoresTransformations, True)
-            proxy.setZValue(1001)
-            proxy.setWidget(widget)
-            self.scene().addItem(proxy)
-            return proxy
-
         # STYLUS
         self.stylus_mode = ''
         self._current_drawing = None
         self._drawing = False
         self.drawings = []
         self._stylus_modes_widget = FlowViewStylusModesWidget(self)
-        self._stylus_modes_proxy = init_proxy_widget(
+        self._stylus_modes_proxy = self.init_proxy_widget(
             self._stylus_modes_widget, FlowViewProxyWidget(self)
         )
         self.set_stylus_proxy_pos()
@@ -261,7 +251,7 @@ class FlowView(GUIBase, QGraphicsView):
 
         topleft_widget = self._create_no_background_widget("Topleft")
         topleft_widget.setLayout(QVBoxLayout())
-        topleft_proxy = init_proxy_widget(topleft_widget, FlowViewProxyWidget(self))
+        topleft_proxy = self.init_proxy_widget(topleft_widget, FlowViewProxyWidget(self))
         self.topleft_proxy = topleft_proxy
         self.set_topleft_proxy_pos()
         
@@ -330,32 +320,11 @@ class FlowView(GUIBase, QGraphicsView):
         fps_timer.setInterval(200)
         fps_timer.start()
         
-        # Graph States - We're doing this here so that
-        # it works remotely as well
-        def on_graph_state_changed(old_state: GraphState, new_state: GraphState):
-            play_button.setEnabled(True)
-            if new_state == GraphState.PLAYING:
-                # save the state only if the graph has just started
-                if old_state == GraphState.STOPPED:
-                    self.save_undo_stack()
-                play_button.setText('Stop')
-                pause_button.setEnabled(True)
-                pause_button.setText('Pause')
-            elif new_state == GraphState.PAUSED:
-                pause_button.setText('Resume')
-            else:
-                self.restore_undo_stack()
-                play_button.setText('Play')
-                pause_button.setText('Pause')
-                pause_button.setEnabled(False)
-                
-        self.graph_state_changed.connect(on_graph_state_changed)        
-        self._graph_player.graph_events.sub_state_changed(self.graph_state_changed.emit)
+        # Undo changes to the graph when it was in play mode. Removed this feature        
+        # self.graph_state_changed.connect(self.on_graph_state_changed)        
+        # self._graph_player.graph_events.sub_state_changed(self.graph_state_changed.emit)
         
         # # TOUCH GESTURES
-        # recognizer = PanGestureRecognizer()
-        # pan_gesture_id = QGestureRecognizer.registerRecognizer(recognizer) <--- CRASH HERE
-        # self.grabGesture(pan_gesture_id)
         self.viewport().setAttribute(Qt.WA_AcceptTouchEvents)
         self.last_pinch_points_dist = 0
 
@@ -384,6 +353,13 @@ class FlowView(GUIBase, QGraphicsView):
     def silent_on_connecting(self):
         return True
     
+    def init_proxy_widget(self, widget: QWidget, proxy: FlowViewProxyWidget):
+            proxy.setFlag(QGraphicsItem.ItemIgnoresTransformations, True)
+            proxy.setZValue(1001)
+            proxy.setWidget(widget)
+            self.scene().addItem(proxy)
+            return proxy
+        
     def menu(self) -> QMenu:
         """The menu for this flow view"""
         return self._menu
@@ -425,6 +401,24 @@ class FlowView(GUIBase, QGraphicsView):
         redo_shortcut = QShortcut(QKeySequence.Redo, self)
         redo_shortcut.activated.connect(self._redo_activated)
 
+    # Saves the graph state to be restored later. Probably won't be used
+    def on_graph_state_changed(self, old_state: GraphState, new_state: GraphState):
+        self.play_button.setEnabled(True)
+        if new_state == GraphState.PLAYING:
+            # save the state only if the graph has just started
+            if old_state == GraphState.STOPPED:
+                self.save_undo_stack()
+            self.play_button.setText('Stop')
+            self.play_button.setEnabled(True)
+            self.play_button.setText('Pause')
+        elif new_state == GraphState.PAUSED:
+            self.play_button.setText('Resume')
+        else:
+            self.restore_undo_stack()
+            self.play_button.setText('Play')
+            self.play_button.setText('Pause')
+            self.play_button.setEnabled(False)
+            
     def _theme_changed(self, t):
         self._node_list_widget.setStyleSheet(self.session_gui.design.node_selection_stylesheet)
         for n, ni in self.node_items.items():
@@ -602,23 +596,28 @@ class FlowView(GUIBase, QGraphicsView):
             event.accept()
             
             view_pos = event.position()
-            self._zoom_data['viewport pos'] = view_pos
-            self._zoom_data['scene pos'] = self.mapToScene(view_pos.toPoint())
-            
+            scene_pos = self.mapToScene(view_pos.toPoint())
             y_delta = event.angleDelta().y()
-            self._zoom_data['delta'] += y_delta
+            self.zoom(view_pos, scene_pos, y_delta)
+            
+            # no point in zooming with animation, at least for this application
+            # self._zoom_data['viewport pos'] = view_pos
+            # self._zoom_data['scene pos'] = scene_pos
+            
+            # self._zoom_data['delta'] += y_delta
 
-            if self._zoom_data['delta'] * y_delta < 0:
-                self._zoom_data['delta'] = y_delta
+            # if self._zoom_data['delta'] * y_delta < 0:
+            #    self._zoom_data['delta'] = y_delta
 
-            anim = QTimeLine(100, self)
-            anim.setUpdateInterval(10)
-            anim.valueChanged.connect(self._scaling_time)
-            anim.start()
+            # anim = QTimeLine(100, self)
+            # anim.setUpdateInterval(10)
+            # anim.valueChanged.connect(self._scaling_time)
+            # anim.start()
 
         else:
             super().wheelEvent(event)
 
+    # Used for animated zooming, kept for legacy purposes
     def _scaling_time(self, x):
         delta = self._zoom_data['delta'] / 8
         if abs(delta) <= 5:

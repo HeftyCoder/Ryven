@@ -7,6 +7,7 @@ from qtpy.QtWidgets import (
     QMainWindow,
     QHBoxLayout,
     QTabWidget,
+    QTabBar,
     QDockWidget,
     QUndoView,
     QAction
@@ -72,6 +73,12 @@ class FlowUI(QMainWindow):
         # inspector dock first
         self.ui.inspector_dock.raise_()
 
+        # TODO: do it for all dock areas
+        # set elide mode to tab bars so the text isn't truncated
+        for tab_widget in self.findChildren(QTabBar):
+            tab_widget: QTabBar = tab_widget
+            tab_widget.setElideMode(Qt.TextElideMode.ElideNone)
+            
         self.flow.algorithm_mode_changed.sub(self.flow_alg_mode_changed)
 
         self.flow_alg_mode_dropdown = QComboBox()
