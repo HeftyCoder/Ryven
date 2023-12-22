@@ -409,15 +409,15 @@ class FlowView(GUIBase, QGraphicsView):
             # if old_state == GraphState.STOPPED:
                 # self.save_undo_stack()
             self._play_button.setText('Stop')
-            self._play_button.setEnabled(True)
-            self._play_button.setText('Pause')
+            self._pause_button.setEnabled(True)
+            self._pause_button.setText('Pause')
         elif new_state == GraphState.PAUSED:
-            self._play_button.setText('Resume')
+            self._pause_button.setText('Resume')
         else:
             # self.restore_undo_stack()
             self._play_button.setText('Play')
-            self._play_button.setText('Pause')
-            self._play_button.setEnabled(False)
+            self._pause_button.setText('Pause')
+            self._pause_button.setEnabled(False)
             
     def _theme_changed(self, t):
         self._node_list_widget.setStyleSheet(self.session_gui.design.node_selection_stylesheet)
