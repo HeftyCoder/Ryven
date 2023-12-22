@@ -320,9 +320,9 @@ class FlowView(GUIBase, QGraphicsView):
         fps_timer.setInterval(200)
         fps_timer.start()
         
-        # Undo changes to the graph when it was in play mode. Removed this feature        
-        # self.graph_state_changed.connect(self.on_graph_state_changed)        
-        # self._graph_player.graph_events.sub_state_changed(self.graph_state_changed.emit)
+        # Graph Change events    
+        self.graph_state_changed.connect(self.on_graph_state_changed)        
+        self._graph_player.graph_events.sub_state_changed(self.graph_state_changed.emit)
         
         # # TOUCH GESTURES
         self.viewport().setAttribute(Qt.WA_AcceptTouchEvents)
@@ -403,21 +403,21 @@ class FlowView(GUIBase, QGraphicsView):
 
     # Saves the graph state to be restored later. Probably won't be used
     def on_graph_state_changed(self, old_state: GraphState, new_state: GraphState):
-        self.play_button.setEnabled(True)
+        self._play_button.setEnabled(True)
         if new_state == GraphState.PLAYING:
             # save the state only if the graph has just started
-            if old_state == GraphState.STOPPED:
-                self.save_undo_stack()
-            self.play_button.setText('Stop')
-            self.play_button.setEnabled(True)
-            self.play_button.setText('Pause')
+            # if old_state == GraphState.STOPPED:
+                # self.save_undo_stack()
+            self._play_button.setText('Stop')
+            self._play_button.setEnabled(True)
+            self._play_button.setText('Pause')
         elif new_state == GraphState.PAUSED:
-            self.play_button.setText('Resume')
+            self._play_button.setText('Resume')
         else:
-            self.restore_undo_stack()
-            self.play_button.setText('Play')
-            self.play_button.setText('Pause')
-            self.play_button.setEnabled(False)
+            # self.restore_undo_stack()
+            self._play_button.setText('Play')
+            self._play_button.setText('Pause')
+            self._play_button.setEnabled(False)
             
     def _theme_changed(self, t):
         self._node_list_widget.setStyleSheet(self.session_gui.design.node_selection_stylesheet)
