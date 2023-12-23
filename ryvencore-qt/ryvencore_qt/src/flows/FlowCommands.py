@@ -9,6 +9,8 @@ from qtpy.QtWidgets import QUndoCommand
 
 from ryvencore import InfoMsgs, Flow
 
+import traceback
+
 
 def undo_text_multi(items:list, command: str, to_str=None):
     """Generates a text for an undo command that has zero, one or multiple items"""
@@ -163,11 +165,15 @@ class PlaceNode_Command(FlowUndoCommand):
         self.flow_view.select_items(self._prev_selected)
 
     def redo_(self):
-        if self.node:
-            self.flow.add_node(self.node)
-        else:
-            self.node = self.flow.create_node(self.node_class)
-        self.setText(f'Create {self.node.gui.item}')
+        try:
+            if self.node:
+                self.flow.add_node(self.node)
+            else:
+                self.node = self.flow.create_node(self.node_class)
+            self.setText(f'Create {self.node.gui.item}')
+        except Exception as e:
+            traceback.print_exc()
+            raise e
 
 
 class PlaceDrawing_Command(FlowUndoCommand):
@@ -247,8 +253,7 @@ class RemoveComponents_Command(FlowUndoCommand):
 
         for n in self.nodes:
             for i in n.inputs:
-                cp = n.flow.connected_output(i)
-                if cp is not None:
+                for cp in n.flow.connected_outputs(i):
                     cn = cp.node
                     if cn not in self.nodes:
                         self.broken_connections.add((cp, i))

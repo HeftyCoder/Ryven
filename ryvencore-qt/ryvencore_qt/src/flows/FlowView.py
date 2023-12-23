@@ -1149,19 +1149,16 @@ class FlowView(GUIBase, QGraphicsView):
             if out.io_pos == PortObjPos.INPUT:
                 out, inp = inp, out
 
-            if self.flow.graph_adj_rev[inp] not in (None, out): # out connected to something else
+            # if self.flow.graph_adj_rev[inp] not in (None, out): # out connected to something else
                 # remove existing connection
-                self.push_undo(
-                    ConnectPorts_Command(self, out=self.flow.graph_adj_rev[inp], inp=inp, silent=self.silent_on_connecting())
-                )
+                # self.push_undo(
+                #    ConnectPorts_Command(self, out=self.flow.graph_adj_rev[inp], inp=inp, silent=self.silent_on_connecting())
+                #)
 
-            if self.flow.connected_output(inp) == out:
-                # if the exact connection exists, we want to remove it by command
-                self.push_undo(
-                    ConnectPorts_Command(self, out=self.flow.connected_output(inp), inp=inp, silent=self.silent_on_connecting())
-                )
-            else:
-                self.push_undo(ConnectPorts_Command(self, out=out, inp=inp, silent=self.silent_on_connecting()))
+            # Adds or Removes the connection dependning on whether it exists or not
+            self.push_undo(
+                ConnectPorts_Command(self, out=out, inp=inp, silent=self.silent_on_connecting())
+            )
 
     def add_connection(self, c: Tuple[NodeOutput, NodeInput]):
         out, inp = c
