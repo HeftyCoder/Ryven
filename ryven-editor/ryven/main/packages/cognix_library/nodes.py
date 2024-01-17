@@ -55,7 +55,7 @@ class GetVar_Node(NodeBase):
 
 
 class Result_Node(TransformNode):
-    """Simply shows a collection of values converted to str"""
+    """Simply shows a value converted to str"""
 
     version = 'v0.2'
 
@@ -72,11 +72,7 @@ class Result_Node(TransformNode):
         self.update()
 
     def update_event(self, input_called=-1):
-        result = self.input_values(0)
-        if result is None:
-            self.val = None
-        else:
-            self.val = [data.payload for data in result]
+        self.val = self.input(0).payload
 
 
 class Val_Node(FrameNode):

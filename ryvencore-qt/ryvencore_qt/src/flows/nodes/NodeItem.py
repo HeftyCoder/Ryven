@@ -9,7 +9,6 @@ from .NodeErrorIndicator import NodeErrorIndicator
 from .NodeGUI import NodeGUI
 from ...GUIBase import GUIBase
 from ryvencore.NodePort import NodeInput, NodeOutput
-from ryvencore import Node
 from .NodeItemAction import NodeItemAction
 from .NodeItemAnimator import NodeItemAnimator
 from .NodeItemWidget import NodeItemWidget
@@ -21,7 +20,7 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
     """The GUI representative for nodes. Unlike the Node class, this class is not subclassed individually and works
     the same for every node."""
 
-    def __init__(self, node: Node, node_gui, flow_view, design):
+    def __init__(self, node, node_gui, flow_view, design):
         GUIBase.__init__(self, representing_component=node)
         QGraphicsObject.__init__(self)
 
@@ -435,7 +434,8 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
 
         for o in self.node.outputs:
             for i in self.node.flow.connected_inputs(o):
-            
+                # c.item.recompute()
+
                 if (o, i) not in self.flow_view.connection_items:
                     # it can happen that the connection item hasn't been
                     # created yet
@@ -444,15 +444,16 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
                 item = self.flow_view.connection_items[(o,i)]
                 item.recompute()
         for i in self.node.inputs:
-            for o in self.node.flow.connected_outputs(i):
-                
-                if (o, i) not in self.flow_view.connection_items:
-                    # it can happen that the connection item hasn't been
-                    # created yet
-                    continue
+            o = self.node.flow.connected_output(i)
+            # c.item.recompute()
 
-                item = self.flow_view.connection_items[(o,i)]
-                item.recompute()
+            if (o, i) not in self.flow_view.connection_items:
+                # it can happen that the connection item hasn't been
+                # created yet
+                continue
+
+            item = self.flow_view.connection_items[(o,i)]
+            item.recompute()
 
     def hoverEnterEvent(self, event):
         self.hovered = True

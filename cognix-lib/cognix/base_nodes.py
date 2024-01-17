@@ -35,9 +35,9 @@ class CognixNode(Node, metaclass=ABCMeta):
         self.flow.executor.update_node(self, inp)
         self.updated.emit(inp)
     
-    def input_value(self, index: int):
+    def input(self, index: int):
         """Overriden to silence InfoMsgs"""
-        return self.flow.executor.input_value(self, index)
+        return self.flow.executor.input(self, index)
     
     def set_output_val(self, index: int, data: Data):
         """Overrides ryvencore to add an on_output_changed event and silence InfoMsgs"""

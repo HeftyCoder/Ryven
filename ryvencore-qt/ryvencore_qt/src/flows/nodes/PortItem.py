@@ -17,35 +17,34 @@ from ..FlowViewProxyWidget import FlowViewProxyWidget
 
 
 def is_connected(port):
-    return (
-        len(port.node.flow.connected_inputs(port)) > 0  if isinstance(port, NodeOutput) 
-        else len(port.node.flow.connected_outputs(port)) > 0
-    )
-
-
-def val(port) -> list:
-    """
-    Returns a list of all the values of this port
-    """
     if isinstance(port, NodeOutput):
-        return [port.val.payload if isinstance(port.val, Data) else None]
+        is_connected = len(port.node.flow.connected_inputs(port)) > 0
     else:
-        conn_outs = port.node.flow.connected_outputs(port)
-        result = []
-        for conn_out in conn_outs:
-            if conn_out.val is not None:
-                result.append(conn_out.val.payload)
-            else:
-                result.append(None)
-        return result
-        
+        is_connected = port.node.flow.connected_output(port) is not None
+    return is_connected
+
+
+def val(port):
+    if isinstance(port, NodeOutput):
+        return port.val.payload if isinstance(port.val, Data) else None
+    else:
+        conn_out = port.node.flow.connected_output(port)
+        if conn_out:
+            return conn_out.val.payload if conn_out.val is not None else None
+        else:
+            return None
 
 
 def connections(port):
     if isinstance(port, NodeOutput):
         return [(port, i) for i in port.node.flow.connected_inputs(port)]
     else:
-        return [(o, port) for o in port.node.flow.connected_outputs(port)]
+        conn_out = port.node.flow.connected_output(port)
+        if conn_out:
+            return [(port.node.flow.connected_output(port), port)]
+        else:
+            return []
+
 
 # main classes
 
@@ -110,7 +109,7 @@ class InputPortItem(PortItem):
         )  # modified by FlowView when performance mode changes
 
         # catch up to missed connections
-        if len(self.port.node.flow.connected_outputs(self.port)) != 0:
+        if self.port.node.flow.connected_output(self.port) is not None:
             self.port_connected()
 
         if (
@@ -284,26 +283,7 @@ class PortItemPin(QGraphicsWidget):
 
     def hoverEnterEvent(self, event):
         if self.port.type_ == 'data':  # and self.parent_port_instance.io_pos == PortPos.OUTPUT:
-            values_str = ''
-            values = val(self.port)
-            if len(values) > 0:
-                for i in range(len(values)):
-                    line_str = '<hr/>' if i != len(values) - 1 else ''
-                    value_str = f'<p>{shorten(str(values[i]), 1000, line_break=False)}{line_str}</p>'
-                    values_str += value_str
-            else:
-                values_str = 'None'
-
-            self.setToolTip(
-                f'''
-                <html>
-                    <head/>
-                    <body>
-                        {values_str}
-                    </body>
-                </html>    
-                '''
-            )
+            self.setToolTip(shorten(str(val(self.port)), 1000, line_break=True))
 
         # highlight connections
         items = self.flow_view.connection_items
