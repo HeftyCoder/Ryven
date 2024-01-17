@@ -258,5 +258,9 @@ def load_gui():
 # testing
 
 from cognix.input.input_nodes import all_input_nodes, input_nodes_pkg
+from cognix.file.file_nodes import all_file_nodes
+from cognix.classification.classification_nodes import all_classification_nodes
 
 export_nodes(all_input_nodes, sub_pkg_name=input_nodes_pkg)
+export_nodes(all_file_nodes, sub_pkg_name='file')
+export_nodes(all_classification_nodes, sub_pkg_name='classification')
