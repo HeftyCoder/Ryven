@@ -12,6 +12,8 @@ from qtpy.QtCore import (
     QTimer,
     QTimeLine,
     QEvent,
+    QRunnable,
+    QThreadPool,
 )
 from qtpy.QtGui import (
     QPainter,
@@ -85,7 +87,18 @@ from enum import Enum
 from cognix.graph_player import GraphPlayer, GraphState
 from threading import Thread
 
-            
+class GraphRunnable(QRunnable):
+    """
+    A class for running a graph in a separate thread via Qt's thread mechanism.
+    """
+    
+    def __init__(self, graph_player: GraphPlayer):
+        super().__init__()
+        self.graph_player = graph_player
+    
+    def run(self):
+        self.graph_player.play()
+    
 class _SelectionMode(Enum):
     """
     Determines how selection change events will be handled.
@@ -285,8 +298,8 @@ class FlowView(GUIBase, QGraphicsView):
         
         def play_button_clicked():
             if self._graph_player.state == GraphState.STOPPED:
-                t = Thread(target=self._graph_player.play)
-                t.start()
+                graph_runnable = GraphRunnable(self._graph_player)
+                QThreadPool.globalInstance().start(graph_runnable)
             else:
                 self._graph_player.stop()
                 

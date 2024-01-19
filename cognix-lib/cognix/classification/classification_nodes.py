@@ -34,8 +34,8 @@ class LogisticRegressionNode(CognixNode):
         packet = self.input(0)
         if not packet:
             return
-        svm = LogisticRegressionLearner()
-        self.set_output_val(0, Data(svm))
+        reg_learner = LogisticRegressionLearner()
+        self.set_output_val(0, Data(reg_learner))
 
 class CrossValidationNode(CognixNode):
     
@@ -46,7 +46,6 @@ class CrossValidationNode(CognixNode):
     init_outputs = [NodeOutputType(label='model'), NodeOutputType(label = 'ACC'), NodeOutputType(label='AUC')]
     
     def update_event(self, inp=-1):
-        print(1)
         data_packet = self.input(0)
         classifier_packet = self.input(1)
         if not data_packet or not classifier_packet:

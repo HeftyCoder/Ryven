@@ -1,6 +1,7 @@
 from Orange.data import Table, Domain
 from ryvencore import NodeOutputType, NodeInputType, Data
 from ..base_nodes import CognixNode, FrameNode, StartNode
+from threading import Thread
 
 class DataTableNode(StartNode):
     
@@ -14,9 +15,18 @@ class DataTableNode(StartNode):
         self.table_data: Table = None
     
     def update_event(self, inp=-1):
+        # import sys
+        # print(sys.setswitchinterval(0.0005))
+        # print(1)
+        # a = 0
+        # for i in range(100000000):
+        #     a = a + 1
+        # print(2)
         self.table_data = Table('C:/Users/salok/Desktop/test_classification.csv')
+        # print(3)
+        self.table_data.domain.class_var = self.table_data.domain['category']
         self.set_output_val(0, Data(self.table_data))
-
+        
 class DataSelectionNode(CognixNode):
     
     title = 'Data Selection'

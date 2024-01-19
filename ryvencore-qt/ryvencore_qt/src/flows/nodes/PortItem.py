@@ -283,7 +283,16 @@ class PortItemPin(QGraphicsWidget):
 
     def hoverEnterEvent(self, event):
         if self.port.type_ == 'data':  # and self.parent_port_instance.io_pos == PortPos.OUTPUT:
-            self.setToolTip(shorten(str(val(self.port)), 1000, line_break=True))
+            value = val(self.port)
+            if not isinstance(value, str):
+                # if there is a __len__ function, get a subset if it's too big
+                if hasattr(value, '__len__') and len(value) > 10:
+                    tooltip_str = str(value[:10])
+                    tooltip_str = f'{tooltip_str}\n. . .'
+                else:
+                    tooltip_str = str(value)
+            tooltip_str = shorten(tooltip_str, 1000, True)
+            self.setToolTip(tooltip_str)
 
         # highlight connections
         items = self.flow_view.connection_items
