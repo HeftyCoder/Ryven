@@ -2,7 +2,14 @@ from Orange.data import Table, Domain
 from ryvencore import NodeOutputType, NodeInputType, Data
 from ..base_nodes import CognixNode, FrameNode, StartNode
 from threading import Thread
+from multiprocessing import Manager, Queue, Process
 
+def worker(queue: Queue, file: str):
+    print(1)
+    table = Table(file)
+    queue.put(table)
+    print(2)
+    
 class DataTableNode(StartNode):
     
     title = 'Import Feature Data'
@@ -14,18 +21,35 @@ class DataTableNode(StartNode):
         super().__init__(params)
         self.table_data: Table = None
     
+    def process_test(self):
+        with Manager() as manager:
+            import time
+            a = time.perf_counter()
+            print(0)
+            result_queue = manager.Queue()
+            process = Process(target=worker, args=(result_queue, 'C:/Users/salok/Desktop/test_classification.csv',))
+            process.start()
+            process.join()
+            
+            #self.table_data: Table = Table('C:/Users/salok/Desktop/test_classification.csv')
+            self.table_data = result_queue.get()
+            b = time.perf_counter()
+            print(b-a)
+            self.table_data.domain.class_var = self.table_data.domain['category']
+            self.set_output_val(0, Data(self.table_data))
+        
+    def normal_test(self):
+        import time
+        a = time.perf_counter()
+        self.table_data = Table('C:/Users/salok/Desktop/test_classification.csv')
+        self.set_output_val(0, Data(self.table_data))
+        b = time.perf_counter()
+        print(b-a)
+        
     def update_event(self, inp=-1):
         # import sys
-        # print(sys.setswitchinterval(0.0005))
-        # print(1)
-        # a = 0
-        # for i in range(100000000):
-        #     a = a + 1
-        # print(2)
-        self.table_data = Table('C:/Users/salok/Desktop/test_classification.csv')
-        # print(3)
-        self.table_data.domain.class_var = self.table_data.domain['category']
-        self.set_output_val(0, Data(self.table_data))
+        # sys.setswitchinterval(0.0005)
+        self.process_test()
         
 class DataSelectionNode(CognixNode):
     
