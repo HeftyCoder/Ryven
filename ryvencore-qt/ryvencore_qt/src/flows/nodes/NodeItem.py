@@ -1,5 +1,5 @@
 import traceback
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 
 from qtpy.QtWidgets import QGraphicsItem, QGraphicsObject, QMenu, QGraphicsDropShadowEffect
 from qtpy.QtCore import Qt, QRectF, QObject, QPointF
@@ -32,8 +32,8 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
         self.movement_state = None
         self.movement_pos_from = None
         self.painted_once = False
-        self.inputs = []
-        self.outputs = []
+        self.inputs: List[InputPortItem] = []
+        self.outputs: List[OutputPortItem] = []
         self.color = QColor(self.node_gui.color)  # manipulated by self.animator
 
         self.collapsed = False

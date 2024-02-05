@@ -5,7 +5,7 @@ from ryvencore.Base import Event
 from ryvencore.Node import NodeInput, NodeOutput
 from abc import ABCMeta, abstractmethod
 
-from ryvencore.Data import Data
+from ryvencore import Data
 
 # the additions over normal ryven can probably be made into PRs
 class CognixNode(Node, metaclass=ABCMeta):

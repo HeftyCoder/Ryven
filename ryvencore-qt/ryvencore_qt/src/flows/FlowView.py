@@ -52,8 +52,8 @@ from ryvencore.NodePort import NodePort, NodeInput, NodeOutput
 
 # from ryvencore.Connection import Connection, DataConnection
 from ryvencore.InfoMsgs import InfoMsgs
-from ryvencore.RC import PortObjPos
-from ryvencore.utils import node_from_identifier
+from ryvencore.RC import PortObjPos, ConnValidType
+from ryvencore.Node import node_from_identifier
 
 from ..GUIBase import GUIBase
 from ..utils import *
@@ -72,7 +72,7 @@ from .FlowViewStylusModesWidget import FlowViewStylusModesWidget
 from .node_list_widget.NodeListWidget import NodeListWidget
 from .nodes.NodeGUI import NodeGUI
 from .nodes.NodeItem import NodeItem
-from .nodes.PortItem import PortItemPin, PortItem
+from .nodes.PortItem import PortItemPin, PortItem, InputPortItem, OutputPortItem
 from .connections.ConnectionItem import (
     default_cubic_connection_path,
     ConnectionItem,
@@ -86,6 +86,8 @@ from enum import Enum
 
 from cognix.graph_player import GraphPlayer, GraphState
 from threading import Thread
+
+from itertools import chain
 
 class GraphRunnable(QRunnable):
     """
@@ -122,7 +124,6 @@ class FlowView(GUIBase, QGraphicsView):
     create_node_request = Signal(object, dict)
     remove_node_request = Signal(Node)
 
-    check_connection_validity_request = Signal((NodeOutput, NodeInput), bool)
     connect_request = Signal(NodePort, NodePort)
 
     # get_nodes_data_request = Signal(list)
@@ -161,13 +162,18 @@ class FlowView(GUIBase, QGraphicsView):
         self.connection_items__cache: dict = {}
         self.selection_mode: _SelectionMode = _SelectionMode.UNDOABLE_CLICK
 
+        # DRAGGING - CONNECTION
+        self._selected_pin: PortItemPin = None
+        self._port_item_over: PortItem = None
+        self._node_item_over: NodeItem = None
+        self._dragging_connection = False
+        self._valid_check: Tuple[ConnValidType, str] = None
+        self._temp_connection_ports: Tuple[NodeOutput, NodeInput] = None
+        self._waiting_for_connection_request: bool = False
+        
         # PRIVATE FIELDS
         self._loaded_state = None # h and v scrollbars are changed on import, so we need to defer
         self._tmp_data = None
-        self._selected_pin: PortItemPin = None
-        self._dragging_connection = False
-        self._temp_connection_ports = None
-        self._waiting_for_connection_request: bool = False
         self.mouse_event_taken = False  # for stylus - see tablet event
         self._last_mouse_move_pos: QPointF = None
         self._node_place_pos = QPointF()
@@ -191,7 +197,6 @@ class FlowView(GUIBase, QGraphicsView):
         # CONNECTIONS TO FLOW
         self.create_node_request.connect(self.flow.create_node)
         self.remove_node_request.connect(self.flow.remove_node)
-        self.check_connection_validity_request.connect(self.flow.check_connection_validity)
         # TODO: need to check if the 2 lines below are used
         # self.get_nodes_data_request.connect(self.flow.gen_nodes_data)
         # self.get_connections_data_request.connect(self.flow.gen_conns_data)
@@ -202,7 +207,6 @@ class FlowView(GUIBase, QGraphicsView):
         self.flow.node_removed.sub(self.remove_node)
         self.flow.connection_added.sub(self.add_connection)
         self.flow.connection_removed.sub(self.remove_connection)
-        self.flow.connection_request_valid.sub(self.connection_request_valid)
 
         # CREATE UI
         scene = QGraphicsScene(self)
@@ -525,15 +529,63 @@ class FlowView(GUIBase, QGraphicsView):
 
         if self._dragging_connection:
             self.viewport().repaint()
+            
+            # Set up for creating a connection when dragging
+            # Wanted to implement this on the hover events of each item
+            # But it seems that they aren't invoked when dragging (probably Qt's "fault", not ours)
+            
+            selected_port_item: NodeItem = self._selected_pin.port_item
+            selected_port: NodePort = self._selected_pin.port
+            event_items = self.items(event.pos())
+            
+            if not event_items:
+                self._clear_conn_attributes()
+                return
+                
+            # Get the port item and node item at mouse position
+            port_item_over = next((item for item in event_items if isinstance(item, PortItem)), None)
+            node_item_over = (port_item_over.node_item 
+                              if port_item_over 
+                              else next((item for item in event_items if isinstance(item, NodeItem)), None))
+        
+            if port_item_over and self._port_item_over != port_item_over:
+                self._port_item_over = port_item_over
+                found_port = port_item_over.port
+                if isinstance(selected_port, NodeOutput) and isinstance(found_port, NodeInput):
+                    self._temp_connection_ports = (selected_port, found_port)
+                else:
+                    self._temp_connection_ports = (found_port, selected_port)
+
+                valid_result, message = self._valid_check = self.flow.check_connection_validity(self._temp_connection_ports)
+                
+            # need to search in the node item 
+            elif node_item_over and node_item_over != self._node_item_over:
+                self._node_item_over = node_item_over     
+                self._valid_check = None
+                
+                if isinstance(selected_port, NodeOutput):
+                    for inp_port_item in node_item_over.inputs:
+                        conn_pair = (selected_port, inp_port_item.port)
+                        valid_result, _ = self._valid_check = self.flow.can_nodes_connect(conn_pair)
+                        if valid_result == ConnValidType.VALID:
+                            break
+                else:
+                    for out_port_item in node_item_over.outputs:
+                        conn_pair = (selected_port, out_port_item.port)
+                        valid_result, _ = self._valid_check = self.flow.can_nodes_connect(conn_pair)
+                        if valid_result == ConnValidType.VALID:
+                            break
+            
+            # make sure there isn't left-over attribute leaks
+            else:
+                self._clear_conn_attributes()
 
     def mouseReleaseEvent(self, event):
         # there might be a proxy widget meant to receive the event instead of the flow
         QGraphicsView.mouseReleaseEvent(self, event)
 
-        node_item_at_event_pos = None
-        for item in self.items(event.pos()):
-            if isinstance(item, NodeItem):
-                node_item_at_event_pos = item
+        node_item_at_event_pos = (next((item for item in self.items(event.pos()) 
+                                        if isinstance(item, NodeItem)), None))
 
         if self.mouse_event_taken:
             self.mouse_event_taken = False
@@ -552,32 +604,21 @@ class FlowView(GUIBase, QGraphicsView):
                 return
 
         if self._dragging_connection:
-            # connection dropped over port item
-            port_items = {i: isinstance(i, PortItem) for i in self.items(event.pos())}
-            if any(port_items.values()):
-                # gets the first PortItem
-                p_i = list(port_items.keys())[list(port_items.values()).index(True)]
-
-                # the validity of the connection is checked in connect_node_ports__cmd
-                self.connect_node_ports__cmd(self._selected_pin.port, p_i.port)
-
-            # connection dropped above NodeItem -> auto connect
-            elif node_item_at_event_pos:
-                # find node item
-                ni_under_drop = None
-                for item in self.items(event.pos()):
-                    if isinstance(item, NodeItem):
-                        ni_under_drop = item
-                        self.auto_connect(self._selected_pin.port, ni_under_drop.node)
-                        break
+            # a connection was found when moving the mouse 
+            if node_item_at_event_pos:
+                # the above and this check are separate so a choice widget
+                # doesn't show over a node item
+                valid_result = self._valid_check[0] if self._valid_check else None
+                if valid_result == ConnValidType.VALID:
+                    out, inp = self._temp_connection_ports
+                    self.connect_node_ports__cmd(out, inp)
 
             # connection dropped somewhere else -> show node choice widget
             else:
                 self._auto_connection_pin = self._selected_pin
                 self.show_place_node_widget(event.pos())
 
-            self._dragging_connection = False
-            self._selected_pin = None
+            self._clear_conn_attributes(True, True)
 
         # if event.button() == Qt.LeftButton:
         #     self._left_mouse_pressed_in_flow = False
@@ -845,20 +886,6 @@ class FlowView(GUIBase, QGraphicsView):
             pos2 = pin_pos if spp.io_pos == PortObjPos.INPUT else cursor_pos
 
             painter.drawPath(default_cubic_connection_path(pos1, pos2))
-
-        # # DRAW SELECTED NIs BORDER
-        # for ni in self.selected_node_items():
-        #     pen = QPen(self.session.design.flow_theme.flow_highlight_pen_color)
-        #     pen.setWidth(3)
-        #     painter.setPen(pen)
-        #     painter.setBrush(Qt.NoBrush)
-        #
-        #     size_factor = 1.2
-        #     x = ni.pos().x() - ni.boundingRect().width() / 2 * size_factor
-        #     y = ni.pos().y() - ni.boundingRect().height() / 2 * size_factor
-        #     w = ni.boundingRect().width() * size_factor
-        #     h = ni.boundingRect().height() * size_factor
-        #     painter.drawRoundedRect(x, y, w, h, 10, 10)
 
         # DRAW SELECTED DRAWINGS BORDER
         for p_o in self.selected_drawings():
@@ -1131,50 +1158,35 @@ class FlowView(GUIBase, QGraphicsView):
         self.scene().removeItem(item)
 
     # CONNECTIONS
+    def _clear_conn_attributes(self, clear_pin: bool = False, clear_dragging: bool = False):
+        
+        if clear_pin:
+            self._selected_pin = None
+        if clear_dragging:
+            self._dragging_connection = False
+            
+        self._temp_connection_ports = None
+        self._valid_check = None
+        self._node_item_over = None
+        self._port_item_over = None
+        
     def connect_node_ports__cmd(self, p1: NodePort, p2: NodePort):
         # Need to check order of ports since Flow.check_connection_validity needs (NodeOutput, NodeInput)
         if isinstance(p1, NodeOutput) and isinstance(p2, NodeInput):
-            self._temp_connection_ports = (p1, p2)
-            self._waiting_for_connection_request = True
-            self.check_connection_validity_request.emit((p1, p2), True)
-
+            connection = (p1, p2)
         elif isinstance(p1, NodeInput) and isinstance(p2, NodeOutput):
-            self._temp_connection_ports = (p2, p1)
-            self._waiting_for_connection_request = True
-            self.check_connection_validity_request.emit((p2, p1), True)
-
-        else:
-            self.connection_request_valid(False)
-
-    def connection_request_valid(self, valid: bool):
-        """
-        Triggered after the abstract flow evaluated validity of pending connect request.
-        This can also lead to a disconnect!
-        """
-
-        if self._waiting_for_connection_request:
-            self._waiting_for_connection_request = False
-        else:
-            return
-
-        if valid:
-            out, inp = self._temp_connection_ports
-            if out.io_pos == PortObjPos.INPUT:
-                out, inp = inp, out
-
-            if self.flow.graph_adj_rev[inp] not in (None, out): # out connected to something else
-                # remove existing connection
-                self.push_undo(
-                    ConnectPorts_Command(self, out=self.flow.graph_adj_rev[inp], inp=inp, silent=self.silent_on_connecting())
-                )
-
-            if self.flow.connected_output(inp) == out:
-                # if the exact connection exists, we want to remove it by command
-                self.push_undo(
-                    ConnectPorts_Command(self, out=self.flow.connected_output(inp), inp=inp, silent=self.silent_on_connecting())
-                )
-            else:
-                self.push_undo(ConnectPorts_Command(self, out=out, inp=inp, silent=self.silent_on_connecting()))
+            connection = (p2, p1)
+        
+        out, inp = connection
+        if self.flow.graph_adj[inp] not in (None, out): # out connected to something else
+            # remove existing connection
+            self.push_undo(
+                ConnectPorts_Command(self, out=self.flow.graph_adj_rev[inp], inp=inp, silent=self.silent_on_connecting())
+            )
+        
+        # the old implementation could remove the connection if it already existed, but I removed this
+        # since we can now select and remove the connection itself
+        self.push_undo(ConnectPorts_Command(self, out=out, inp=inp, silent=self.silent_on_connecting()))
 
     def add_connection(self, c: Tuple[NodeOutput, NodeInput]):
         out, inp = c
