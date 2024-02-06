@@ -1,6 +1,6 @@
 import json
 
-from typing import Tuple
+from typing import Tuple, Optional
 
 from qtpy.QtCore import (
     Qt,
@@ -72,7 +72,14 @@ from .FlowViewStylusModesWidget import FlowViewStylusModesWidget
 from .node_list_widget.NodeListWidget import NodeListWidget
 from .nodes.NodeGUI import NodeGUI
 from .nodes.NodeItem import NodeItem
-from .nodes.PortItem import PortItemPin, PortItem, InputPortItem, OutputPortItem
+from .nodes.PortItem import (
+    PortItemPin, 
+    PinState,
+    PortItem, 
+    InputPortItem, 
+    OutputPortItem,
+)
+
 from .connections.ConnectionItem import (
     default_cubic_connection_path,
     ConnectionItem,
@@ -164,6 +171,7 @@ class FlowView(GUIBase, QGraphicsView):
 
         # DRAGGING - CONNECTION
         self._selected_pin: PortItemPin = None
+        self._potential_conn_pin: PortItemPin = None # the pin we're trying to connect to
         self._port_item_over: PortItem = None
         self._node_item_over: NodeItem = None
         self._dragging_connection = False
@@ -547,9 +555,17 @@ class FlowView(GUIBase, QGraphicsView):
             node_item_over = (port_item_over.node_item 
                               if port_item_over 
                               else next((item for item in event_items if isinstance(item, NodeItem)), None))
-        
+
+            if not port_item_over and not node_item_over:
+                self._clear_conn_attributes()
+                return
+            
+            updated = False
+            potential_conn_pin: PortItemPin = None
+            
             if port_item_over and self._port_item_over != port_item_over:
                 self._port_item_over = port_item_over
+                potential_conn_pin = port_item_over.pin
                 found_port = port_item_over.port
                 if isinstance(selected_port, NodeOutput) and isinstance(found_port, NodeInput):
                     self._drag_conn_port_items = (selected_port_item, port_item_over)
@@ -557,12 +573,13 @@ class FlowView(GUIBase, QGraphicsView):
                     self._drag_conn_port_items = (port_item_over, selected_port_item)
 
                 self._valid_check = self.flow.can_nodes_connect(self._get_drag_conn_pair())
-                print(self._valid_check)
+                updated = True
                 
             # need to search in the node item 
             elif node_item_over and node_item_over != self._node_item_over:
                 self._node_item_over = node_item_over     
                 self._valid_check = None
+                updated = True
                 
                 if isinstance(selected_port, NodeOutput):
                     for inp_port_item in node_item_over.inputs:
@@ -571,6 +588,8 @@ class FlowView(GUIBase, QGraphicsView):
                             self._get_drag_conn_pair()
                         )
                         if valid_result == ConnValidType.VALID:
+                            potential_conn_pin = inp_port_item.pin
+                            self._port_item_over = inp_port_item
                             break
                 else:
                     for out_port_item in node_item_over.outputs:
@@ -579,10 +598,24 @@ class FlowView(GUIBase, QGraphicsView):
                             self._get_drag_conn_pair()
                         )
                         if valid_result == ConnValidType.VALID:
+                            potential_conn_pin = out_port_item.pin
+                            self._port_item_over = out_port_item
                             break
-                    
-                print(self._valid_check)
-
+            
+            # If hovered over new port item or new node
+            if updated:      
+                if self._potential_conn_pin: # and self._potential_conn_pin != potential_conn_pin:
+                    self._potential_conn_pin.state = PinState.DISCONNECTED
+                    self._potential_conn_pin = None
+                
+                if potential_conn_pin and self._valid_check:
+                    self._potential_conn_pin = potential_conn_pin
+                    valid_result, _ = self._valid_check
+                    self._potential_conn_pin.state = (
+                        PinState.VALID if valid_result == ConnValidType.VALID
+                        else PinState.INVALID)
+                    self._potential_conn_pin.update()
+                
     def mouseReleaseEvent(self, event):
         # there might be a proxy widget meant to receive the event instead of the flow
         QGraphicsView.mouseReleaseEvent(self, event)
@@ -620,7 +653,8 @@ class FlowView(GUIBase, QGraphicsView):
             else:
                 self._auto_connection_pin = self._selected_pin
                 self.show_place_node_widget(event.pos())
-
+            
+            # clear every drag related connection attribute
             self._clear_conn_attributes(True, True)
 
         # if event.button() == Qt.LeftButton:
@@ -1161,6 +1195,12 @@ class FlowView(GUIBase, QGraphicsView):
         self.scene().removeItem(item)
 
     # CONNECTIONS
+    
+    def _set_found_pin(self, pin: PortItemPin, state: PinState):
+        """Sets the pin state given a PinState"""
+        self._potential_conn_pin = pin
+        self._potential_conn_pin.state = state
+        
     def _get_conn_pair(self, conn_port_items: Tuple[OutputPortItem, InputPortItem]) -> Tuple[NodeOutput, NodeInput]:
         """Returns a connected given port items"""
         out_port_item, inp_port_item = conn_port_items
@@ -1170,17 +1210,21 @@ class FlowView(GUIBase, QGraphicsView):
         """Returns the current drag possible connection"""
         return self._get_conn_pair(self._drag_conn_port_items)
     
-    def _clear_conn_attributes(self, clear_pin: bool = False, clear_dragging: bool = False):
+    def _clear_conn_attributes(self, clear_selected_pin: bool = False, clear_dragging: bool = False):
         
-        if clear_pin:
+        if clear_selected_pin:
             self._selected_pin = None
         if clear_dragging:
             self._dragging_connection = False
+        
+        if self._port_item_over:
+            # this will be ignored if port is connected
+            self._port_item_over.pin.state = PinState.DISCONNECTED
+            self._port_item_over = None
             
+        self._node_item_over = None
         self._drag_conn_port_items = None
         self._valid_check = None
-        self._node_item_over = None
-        self._port_item_over = None
         
     def connect_node_ports__cmd(self, p1: NodePort, p2: NodePort):
         # Need to check order of ports since Flow.check_connection_validity needs (NodeOutput, NodeInput)

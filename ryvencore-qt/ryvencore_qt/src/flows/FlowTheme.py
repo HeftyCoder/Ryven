@@ -2,15 +2,57 @@ from qtpy.QtCore import Qt, QPointF, QPoint, QRectF, QMargins, QMarginsF
 from qtpy.QtGui import QColor, QPainter, QBrush, QRadialGradient, QLinearGradient, QPen, QPainterPath, QFont, QPolygon
 from qtpy.QtWidgets import QStyle, QStyleOption
 
+from ..flows.nodes.PortItem import PinState
 from ..utils import pythagoras
 
-
+from typing import Dict
+from dataclasses import dataclass
 #
 #   notice: available themes are hardcoded in Ryven for CLI; make sure to update those
 #   in case of changes affecting it
 #
 
+@dataclass
+class PinStyle:
+    pen_width: int = 2
+    
+    valid_color: QColor = QColor('#0dff05')
+    valid_color.setAlpha(125)
+    invalid_color: QColor = QColor('#ff2605')
+    invalid_color.setAlpha(125)
+    connected_color: QColor = QColor('#c69a15')
+    disconnected_color: QColor = None
+    
+    margin_cut: int = 0
 
+    __pin_colors = None
+    
+    @property
+    def pin_colors(self) -> Dict[PinState, QColor]:
+        if not self.__pin_colors:
+            self.__pin_colors = {
+                PinState.VALID: self.valid_color,
+                PinState.INVALID: self.invalid_color,
+                PinState.CONNECTED: self.connected_color,
+                PinState.DISCONNECTED: self.disconnected_color,
+            }
+        return self.__pin_colors
+    
+@dataclass
+class DataPinStyle(PinStyle):
+    """Default values for Data"""
+    pen_width: int = 2
+    margin_cut: int = 0
+
+
+@dataclass
+class ExecPinStyle(PinStyle):
+    """Default values for Exec"""
+    connected_color: QColor = QColor("#FFFFFF")
+    pen_width: int = 0
+    margin_cut: int = 0
+    
+    
 class FlowTheme:
 
     name = ''
@@ -42,7 +84,11 @@ NodeWidget {
     flow_highlight_pen_color = QColor('#245d75')
 
     node_item_shadow_color = QColor('#2b2b2b')
-
+    
+    # Setting for pins
+    pin_style_data = DataPinStyle()
+    pin_style_exec = ExecPinStyle()
+    
     EXPORT = []
 
     def __init__(self):
@@ -83,13 +129,13 @@ NodeWidget {
                              node_style: str, node_title: str, node_color: QColor, node_item_bounding_rect):
         pass
 
-    def paint_PI_label(self, node_gui, painter: QPainter, option: QStyleOption, type_: str, connected: bool, label_str: str,
+    def paint_PI_label(self, node_gui, painter: QPainter, option: QStyleOption, type_: str, pin_state: bool, label_str: str,
                        node_color: QColor, bounding_rect: QRectF):
         pass
 
-    def paint_PI(self, node_gui, painter: QPainter, option: QStyleOption, node_color: QColor, type_: str, connected: bool,
+    def paint_PI(self, node_gui, painter: QPainter, option: QStyleOption, node_color: QColor, type_: str, pin_state: PinState,
                  rect: QRectF):  # padding, w, h):
-        pass
+        self.paint_PI_default(self, node_gui, painter, option, node_color, type_, pin_state, rect)
 
     def paint_NI(self, node_gui,
                  selected: bool, hovered: bool, node_style: str,
@@ -152,6 +198,40 @@ NodeWidget {
         painter.setFont(font)
         painter.drawText(bounding_rect, Qt.AlignCenter, label_str)
 
+    @staticmethod
+    def paint_PI_default(theme, node_gui, painter: QPainter, option: QStyleOption, node_color: QColor, type_: str, pin_state: PinState,
+                 rect: QRectF, use_node_color = True):
+        
+        theme: FlowTheme = theme
+        
+        pin_style = theme.pin_style_exec if type_ == 'exec' else theme.pin_style_data
+        brush_color = pin_style.pin_colors.get(pin_state)
+        pen_color = pin_style.connected_color
+        
+        # ignore the pin style's connected color and use the
+        # node guis
+        if type_ == 'data' and use_node_color:
+            pen_color = node_color
+            
+            if pin_state == PinState.CONNECTED:
+                brush_color = QColor(pen_color)
+                brush_color.setAlpha(100)
+        
+        brush = QBrush(brush_color) if brush_color else Qt.NoBrush
+        
+        pen = (
+            QPen(pen_color) 
+            if pin_style.pen_width > 0
+            else Qt.NoPen 
+        )
+        
+        painter.setBrush(brush)
+        painter.setPen(pen)
+        
+        c = pin_style.margin_cut
+        draw_rect = rect.marginsRemoved(QMarginsF(c, c, c, c)) if c > 0 else rect
+        painter.drawEllipse(draw_rect)
+        
     @staticmethod
     def get_header_rect(node_width, node_height, title_rect):
         header_height = 1.0 * title_rect.height()  # 35 * (self.parent_node.title.count('\n')+1)
@@ -234,7 +314,16 @@ class FlowTheme_Toy(FlowTheme):
     data_conn_pen_style = Qt.DashLine
 
     flow_background_brush = QBrush(QColor('#333333'))
-
+    
+    pin_style_data = DataPinStyle(
+        pen_width=0,
+        valid_color=QColor('#2E688C'),
+        margin_cut=3
+    )
+    pin_style_exec = ExecPinStyle(
+        valid_color=QColor('#3880ad'),
+    )
+    
     def paint_NI_title_label(self, node_gui, selected, hovering, painter, option, node_style, node_title, node_color,
                              node_item_bounding_rect):
 
@@ -259,21 +348,9 @@ class FlowTheme_Toy(FlowTheme):
                 node_item_bounding_rect=node_item_bounding_rect
             )
 
-    def paint_PI_label(self, node_gui, painter, option, type_, connected, label_str, node_color, bounding_rect):
+    def paint_PI_label(self, node_gui, painter, option, type_, pin_state, label_str, node_color, bounding_rect):
         c = QColor('#FFFFFF')
         self.paint_PI_label_default(painter, label_str, c, QFont("Source Code Pro", 10, QFont.Bold), bounding_rect)
-
-    def paint_PI(self, node_gui, painter, option, node_color, type_, connected, rect):
-
-        color = QColor('#2E688C') if type_ == 'data' else QColor('#3880ad')
-        if option.state & QStyle.State_MouseOver:
-            color = color.lighter()
-
-        brush = QBrush(QColor(color))
-        painter.setBrush(brush)
-        painter.setPen(Qt.NoPen)
-
-        painter.drawEllipse(rect)
 
     def draw_NI_normal(self, node_gui, selected: bool, hovered: bool,
                        painter: QPainter, c: QColor, w, h, bounding_rect, title_rect):
@@ -369,31 +446,13 @@ class FlowTheme_DarkTron(FlowTheme):
                 node_item_bounding_rect=node_item_bounding_rect
             )
 
-    def paint_PI_label(self, node_gui, painter, option, type_, connected, label_str, node_color, bounding_rect):
+    def paint_PI_label(self, node_gui, painter, option, type_, pin_state, label_str, node_color, bounding_rect):
         if type_ == 'exec':
             c = QColor('#FFFFFF')
         else:
             c = node_color
 
         self.paint_PI_label_default(painter, label_str, c, QFont("Source Code Pro", 10, QFont.Bold), bounding_rect)
-
-    def paint_PI(self, node_gui, painter, option, node_color, type_, connected, rect):
-
-        color = QColor('#FFFFFF') if type_ == 'exec' else QColor(node_color)
-        pen = QPen(color)
-        pen.setWidth(2)
-        painter.setPen(pen)
-        if connected or \
-                option.state & QStyle.State_MouseOver:  # also fill when mouse hovers
-            r = color.red()
-            g = color.green()
-            b = color.blue()
-            brush = QBrush(QColor(r, g, b, 100))
-            painter.setBrush(brush)
-        else:
-            painter.setBrush(Qt.NoBrush)
-
-        painter.drawEllipse(rect)
 
     # def paint_NI(self, node, node_style,
     #              painter, option,
@@ -517,6 +576,9 @@ class FlowTheme_Ghost(FlowTheme):
     node_color = QColor(28, 28, 28, 170)
     node_small_color = QColor('#212429')
 
+    pin_style_data = DataPinStyle(margin_cut=3, pen_width=1)
+    pin_style_exec = ExecPinStyle(pen_width=1)
+    
     EXPORT = [
         'nodes color',
         'small nodes color',
@@ -559,40 +621,13 @@ class FlowTheme_Ghost(FlowTheme):
                 node_item_bounding_rect=node_item_bounding_rect
             )
 
-    def paint_PI_label(self, node_gui, painter, option, type_, connected, label_str, node_color, bounding_rect):
+    def paint_PI_label(self, node_gui, painter, option, type_, pin_state, label_str, node_color, bounding_rect):
         if type_ == 'exec':
             c = QColor('#FFFFFF')
         else:
             c = node_color
 
         self.paint_PI_label_default(painter, label_str, c, QFont("Source Code Pro", 10, QFont.Bold), bounding_rect)
-
-    def paint_PI(self, node_gui, painter, option, node_color, type_, connected, rect):
-
-        color = QColor('#FFFFFF') if type_ == 'exec' else QColor(node_color)
-
-        if type_ == 'exec':
-            if connected or \
-                    option.state & QStyle.State_MouseOver:  # also fill when mouse hovers
-                brush = QBrush(QColor(255, 255, 255, 100))
-                painter.setBrush(brush)
-            else:
-                painter.setBrush(Qt.NoBrush)
-        elif type_ == 'data':
-            if connected or \
-                    option.state & QStyle.State_MouseOver:  # also fill when mouse hovers
-                r = color.red()
-                g = color.green()
-                b = color.blue()
-                brush = QBrush(QColor(r, g, b, 100))
-                painter.setBrush(brush)
-            else:
-                painter.setBrush(Qt.NoBrush)
-
-        pen = QPen(color)
-        pen.setWidth(1)
-        painter.setPen(pen)
-        painter.drawEllipse(rect.marginsRemoved(QMarginsF(3, 3, 3, 3)))
 
     # def paint_NI(self, node, node_style,
     #              painter, option,
@@ -683,6 +718,9 @@ class FlowTheme_Blender(FlowTheme):
     corner_radius_normal = 5
     corner_radius_small = 10
 
+    pin_style_data = DataPinStyle(margin_cut=3, pen_width=1)
+    pin_style_exec= ExecPinStyle(pen_width=1)
+    
     EXPORT = [
         'nodes color',
         'flow background color'
@@ -721,42 +759,13 @@ class FlowTheme_Blender(FlowTheme):
                 node_item_bounding_rect=node_item_bounding_rect
             )
 
-    def paint_PI_label(self, node_gui, painter, option, type_, connected, label_str, node_color, bounding_rect):
+    def paint_PI_label(self, node_gui, painter, option, type_, pin_state, label_str, node_color, bounding_rect):
         if type_ == 'exec':
             c = QColor('#FFFFFF')
         else:
             c = node_color
 
         self.paint_PI_label_default(painter, label_str, c, QFont("Source Code Pro", 10, QFont.Bold), bounding_rect)
-
-    def paint_PI(self, node_gui, painter, option, node_color, type_, connected, rect):
-
-        color = QColor('#FFFFFF') if type_ == 'exec' else node_color
-
-        painter.setBrush(QBrush(color))
-
-        # if type_ == 'exec':
-        #     if connected or \
-        #             option.state & QStyle.State_MouseOver:  # also fill when mouse hovers
-        #         brush = QBrush(QColor(255, 255, 255, 100))
-        #         painter.setBrush(brush)
-        #     else:
-        #         painter.setBrush(Qt.NoBrush)
-        # elif type_ == 'data':
-        #     if connected or \
-        #             option.state & QStyle.State_MouseOver:  # also fill when mouse hovers
-        #         r = node_color.red()
-        #         g = node_color.green()
-        #         b = node_color.blue()
-        #         brush = QBrush(QColor(r, g, b, 100))
-        #         painter.setBrush(brush)
-        #     else:
-        #         painter.setBrush(Qt.NoBrush)
-
-        pen = QPen(color)
-        pen.setWidth(1)
-        painter.setPen(pen)
-        painter.drawEllipse(rect.marginsRemoved(QMarginsF(2, 2, 2, 2)))
 
     def draw_NI_normal(self, node_gui, selected: bool, hovered: bool,
                        painter, c, w, h, bounding_rect, title_rect):
@@ -817,6 +826,16 @@ class FlowTheme_Simple(FlowTheme):
     node_background_color = QColor('#212429')
     node_small_background_color = QColor('#212429')
 
+    pin_style_data = DataPinStyle(
+        margin_cut=2,
+        disconnected_color=QColor('#53585c'),
+        pen_width=0
+    )
+    pin_style_exec = ExecPinStyle(
+        margin_cut=2,
+        valid_color=QColor('#dddddd')
+    )
+    
     EXPORT = [
         'nodes background color',
         'small nodes background color',
@@ -858,9 +877,9 @@ class FlowTheme_Simple(FlowTheme):
                 node_item_bounding_rect=node_item_bounding_rect
             )
 
-    def paint_PI_label(self, node_gui, painter, option, type_, connected, label_str, node_color, bounding_rect):
+    def paint_PI_label(self, node_gui, painter, option, type_, pin_state, label_str, node_color, bounding_rect):
         c = None
-        if not connected:
+        if pin_state != PinState.CONNECTED:
             c = QColor('#53585c')
         else:
             if type_ == 'exec':
@@ -869,42 +888,6 @@ class FlowTheme_Simple(FlowTheme):
                 c = node_color
 
         self.paint_PI_label_default(painter, label_str, c, QFont("Courier New", 10, QFont.Bold), bounding_rect)
-
-    def paint_PI(self, node_gui, painter, option, node_color, type_, connected, rect):
-
-        color = None
-        if not connected:
-            color = QColor('#53585c')
-        else:
-            if type_ == 'exec':
-                color = QColor('#dddddd')
-            else:
-                color = QColor(node_color)
-
-        if type_ == 'exec':
-            if connected or \
-                    option.state & QStyle.State_MouseOver:  # also fill when mouse hovers
-                brush = QBrush(QColor(255, 255, 255, 100))
-                painter.setBrush(brush)
-            else:
-                painter.setBrush(Qt.NoBrush)
-        elif type_ == 'data':
-            if connected or \
-                    option.state & QStyle.State_MouseOver:  # also fill when mouse hovers
-                r = color.red()
-                g = color.green()
-                b = color.blue()
-                brush = QBrush(QColor(r, g, b, 100))
-                painter.setBrush(brush)
-            else:
-                painter.setBrush(Qt.NoBrush)
-
-        brush = QBrush(color)
-        painter.setBrush(brush)
-        painter.setPen(Qt.NoPen)
-
-        painter.drawEllipse(rect.marginsRemoved(QMarginsF(2, 2, 2, 2)))
-        # painter.drawEllipse(QRectF(padding+w/8, padding+h/8, 3*w/4, 3*h/4))
 
     def draw_NI_normal(self, node_gui, selected: bool, hovered: bool,
                        painter, c, w, h, bounding_rect, title_rect):
@@ -958,6 +941,16 @@ class FlowTheme_Ueli(FlowTheme):
     nodes_background_color = QColor('#212429')
     small_nodes_background_color = nodes_background_color
 
+    pin_style_data = DataPinStyle(
+        pen_width=0,
+        disconnected_color=QColor('#53585c'),
+        margin_cut=2
+    )
+    pin_style_exec = ExecPinStyle(
+        pen_width=0,
+        valid_color=QColor('#dddddd')
+    )
+    
     EXPORT = [
         'nodes background color',
         'small nodes background color',
@@ -994,10 +987,10 @@ class FlowTheme_Ueli(FlowTheme):
                 node_item_bounding_rect=node_item_bounding_rect
             )
 
-    def paint_PI_label(self, node_gui, painter, option, type_, connected, label_str, node_color, bounding_rect):
+    def paint_PI_label(self, node_gui, painter, option, type_, pin_state, label_str, node_color, bounding_rect):
 
         c = None
-        if not connected:
+        if pin_state != PinState.CONNECTED:
             c = '#53585c'
         else:
             if type_ == 'exec':
@@ -1007,43 +1000,6 @@ class FlowTheme_Ueli(FlowTheme):
         color = QColor(c)
 
         self.paint_PI_label_default(painter, label_str, color, QFont("Courier New", 10, QFont.Bold), bounding_rect)
-
-    def paint_PI(self, node_gui, painter, option, node_color, type_, connected, rect):
-
-        color_str = None
-        if not connected:
-            color_str = '#53585c'
-        else:
-            if type_ == 'exec':
-                color_str = '#dddddd'
-            else:
-                color_str = node_color
-
-        color = QColor(color_str)
-        if type_ == 'exec':
-            if connected or \
-                    option.state & QStyle.State_MouseOver:  # also fill when mouse hovers
-                brush = QBrush(QColor(255, 255, 255, 100))
-                painter.setBrush(brush)
-            else:
-                painter.setBrush(Qt.NoBrush)
-        elif type_ == 'data':
-            if connected or \
-                    option.state & QStyle.State_MouseOver:  # also fill when mouse hovers
-                r = color.red()
-                g = color.green()
-                b = color.blue()
-                brush = QBrush(QColor(r, g, b, 100))
-                painter.setBrush(brush)
-            else:
-                painter.setBrush(Qt.NoBrush)
-
-        brush = QBrush(color)
-        painter.setBrush(brush)
-        painter.setPen(Qt.NoPen)
-
-        painter.drawEllipse(rect.marginsRemoved(QMarginsF(2, 2, 2, 2)))
-        # painter.drawEllipse(QRectF(padding+w/8, padding+h/8, 3*w/4, 3*h/4))
 
     def draw_NI_normal(self, node_gui, selected: bool, hovered: bool,
                        painter, c, w, h, bounding_rect: QRectF, title_rect):
@@ -1103,7 +1059,7 @@ class FlowTheme_PureDark(FlowTheme):
     node_small_bg_col = QColor('#363c41')
     node_title_color = QColor('#ffffff')
     port_pin_pen_color = QColor('#ffffff')
-
+    
     EXPORT = [
         'extended node background color',
         'small node background color',
@@ -1138,9 +1094,9 @@ class FlowTheme_PureDark(FlowTheme):
 
         painter.drawText(node_item_bounding_rect, align, node_title)
 
-    def paint_PI_label(self, node_gui, painter, option, type_, connected, label_str, node_color, bounding_rect):
+    def paint_PI_label(self, node_gui, painter, option, type_, pin_state, label_str, node_color, bounding_rect):
         c = None
-        if not connected:
+        if pin_state != PinState.CONNECTED:
             c = QColor('#53585c')
         else:
             if type_ == 'exec':
@@ -1150,21 +1106,25 @@ class FlowTheme_PureDark(FlowTheme):
 
         self.paint_PI_label_default(painter, label_str, c, QFont("Segoe UI", 10), bounding_rect)
 
-    def paint_PI(self, node_gui, painter, option, node_color, type_, connected, rect):
-
-        if connected:
-            painter.setBrush(QColor('#508AD8'))
+    def paint_PI(self, node_gui, painter, option, node_color, type_, pin_state, rect):
+        
+        pin_style = self.pin_style_exec if type_ == 'exec' else self.pin_style_data
+        brush_color = pin_style.pin_colors.get(pin_state)
+        
+        if pin_state == PinState.CONNECTED:
+            brush_color = QColor('#508AD8')
             painter.setPen(Qt.NoPen)
         else:
-            painter.setBrush(Qt.NoBrush)
-            p = QPen(self.port_pin_pen_color)
-            p.setWidthF(1.1)
-            painter.setPen(p)
+            pen = QPen(self.port_pin_pen_color)
+            pen.setWidthF(1.1)
+            painter.setPen(pen)
+        
+        brush = QBrush(brush_color) if brush_color else QBrush(Qt.NoBrush)
+        painter.setBrush(brush)
 
-        # rect = QRectF(padding + w / 8, padding + h / 8, 3 * w / 4, 3 * h / 4)
         if type_ == 'exec':
             painter.setBrush(QBrush(QColor('white')))
-        # painter.drawEllipse(rect)
+        
         painter.drawEllipse(rect.marginsRemoved(QMarginsF(2, 2, 2, 2)))
 
     def draw_NI_normal(self, node_gui, selected: bool, hovered: bool,
@@ -1279,9 +1239,9 @@ class FlowTheme_Colorful(FlowTheme):
 
         painter.drawText(node_item_bounding_rect, align, node_title)
 
-    def paint_PI_label(self, node_gui, painter, option, type_, connected, label_str, node_color, bounding_rect):
+    def paint_PI_label(self, node_gui, painter, option, type_, pin_state, label_str, node_color, bounding_rect):
         c = None
-        if not connected:
+        if pin_state != PinState.CONNECTED:
             c = QColor('#dddddd')
         else:
             if type_ == 'exec':
@@ -1291,19 +1251,9 @@ class FlowTheme_Colorful(FlowTheme):
 
         self.paint_PI_label_default(painter, label_str, c, QFont("Segoe UI", 10), bounding_rect)
 
-    def paint_PI(self, node_gui, painter, option, node_color, type_, connected, rect):
-
-        if connected:
-            painter.setBrush(QColor('#508AD8'))
-            painter.setPen(Qt.NoPen)
-        else:
-            painter.setBrush(Qt.NoBrush)
-            p = QPen(self.port_pin_pen_color)
-            p.setWidthF(1.1)
-            painter.setPen(p)
-
-        painter.drawEllipse(rect.marginsRemoved(QMarginsF(2, 2, 2, 2)))
-        # painter.drawEllipse(QRectF(padding + w / 8, padding + h / 8, 3 * w / 4, 3 * h / 4))
+    def paint_PI(self, node_gui, painter, option, node_color, type_, pin_state, rect):
+        
+        FlowTheme_PureDark.paint_PI(self, node_gui, painter, option, node_color, type_, pin_state, rect)
 
     def draw_NI_normal(self, node_gui, selected: bool, hovered: bool,
                        painter, c, w, h, bounding_rect: QRectF, title_rect):
@@ -1353,9 +1303,9 @@ class FlowTheme_ColorfulLight(FlowTheme_Colorful):
 
     node_item_shadow_color = QColor('#cccccc')
 
-    def paint_PI_label(self, node_gui, painter, option, type_, connected, label_str, node_color, bounding_rect):
+    def paint_PI_label(self, node_gui, painter, option, type_, pin_state, label_str, node_color, bounding_rect):
         c = None
-        if not connected:
+        if pin_state != PinState.CONNECTED:
             c = QColor('#1f1f1f')
         else:
             if type_ == 'exec':
@@ -1433,11 +1383,11 @@ class FlowTheme_Industrial(FlowTheme):
                 node_item_bounding_rect=node_item_bounding_rect
             )
 
-    def paint_PI_label(self, node_gui, painter, option, type_, connected, label_str, node_color, bounding_rect):
+    def paint_PI_label(self, node_gui, painter, option, type_, pin_state, label_str, node_color, bounding_rect):
         c = QColor('#FFFFFF')
         self.paint_PI_label_default(painter, label_str, c, QFont("Segoe UI", 8, QFont.Normal), bounding_rect)
 
-    def paint_PI(self, node_gui, painter, option, node_color, type_, connected, rect):
+    def paint_PI(self, node_gui, painter, option, node_color, type_, pin_state, rect):
 
         color = QColor('#FFFFFF') if type_ == 'exec' else QColor(node_color)
 
@@ -1449,12 +1399,15 @@ class FlowTheme_Industrial(FlowTheme):
         inner_ellipse_rect = rect.marginsRemoved(QMarginsF(4, 4, 4, 4))  # QRectF(padd, padd, w - 2*padd, h - 2*padd)
 
         if type_ == 'exec':
-
-            if connected:
-                brush = QBrush(QColor(255, 255, 255, 200))
-                painter.setBrush(brush)
-            else:
-                painter.setBrush(Qt.NoBrush)
+            
+            pin_style = self.pin_style_exec
+            brush_color = pin_style.pin_colors.get(pin_state)
+            
+            if pin_state == PinState.CONNECTED:
+                brush_color = QBrush(QColor(255, 255, 255, 200))
+            
+            brush = QBrush(brush_color) if brush_color else Qt.NoBrush    
+            painter.setBrush(brush)
 
             rect_ = rect.marginsRemoved(QMarginsF(2, 2, 2, 2))
 
@@ -1468,13 +1421,20 @@ class FlowTheme_Industrial(FlowTheme):
 
         elif type_ == 'data':
 
+            pin_style = self.pin_style_data
+            
             pen = QPen(color)
             pen.setWidth(1)
             painter.setPen(pen)
 
-            if connected:
+            if pin_state != PinState.DISCONNECTED:
                 # draw inner ellipse
-                brush = QBrush(QColor(color.red(), color.green(), color.blue(), 200))
+                brush_color = pin_style.pin_colors[pin_state]
+                if pin_state == PinState.CONNECTED:
+                    brush_color = color
+                    
+                brush_color = QColor(brush_color)
+                brush_color.setAlpha(200)
                 painter.setBrush(brush)
                 painter.drawEllipse(inner_ellipse_rect)
 

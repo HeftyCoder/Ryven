@@ -12,6 +12,7 @@ from ...GUIBase import GUIBase
 from ...utils import get_longest_line, shorten
 from ..FlowViewProxyWidget import FlowViewProxyWidget
 
+from enum import IntEnum
 
 # utils
 
@@ -89,10 +90,12 @@ class PortItem(GUIBase, QGraphicsWidget):
         pass
 
     def port_connected(self):
-        pass
+        self.pin.state = PinState.CONNECTED
+        self.update()
 
     def port_disconnected(self):
-        pass
+        self.pin.state = PinState.DISCONNECTED
+        self.update()
 
 
 class InputPortItem(PortItem):
@@ -165,6 +168,7 @@ class InputPortItem(PortItem):
         """Disables the widget"""
         if self.widget:
             self.widget.setEnabled(False)
+        super().port_connected()
 
         # https://github.com/leon-thomm/Ryven/pull/137#issuecomment-1433783052
         # if self.port.type_ == 'data':
@@ -176,6 +180,7 @@ class InputPortItem(PortItem):
         """Enables the widget again"""
         if self.widget:
             self.widget.setEnabled(True)
+        super().port_disconnected()
 
     def complete_data(self, data: dict) -> dict:
         if self.port.type_ == 'data':
@@ -210,8 +215,15 @@ class OutputPortItem(PortItem):
 
 # contents
 
-
+class PinState(IntEnum):
+    DISCONNECTED = 1
+    CONNECTED = 2
+    VALID = 3
+    INVALID = 4
+        
+        
 class PortItemPin(QGraphicsWidget):
+    
     def __init__(self, port, port_item, node_gui, node_item):
         super(PortItemPin, self).__init__(node_item)
 
@@ -220,6 +232,8 @@ class PortItemPin(QGraphicsWidget):
         self.node_gui = node_gui
         self.node_item = node_item
         self.flow_view = self.node_item.flow_view
+        
+        self._state = PinState.DISCONNECTED
 
         self.setGraphicsItem(self)
         self.setAcceptHoverEvents(True)
@@ -236,6 +250,21 @@ class PortItemPin(QGraphicsWidget):
         self.height = 17
         self.port_local_pos = None
 
+    @property
+    def state(self):
+        """
+        If it's connected, always returns PinState.CONNECTED
+        
+        Otherwise, returns the underlying _state value
+        """
+        
+        return PinState.CONNECTED if is_connected(self.port) else self._state
+    
+    @state.setter
+    def state(self, value: PinState):
+        self._state = value
+        self.update()
+        
     def boundingRect(self):
         return QRectF(QPointF(0, 0), self.geometry().size())
 
@@ -254,7 +283,7 @@ class PortItemPin(QGraphicsWidget):
             option=option,
             node_color=self.node_gui.color,
             type_=self.port.type_,
-            connected=is_connected(self.port),
+            pin_state=self.state,
             rect=QRectF(
                 self.padding, self.padding, self.width_no_padding(), self.height_no_padding()
             ),
