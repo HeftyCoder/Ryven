@@ -252,18 +252,27 @@ class PortItemPin(QGraphicsWidget):
 
     @property
     def state(self):
-        """
-        If it's connected, always returns PinState.CONNECTED
+        """Returns the pin state, regardless of whether it's connected"""
         
-        Otherwise, returns the underlying _state value
-        """
-        
-        return PinState.CONNECTED if is_connected(self.port) else self._state
+        return self._state
     
     @state.setter
     def state(self, value: PinState):
-        self._state = value
-        self.update()
+        """Sets the pin state. Protects if pin is connected"""
+        self.set_state(value)
+    
+    def set_state(self, value: PinState, protect_connection = True):
+        """
+        Sets the pin state.
+        
+        If protect_connection and port is connected, state is set to PinState.CONNECTED
+        """
+        self._state = (
+            value 
+            if not (is_connected(self.port) and protect_connection) 
+            else PinState.CONNECTED
+        )
+        self.update
         
     def boundingRect(self):
         return QRectF(QPointF(0, 0), self.geometry().size())
@@ -283,7 +292,7 @@ class PortItemPin(QGraphicsWidget):
             option=option,
             node_color=self.node_gui.color,
             type_=self.port.type_,
-            pin_state=self.state,
+            pin_state=self._state,
             rect=QRectF(
                 self.padding, self.padding, self.width_no_padding(), self.height_no_padding()
             ),
