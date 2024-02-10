@@ -1,7 +1,15 @@
 import traceback
 from typing import Optional, Tuple, List
 
-from qtpy.QtWidgets import QGraphicsItem, QGraphicsObject, QMenu, QGraphicsDropShadowEffect
+from qtpy.QtWidgets import (
+    QGraphicsItem, 
+    QGraphicsObject, 
+    QMenu, 
+    QGraphicsDropShadowEffect,
+    QGraphicsWidget,
+    QGraphicsLinearLayout,
+    QSizePolicy,
+)
 from qtpy.QtCore import Qt, QRectF, QObject, QPointF
 from qtpy.QtGui import QColor
 
@@ -9,12 +17,15 @@ from .NodeErrorIndicator import NodeErrorIndicator
 from .NodeGUI import NodeGUI
 from ...GUIBase import GUIBase
 from ryvencore.NodePort import NodeInput, NodeOutput
+from ryvencore.RC import ProgressState
+
 from .NodeItemAction import NodeItemAction
 from .NodeItemAnimator import NodeItemAnimator
 from .NodeItemWidget import NodeItemWidget
 from .PortItem import InputPortItem, OutputPortItem
 from ...utils import serialize, deserialize, MovementEnum, generate_name
-
+from .GraphicsProgressBar import GraphicsProgressBar
+from .GraphicsTextWidget import GraphicsTextWidget
 
 class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
     """The GUI representative for nodes. Unlike the Node class, this class is not subclassed individually and works
@@ -35,6 +46,7 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
         self.inputs: List[InputPortItem] = []
         self.outputs: List[OutputPortItem] = []
         self.color = QColor(self.node_gui.color)  # manipulated by self.animator
+        self.progress_state: ProgressState = None
 
         self.collapsed = False
         self.hovered = False
@@ -69,7 +81,23 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
         self.setAcceptHoverEvents(True)
         self.setCacheMode(QGraphicsItem.DeviceCoordinateCache)
 
-        # UI
+        # Progress Bar and Message
+        self.top_section_widget = QGraphicsWidget(parent=self)
+        self.top_section_widget.setVisible(False)
+        top_section_layout = QGraphicsLinearLayout(Qt.Vertical)
+        top_section_layout.setContentsMargins(0, 0, 0 , 0)
+        self.top_section_widget.setLayout(top_section_layout)
+        
+        self.message = GraphicsTextWidget()
+        self.message.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        top_section_layout.addItem(self.message)
+        
+        self.progress_bar = GraphicsProgressBar()
+        top_section_layout.addItem(self.progress_bar)
+        
+        self.node_gui.progress_updated.connect(self._on_progress_updated)
+        
+        # Node UI
         self.shadow_effect = None
         self.main_widget = None
         if self.node_gui.main_widget_class is not None:
@@ -136,6 +164,13 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
         name = self.node.__class__.title if self.node else f'{NodeItem.__name__}'
         obj = self.node if self.node else self
         return generate_name(obj, name)
+    
+    # EVENTS
+    
+    def _on_progress_updated(self, p_state: ProgressState):
+        self.progress_state = p_state
+        self.top_section_widget.setVisible(p_state is not None)
+        self.update()
     
     # UI STUFF
 
@@ -279,6 +314,18 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
         
     def update_design(self):
         """Loads the shadow effect option and causes redraw with active theme."""
+        self.progress_bar.setVisible(
+            self.session_design.flow_theme.use_progress_bar
+        )
+        
+        t_color = (
+            QColor(185, 185, 185)
+            if self.session_design.flow_theme.type_ == "dark"
+            else QColor(40, 40, 40)
+        )
+        self.progress_bar.text_color = t_color
+        self.message.set_default_text_color(t_color)
+        
         if self.session_design.node_item_shadows_enabled:
             self.shadow_effect = QGraphicsDropShadowEffect()
             self.shadow_effect.setXOffset(12)
@@ -345,6 +392,8 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
         
     def paint(self, painter, option, widget=None):
         """All painting is done by NodeItemPainter"""
+        
+        b_rect = self.boundingRect()
         # in order to access a meaningful geometry of GraphicsWidget contents in update_shape(), the paint event
         # has to be called once.
         # https://forum.qt.io/topic/117179/force-qgraphicsitem-to-update-immediately-wait-for-update-event/4
@@ -356,8 +405,33 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
 
             self.update_shape()
             self.update_conn_pos()
-            self.error_indicator.setPos(self.boundingRect().bottomRight())
+            self.error_indicator.setPos(b_rect.bottomRight())
 
+        # Progress Bar and Message.
+        if self.progress_state:
+            
+            message = self.progress_state.message
+            if message is not None and message != '':
+                self.message.setVisible(True)
+                self.message.set_text(message)
+            else:
+                self.message.setVisible(False)
+            self.message.set_text_width(b_rect.width() + 50)
+            
+            self.progress_bar.setVisible(self.session_design.flow_theme.use_progress_bar)
+            
+            if self.progress_bar.isVisible():
+                self.progress_bar.set_size(b_rect.width(), 20)
+                h = self.top_section_widget.size().height()
+                self.top_section_widget.setPos(-b_rect.width() / 2, -b_rect.height() / 2 - h - 5)       
+
+                self.progress_bar.progress = self.progress_state.percentage()
+        
+        # I think calling this here is not well thought, because some functions in FlowTheme DO NOT take into
+        # account potential expansions of NodeItemWidget, like the get_header... ones. Ideally, I think 
+        # this should be called inside NodeItemWidget.
+        n_rect = b_rect
+        
         self.session_design.flow_theme.paint_NI(
             node_gui=self.node_gui,
             selected=self.isSelected(),
@@ -366,9 +440,9 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
             painter=painter,
             option=option,
             color=self.color,
-            w=self.boundingRect().width(),
-            h=self.boundingRect().height(),
-            bounding_rect=self.boundingRect(),
+            w=n_rect.width(),
+            h=n_rect.height(),
+            bounding_rect=n_rect,
             title_rect=self.widget.header_widget.boundingRect()
             if self.widget.header_widget
             else self.widget.title_label.boundingRect()

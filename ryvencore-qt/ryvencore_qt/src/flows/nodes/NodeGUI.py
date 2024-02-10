@@ -6,6 +6,8 @@ from qtpy.QtCore import QObject, Signal
 from .WidgetBaseClasses import NodeMainWidget, NodeInputWidget, NodeInspectorWidget
 from .NodeInspector import NodeInspectorDefaultWidget
 
+from ryvencore.RC import ProgressState
+from ryvencore import Node
 
 class NodeGUI(QObject):
     """
@@ -35,12 +37,13 @@ class NodeGUI(QObject):
     update_shape_triggered = Signal()
     hide_unconnected_ports_triggered = Signal()
     show_unconnected_ports_triggered = Signal()
+    progress_updated = Signal(ProgressState)
 
     def __init__(self, params):
         QObject.__init__(self)
 
         node, session_gui = params
-        self.node = node
+        self.node: Node = node
         self.item = None   # set by the node item directly after this __init__ call
         self.session_gui = session_gui
         setattr(node, 'gui', self)
@@ -66,6 +69,7 @@ class NodeGUI(QObject):
         self.node.output_added.sub(self._on_new_output_added)
         self.node.input_removed.sub(self._on_input_removed)
         self.node.output_removed.sub(self._on_output_removed)
+        self.node.progress_updated.sub(self._on_progress_updated)
 
         # create the inspector widget
         inspector_params = (self.node, self)
@@ -130,6 +134,9 @@ class NodeGUI(QObject):
     def _on_output_removed(self, _, index, out):
         self.output_removed.emit(index, out)
 
+    def _on_progress_updated(self, progress: ProgressState):
+        self.progress_updated.emit(progress)
+        
     """
     actions
     

@@ -67,6 +67,7 @@ NodeWidget {
 
 }
 '''
+    use_progress_bar = True
     node_selection_stylesheet = ''
 
     header_padding = (10, 2, 10, 2)  # (left, top, right, botton)
@@ -124,7 +125,7 @@ NodeWidget {
 
     def build_node_selection_stylesheet(self):
         return self.node_selection_stylesheet__base + '\n' + self.node_selection_stylesheet
-
+    
     def paint_NI_title_label(self, node_gui, selected: bool, hovering: bool, painter: QPainter, option: QStyleOption,
                              node_style: str, node_title: str, node_color: QColor, node_item_bounding_rect):
         pass
@@ -318,8 +319,10 @@ class FlowTheme_Toy(FlowTheme):
     pin_style_data = DataPinStyle(
         pen_width=0,
         valid_color=QColor('#2E688C'),
-        margin_cut=3
+        margin_cut=3,
+        disconnected_color=QColor('#c69a15'),
     )
+    
     pin_style_exec = ExecPinStyle(
         valid_color=QColor('#3880ad'),
     )
@@ -1435,7 +1438,7 @@ class FlowTheme_Industrial(FlowTheme):
                     
                 brush_color = QColor(brush_color)
                 brush_color.setAlpha(200)
-                painter.setBrush(brush)
+                painter.setBrush(brush_color)
                 painter.drawEllipse(inner_ellipse_rect)
 
             # draw outer ellipse
@@ -1514,7 +1517,7 @@ class FlowTheme_Fusion(FlowTheme):
         painter.drawText(node_item_bounding_rect, align, node_title)
 
 
-    def paint_PI_label(self, node_gui, painter, option, type_, connected, label_str, node_color, bounding_rect):
+    def paint_PI_label(self, node_gui, painter, option, type_, pin_state, label_str, node_color, bounding_rect):
         pen = QPen(QColor('#000000'))
         pen.setWidthF(1.2)
         painter.setPen(pen)
@@ -1522,7 +1525,7 @@ class FlowTheme_Fusion(FlowTheme):
         self.paint_PI_label_default(painter, label_str, QColor(0, 0, 0), QFont("Segoe UI", 8), bounding_rect)
 
 
-    def paint_PI(self, node_gui, painter, option, node_color, type_, connected, rect):
+    def paint_PI(self, node_gui, painter, option, node_color, type_, pin_state, rect):
 
         painter.setBrush(QColor('#000000'))
         painter.setPen(Qt.NoPen)
