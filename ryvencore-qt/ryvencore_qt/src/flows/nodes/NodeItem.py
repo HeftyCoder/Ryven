@@ -1,5 +1,5 @@
 import traceback
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, TYPE_CHECKING
 
 from qtpy.QtWidgets import (
     QGraphicsItem, 
@@ -18,6 +18,7 @@ from .NodeGUI import NodeGUI
 from ...GUIBase import GUIBase
 from ryvencore.NodePort import NodeInput, NodeOutput
 from ryvencore.RC import ProgressState
+from ryvencore import Node
 
 from .NodeItemAction import NodeItemAction
 from .NodeItemAnimator import NodeItemAnimator
@@ -27,11 +28,12 @@ from ...utils import serialize, deserialize, MovementEnum, generate_name
 from .GraphicsProgressBar import GraphicsProgressBar
 from .GraphicsTextWidget import GraphicsTextWidget
 
+
 class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
     """The GUI representative for nodes. Unlike the Node class, this class is not subclassed individually and works
     the same for every node."""
 
-    def __init__(self, node, node_gui, flow_view, design):
+    def __init__(self, node: Node, node_gui, flow_view, design):
         GUIBase.__init__(self, representing_component=node)
         QGraphicsObject.__init__(self)
 
@@ -133,10 +135,10 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
                           ' (was this intended?)')
 
         # catch up on init ports
-        for inp in self.node.inputs:
+        for inp in self.node._inputs:
             self.add_new_input(inp)
 
-        for out in self.node.outputs:
+        for out in self.node._outputs:
             self.add_new_output(out)
 
         if self.init_data is not None:
@@ -170,6 +172,27 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
     def _on_progress_updated(self, p_state: ProgressState):
         self.progress_state = p_state
         self.top_section_widget.setVisible(p_state is not None)
+        
+        if not p_state:
+            # stop any potential animations
+            self.progress_bar.stop_animation()
+            return
+        
+        # message
+        message = self.progress_state.message
+        if message is not None and message != '':
+            self.message.setVisible(True)
+            self.message.set_text(message)
+        else:
+            self.message.setVisible(False)
+            
+        # progress
+        self.progress_bar.setVisible(self.session_design.flow_theme.use_progress_bar and self.progress_state is not None)
+        if not self.progress_state.is_indefinite():
+            self.progress_bar.set_progress_values(self.progress_state.percentage(), 0)
+        else:
+            self.progress_bar.play_animation(1/3, 2, 50)
+        
         self.update()
     
     # UI STUFF
@@ -208,7 +231,7 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
         self.setCursor(Qt.SizeAllCursor)
 
     def on_node_input_added(self, index, inp: NodeInput):
-        insert = index if index == len(self.node.inputs) - 1 else None
+        insert = index if index == len(self.node._inputs) - 1 else None
         self.add_new_input(inp, insert)
 
     def add_new_input(self, inp: NodeInput, insert: int = None):
@@ -263,7 +286,7 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
             self.update()
 
     def on_node_output_added(self, index, out: NodeOutput):
-        insert = index if index == len(self.node.outputs) - 1 else None
+        insert = index if index == len(self.node._outputs) - 1 else None
         self.add_new_output(out, insert)
 
     def add_new_output(self, out: NodeOutput, insert: int = None):
@@ -406,27 +429,16 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
             self.update_shape()
             self.update_conn_pos()
             self.error_indicator.setPos(b_rect.bottomRight())
-
-        # Progress Bar and Message.
-        if self.progress_state:
-            
-            message = self.progress_state.message
-            if message is not None and message != '':
-                self.message.setVisible(True)
-                self.message.set_text(message)
-            else:
-                self.message.setVisible(False)
+        
+        # Progress and message drawing
+        if self.message.isVisible():
             self.message.set_text_width(b_rect.width() + 50)
             
-            self.progress_bar.setVisible(self.session_design.flow_theme.use_progress_bar)
+        if self.progress_bar.isVisible():
+            self.progress_bar.set_size(b_rect.width(), 20)
+            h = self.top_section_widget.size().height()
+            self.top_section_widget.setPos(-b_rect.width() / 2, -b_rect.height() / 2 - h - 5)       
             
-            if self.progress_bar.isVisible():
-                self.progress_bar.set_size(b_rect.width(), 20)
-                h = self.top_section_widget.size().height()
-                self.top_section_widget.setPos(-b_rect.width() / 2, -b_rect.height() / 2 - h - 5)       
-
-                self.progress_bar.progress = self.progress_state.percentage()
-        
         # I think calling this here is not well thought, because some functions in FlowTheme DO NOT take into
         # account potential expansions of NodeItemWidget, like the get_header... ones. Ideally, I think 
         # this should be called inside NodeItemWidget.
@@ -506,7 +518,7 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
     def update_conn_pos(self):
         """Updates the scene positions of connections"""
 
-        for o in self.node.outputs:
+        for o in self.node._outputs:
             for i in self.node.flow.connected_inputs(o):
                 # c.item.recompute()
 
@@ -517,7 +529,7 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
 
                 item = self.flow_view.connection_items[(o,i)]
                 item.recompute()
-        for i in self.node.inputs:
+        for i in self.node._inputs:
             o = self.node.flow.connected_output(i)
             # c.item.recompute()
 

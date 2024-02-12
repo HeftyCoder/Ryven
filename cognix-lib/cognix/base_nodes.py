@@ -16,8 +16,6 @@ class CognixNode(Node, metaclass=ABCMeta):
         # events that ryvencore doesn't have
         self.updated = Event(int)
         self.output_changed = Event(NodeOutput, Data)
-        # for type hinting...
-        self.flow: Flow = self.flow
         
         from .graph_player import GraphPlayer # to avoid circular imports
         self._player: GraphPlayer = None
@@ -44,7 +42,7 @@ class CognixNode(Node, metaclass=ABCMeta):
         
         assert isinstance(data, Data), "Output value must be of type ryvencore.Data"
         self.flow.executor.set_output_val(self, index, data)
-        self.output_changed.emit(self.outputs[index], data)
+        self.output_changed.emit(self._outputs[index], data)
         
     def reset(self):
         """

@@ -1,5 +1,5 @@
 # import math
-from typing import List
+from typing import List, Tuple
 from qtpy.QtCore import QPointF, Qt, Signal, QObject, QTimer
 from qtpy.QtGui import QPainter, QColor, QRadialGradient, QPainterPath, QPen
 from qtpy.QtWidgets import (
@@ -24,7 +24,7 @@ class ConnectionItem(GUIBase, QGraphicsPathItem, QObject):
     
     data_signal = Signal(Data) # tuple[NodeOutput, NodeInput]
 
-    def __init__(self, connection: tuple, session_design: Design):
+    def __init__(self, connection: Tuple[NodeOutput, NodeInput], session_design: Design):
         QGraphicsPathItem.__init__(self)
         QObject.__init__(self)
 
@@ -33,8 +33,8 @@ class ConnectionItem(GUIBase, QGraphicsPathItem, QObject):
         self.connection = connection
         out, inp = self.connection
 
-        out_port_index = out.node.outputs.index(out)
-        inp_port_index = inp.node.inputs.index(inp)
+        out_port_index = out.node._outputs.index(out)
+        inp_port_index = inp.node._inputs.index(inp)
         self.out_item: PortItem = out.node.gui.item.outputs[out_port_index]
         self.inp_item: PortItem = inp.node.gui.item.inputs[inp_port_index]
 
@@ -92,9 +92,9 @@ class ConnectionItem(GUIBase, QGraphicsPathItem, QObject):
     def __str__(self):
         out, inp = self.connection
         node_in_name = f'{inp.node.gui.item}'
-        node_in_index = inp.node.inputs.index(inp)
+        node_in_index = inp.node._inputs.index(inp)
         node_out_name = f'{out.node.gui.item}'
-        node_out_index = out.node.outputs.index(out)
+        node_out_index = out.node._outputs.index(out)
         return f'{node_out_index}->{node_in_index} ({node_out_name}, {node_in_name})'
 
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget):

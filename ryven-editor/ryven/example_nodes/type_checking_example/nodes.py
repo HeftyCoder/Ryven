@@ -22,37 +22,47 @@ class Producer(StartNode):
     
     def update_event(self, inp=-1):
 
-        progress_state = ProgressState(1, 0)
-        self.progress = progress_state
+        try:
+            
+            progress_state = ProgressState(1, 0)
+            self.progress = progress_state
+            
+            self.set_output_payload(0, [1, 2, 3]) # a list of data produced
+
+            self.set_progress_value(0.2, 'Loading Values')
+            sleep(1)
+            
+            self.set_output_payload(1, 
+                {
+                    'george': 2,
+                    'john': 3,
+                    'damon': 4,
+                }
+            )
+
+            self.set_progress_value(0.5, 'Setting numbers')
+            sleep(3)
+            
+            self.set_output_payload(2, 23)
+
+            self.set_output_payload(3, 2+3j)
+
+            self.set_output_payload(4, 'custom info')
+            
+            self.set_progress_value(0.9, 'This is my way!')
+            sleep(2)
+
+            self.set_output_payload(5, {23, 4, 1, 2})
+            
+            self.set_progress_value(-1, "Nothing to see here!")
+            sleep(5)
+            
+            self.progress = None
         
-        self.set_output_payload(0, [1, 2, 3]) # a list of data produced
-
-        self.set_progress_value(0.2, 'Loading Values')
-        sleep(1)
-        
-        self.set_output_payload(1, 
-            {
-                'george': 2,
-                'john': 3,
-                'damon': 4,
-            }
-        )
-
-        self.set_progress_value(0.5, 'Setting numbers')
-        sleep(3)
-        
-        self.set_output_payload(2, 23)
-
-        self.set_output_payload(3, 2+3j)
-
-        self.set_output_payload(4, 'custom info')
-        
-        self.set_progress_value(0.9, 'Finalizing')
-        sleep(4)
-
-        self.set_output_payload(5, {23, 4, 1, 2})
-
-        self.progress = None
+        except Exception:
+            import traceback
+            traceback.print_exc()
+            self.progress = None
         
 class Consumer(CognixNode):
     

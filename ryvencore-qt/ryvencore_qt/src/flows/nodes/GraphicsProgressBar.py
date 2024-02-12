@@ -6,10 +6,10 @@ from qtpy.QtWidgets import (
     QStyleOptionGraphicsItem,
     QGraphicsLayoutItem,
 )
-from numbers import Real
+from numbers import Real, Integral
 from typing import Union
-from qtpy.QtCore import Qt, QPointF, QSizeF
-from qtpy.QtGui import QColor, QPainter, QFont, QPen
+from qtpy.QtCore import Qt, QPointF, QSizeF, QTimeLine
+from qtpy.QtGui import QColor, QPainter, QFont
 
 
 class GraphicsProgressBar(QGraphicsWidget):
@@ -25,7 +25,10 @@ class GraphicsProgressBar(QGraphicsWidget):
         self._width = 100
         self._font: QFont = None
         self._text_color: QColor = QColor(185, 185, 185)
-        
+
+        self.__timeline = None
+    # PROPERTIES
+    
     @property
     def color(self):
         return self._color
@@ -51,7 +54,7 @@ class GraphicsProgressBar(QGraphicsWidget):
     
     @offset.setter
     def offset(self, value: Real):
-        self._offset = self.__clamp(value, 0, self._progress)
+        self._offset = self.__clamp(value, 0, 1)
         self.update()
         
     def set_progress_values(self, progress: Real, offset: Real):
@@ -105,6 +108,51 @@ class GraphicsProgressBar(QGraphicsWidget):
             self._text_color = QColor(185, 185, 185)
         self.update()
     
+    # ANIMATION
+    
+    def play_animation(
+        self, percent: Integral, 
+        duration: Integral = 1, 
+        frames: Integral = 100 
+    ):
+        """
+        Plays an animation that indicates indefinite loading
+        
+        Duration is in seconds
+        """
+        
+        # timeline creation
+        self.__timeline = QTimeLine(duration * 1000, self)
+        self.__timeline.setFrameRange(0, frames)
+        self.__timeline.setLoopCount(0)
+        
+        # progress
+        self.progress = percent
+        
+        def update_timeline(frame):
+            half_point = int(frames * 0.5)
+            if frame < half_point:
+                # forward
+                percentage = 2 * frame / frames
+            else:
+                # reverse
+                percentage = 2 * (1 - frame / frames)
+            
+            final_value = 1 - percent
+            self.offset = final_value * percentage
+        
+        self.__timeline.frameChanged.connect(update_timeline)
+        
+        self.__timeline.start()
+
+    def stop_animation(self):
+        if self.__timeline:
+            self.__timeline.stop()
+            self.__timeline.deleteLater()
+            self.__timeline = None
+
+    # DRAWING
+    
     def boundingRect(self) -> QRectF:
         return QRectF(QPointF(0, 0), self.geometry().size())
     
@@ -135,12 +183,16 @@ class GraphicsProgressBar(QGraphicsWidget):
         p_x = int(rect_width * self.offset)
         # excess is cut automatically
         p_width = int(rect_width * self.progress)
-        painter.drawRect(x + p_x, 0, p_width, height)
+        painter.drawRect(x + p_x, y, p_width, height)
         
         # Draw text
         text_rect = QRectF(x + rect_width, y, width - rect_width, height)
         painter.setPen(self._text_color)
-        painter.drawText(text_rect, f'{self.progress * 100}%', Qt.AlignmentFlag.AlignCenter)
+        
+        if self.__timeline:
+            painter.drawText(text_rect, f'---%', Qt.AlignmentFlag.AlignCenter)
+        else:
+            painter.drawText(text_rect, f'{self.progress * 100}%', Qt.AlignmentFlag.AlignCenter)
     
     def __clamp(self, num, min_value, max_value):
         return max(min(num, max_value), min_value)

@@ -174,7 +174,7 @@ class FlowView(GUIBase, QGraphicsView):
         self._potential_conn_pin: PortItemPin = None # the pin we're trying to connect to
         self._conn_item_over: Union[PortItem, NodeItem, None] = None
         self._dragging_connection = False
-        self._valid_check: Tuple[ConnValidType, str] = None
+        self._valid_check: ConnValidType = None
         self._drag_conn_port_items: Tuple[OutputPortItem, InputPortItem] = None
         self._waiting_for_connection_request: bool = False
         
@@ -592,19 +592,19 @@ class FlowView(GUIBase, QGraphicsView):
                 if isinstance(selected_port, NodeOutput):
                     for inp_port_item in node_item_over.inputs:
                         self._drag_conn_port_items = (selected_port_item, inp_port_item)
-                        valid_result, _ = self._valid_check = self.flow.can_nodes_connect(
+                        self._valid_check = self.flow.can_nodes_connect(
                             self._get_drag_conn_pair()
                         )
-                        if  valid_result == ConnValidType.VALID:
+                        if  self._valid_check == ConnValidType.VALID:
                             potential_conn_pin = inp_port_item.pin
                             break
                 else:
                     for out_port_item in node_item_over.outputs:
                         self._drag_conn_port_items = (out_port_item, selected_port_item)
-                        valid_result, _ = self._valid_check = self.flow.can_nodes_connect(
+                        self._valid_check = self.flow.can_nodes_connect(
                             self._get_drag_conn_pair()
                         )
-                        if valid_result == ConnValidType.VALID:
+                        if self._valid_check == ConnValidType.VALID:
                             potential_conn_pin = out_port_item.pin
                             break
             
@@ -614,13 +614,12 @@ class FlowView(GUIBase, QGraphicsView):
                     self._potential_conn_pin.state = PinState.DISCONNECTED
                 
                 self._potential_conn_pin = potential_conn_pin
-                valid_result = self._valid_check[0] if self._valid_check else None
                 
                 # change the pin state only if it's valid or invalid
-                if potential_conn_pin and valid_result:
+                if potential_conn_pin and self._valid_check:
                     if (
-                        valid_result == ConnValidType.VALID or
-                        valid_result == ConnValidType.INPUT_TAKEN
+                        self._valid_check == ConnValidType.VALID or
+                        self._valid_check == ConnValidType.INPUT_TAKEN
                     ):
                         self._potential_conn_pin.set_state(PinState.VALID, False)
                     
@@ -655,8 +654,7 @@ class FlowView(GUIBase, QGraphicsView):
             if node_item_at_event_pos:
                 # the above and this check are separate so a choice widget
                 # doesn't show over a node item
-                valid_result = self._valid_check[0] if self._valid_check else None
-                if valid_result and self.is_potential_valid_check(valid_result):
+                if self._valid_check and self.is_potential_valid_check(self._valid_check):
                     out, inp = self._get_drag_conn_pair()
                     self.connect_node_ports__cmd(out, inp)
 
