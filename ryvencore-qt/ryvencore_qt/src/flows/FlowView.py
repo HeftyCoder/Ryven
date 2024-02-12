@@ -1387,7 +1387,7 @@ class FlowView(GUIBase, QGraphicsView):
         elif isinstance(e, DrawingObject):
             self.add_drawing(e)
 
-    def remove_components(self, comps: [QGraphicsItem]):
+    def remove_components(self, comps: List[QGraphicsItem]):
         for c in comps:
             self.remove_component(c)
 
@@ -1482,18 +1482,18 @@ class FlowView(GUIBase, QGraphicsView):
                 SelectComponents_Command(self, items, self._current_selected)
             )
 
-    def selected_node_items(self, item_list: list = None) -> [NodeItem]:
+    def selected_node_items(self, item_list: list = None) -> List[NodeItem]:
         """Returns a list of the currently selected NodeItems."""
 
         search_list = item_list if item_list else self.scene().selectedItems()
         return [node_item for node_item in search_list if isinstance(node_item, NodeItem)]
 
-    def selected_nodes(self, item_list: list = None) -> [Node]:
+    def selected_nodes(self, item_list: list = None) -> List[Node]:
         """Returns a list of the currently selected nodes."""
         
         return [node_item.node for node_item in self.selected_node_items(item_list)]
 
-    def selected_drawings(self) -> [DrawingObject]:
+    def selected_drawings(self) -> List[DrawingObject]:
         """Returns a list of the currently selected drawings."""
 
         return [
