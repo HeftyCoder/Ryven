@@ -1,0 +1,57 @@
+from typing import Tuple, TYPE_CHECKING
+from PySide6.QtGui import QCloseEvent, QHideEvent, QShowEvent
+from ryvencore import Node
+from .WidgetBaseClasses import NodeViewerWidget
+from qtpy.QtWidgets import QDialog, QVBoxLayout, QSplitter
+from qtpy.QtCore import Qt
+
+if TYPE_CHECKING:
+    from .NodeGUI import NodeGUI
+
+class NodeViewerDefault(NodeViewerWidget, QDialog):
+    """
+    The default class for creating a view window for a node.
+    
+    Attaches a horizontal splitter as self.content. The inspector
+    is also attached to the splitter.
+    
+    It is adviced to utilize this class for any potential overrides, as
+    it connects to other qt events.
+    """
+    
+    attach_inspector = True
+    
+    def __init__(self, params: Tuple[Node, 'NodeGUI'], parent=None):
+        NodeViewerWidget.__init__(self, params)
+        QDialog.__init__(self, parent)
+        
+        self.setLayout(QVBoxLayout())
+        
+        self.content = QSplitter()
+        self.content.setOrientation(Qt.Orientation.Horizontal)
+        self.layout().addWidget(self.content)
+        
+        if self.attach_inspector:
+            self.content.addWidget(self.node_gui.create_inspector())
+        
+        self.setWindowTitle(f'{self.node_gui.display_title} Viewer')
+        
+    # Connect Viewer functons to QT events
+    
+    def showEvent(self, show_event: QShowEvent):
+        self.on_before_shown()
+        super().showEvent(show_event)
+        self.on_after_shown()
+    
+    def hideEvent(self, hide_event: QHideEvent):
+        self.on_before_hidden()
+        super().hideEvent(hide_event)
+        self.on_after_hidden()
+    
+    def closeEvent(self, close_event: QCloseEvent):
+        self.on_before_closed()
+        super().closeEvent(close_event)
+        self.on_after_closed()
+    
+    
+     

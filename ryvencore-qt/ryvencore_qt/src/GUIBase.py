@@ -3,7 +3,28 @@ from qtpy.QtWidgets import QGraphicsObject, QGraphicsItem
 from qtpy.QtCore import QTimer
 
 import time
-  
+
+class SerializableItem:
+    """An interface for providing serialization / deserialization functions"""
+    
+    def get_state(self) -> dict:
+        """
+        *VIRTUAL*
+
+        Return the state of the widget, in a (pickle) serializable format.
+        """
+        data = {}
+        return data
+
+    def set_state(self, data: dict):
+        """
+        *VIRTUAL*
+
+        Set the state of the widget, where data corresponds to the dict
+        returned by get_state().
+        """
+        pass
+    
 class GUIBase:
     """Base class for GUI items that represent specific core components"""
 

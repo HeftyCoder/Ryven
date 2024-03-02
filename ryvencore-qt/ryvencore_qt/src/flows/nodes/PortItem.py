@@ -322,6 +322,7 @@ class PortItemPin(QGraphicsWidget):
     def hoverEnterEvent(self, event):
         if self.port.type_ == 'data':  # and self.parent_port_instance.io_pos == PortPos.OUTPUT:
             value = val(self.port)
+            tooltip = "None"
             if not isinstance(value, str):
                 # if there is a __len__ function, get a subset if it's too big
                 if hasattr(value, '__len__') and len(value) > 10:

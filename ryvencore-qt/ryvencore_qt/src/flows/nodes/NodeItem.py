@@ -22,25 +22,29 @@ from ryvencore import Node
 
 from .NodeItemAction import NodeItemAction
 from .NodeItemAnimator import NodeItemAnimator
-from .NodeItemWidget import NodeItemWidget
+from .NodeItemWidgets import NodeItemWidget
 from .PortItem import InputPortItem, OutputPortItem
 from ...utils import serialize, deserialize, MovementEnum, generate_name
 from .GraphicsProgressBar import GraphicsProgressBar
 from .GraphicsTextWidget import GraphicsTextWidget
+from ...Design import Design
 
+if TYPE_CHECKING:
+    from ..FlowView import FlowView
+    
 
 class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
     """The GUI representative for nodes. Unlike the Node class, this class is not subclassed individually and works
     the same for every node."""
 
-    def __init__(self, node: Node, node_gui, flow_view, design):
+    def __init__(self, node: Node, node_gui: NodeGUI, flow_view, design: Design):
         GUIBase.__init__(self, representing_component=node)
         QGraphicsObject.__init__(self)
 
         self.node = node
         self.node_gui = node_gui
         self.node_gui.item = self
-        self.flow_view = flow_view
+        self.flow_view: FlowView = flow_view
         self.session_design = design
         self.movement_state = None
         self.movement_pos_from = None
@@ -460,32 +464,14 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
             else self.widget.title_label.boundingRect()
         )
 
-        # useful for widget development:
-
-        # painter.setBrush(Qt.NoBrush)
-        # painter.setPen(QPen(QColor('black')))
-        #
-        # painter.drawRect(
-        #         self.boundingRect()
-        # )
-        #
-        # header_rect = QRectF(
-        #         -self.boundingRect().width()/2, -self.boundingRect().height()/2,
-        #         self.widget.header_widget.geometry().width(), self.widget.header_widget.geometry().height()
-        #     )
-        # painter.drawRect(header_rect)
-        #
-        # # note that the widget's layout has spacing 0
-        # body_rect = QRectF(
-        #     -self.boundingRect().width()/2, -self.boundingRect().height()/2 + header_rect.height(),
-        #     self.widget.body_widget.geometry().width(), self.widget.body_widget.geometry().height()
-        # )
-        # painter.drawRect(body_rect)
-
         self.painted_once = True
 
     # MOUSE INTERACTION
 
+    def mouseDoubleClickEvent(self, event):
+        self.node_gui.show_viewer()
+        QGraphicsObject.mouseDoubleClickEvent(self, event)
+        
     def get_context_menu(self):
         menu = QMenu(self.flow_view)
 

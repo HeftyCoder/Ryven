@@ -1,18 +1,219 @@
-from qtpy.QtCore import QPointF, QRectF, Qt, QSizeF
-from qtpy.QtWidgets import QGraphicsWidget, QGraphicsLinearLayout, QSizePolicy
-
-from .NodeItem_CollapseButton import NodeItem_CollapseButton
+from qtpy.QtCore import (
+    QPointF, 
+    QRectF, 
+    Qt, 
+    QSizeF, 
+    Property,
+    QSize
+)
+from qtpy.QtWidgets import (
+    QGraphicsWidget, 
+    QGraphicsLinearLayout, 
+    QSizePolicy, 
+    QGraphicsLayoutItem, 
+    QGraphicsItem,
+    QGraphicsPixmapItem,
+)
+from qtpy.QtGui import (
+    QFont, 
+    QFontMetricsF, 
+    QColor,
+    QPixmap,
+    QImage,
+)
 from ..FlowViewProxyWidget import FlowViewProxyWidget
-# from .Node import Node
-from .NodeItem_Icon import NodeItem_Icon
-from .NodeItem_TitleLabel import TitleLabel
 from .PortItem import InputPortItem, OutputPortItem
 
+from ...utils import get_longest_line, change_svg_color, get_resource
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from .NodeGUI import NodeGUI
+    from .NodeItem import NodeItem
+    
+
+class NodeItem_CollapseButton(QGraphicsWidget):
+    def __init__(self, node_gui: 'NodeGUI', node_item: 'NodeItem'):
+        super().__init__(parent=node_item)
+
+        self.node_gui = node_gui
+        self.node_item = node_item
+
+        self.size = QSizeF(14, 7)
+
+        self.setGraphicsItem(self)
+        self.setCursor(Qt.PointingHandCursor)
+
+
+        self.collapse_pixmap = change_svg_color(
+            get_resource('node_collapse_icon.svg'),
+            self.node_gui.color
+        )
+        self.expand_pixmap = change_svg_color(
+            get_resource('node_expand_icon.svg'),
+            self.node_gui.color
+        )
+
+
+    def boundingRect(self):
+        return QRectF(QPointF(0, 0), self.size)
+
+    def setGeometry(self, rect):
+        self.prepareGeometryChange()
+        QGraphicsLayoutItem.setGeometry(self, rect)
+        self.setPos(rect.topLeft())
+
+    def sizeHint(self, which, constraint=...):
+        return QSizeF(self.size.width(), self.size.height())
+
+    def mousePressEvent(self, event):
+        event.accept()  # make sure the event doesn't get passed on
+        self.node_item.flow_view.mouse_event_taken = True
+
+        if self.node_item.collapsed:
+            self.node_item.expand()
+        else:
+            self.node_item.collapse()
+
+    # def hoverEnterEvent(self, event):
+
+    def paint(self, painter, option, widget=None):
+
+        # doesn't work: ...
+        # painter.setRenderHint(QPainter.Antialiasing, True)
+        # painter.setRenderHint(QPainter.HighQualityAntialiasing, True)
+        # painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+
+        if not self.node_item.hovered:
+            return
+
+        if self.node_item.collapsed:
+            pixmap = self.expand_pixmap
+        else:
+            pixmap = self.collapse_pixmap
+
+        painter.drawPixmap(
+            0, 0,
+            self.size.width(), self.size.height(),
+            pixmap
+        )
+        
+        
+class NodeItem_Icon(QGraphicsWidget):
+    def __init__(self, node_gui: 'NodeGUI', node_item: 'NodeItem'):
+        super().__init__(parent=node_item)
+
+        if node_gui.style == 'normal':
+            self.size = QSize(20, 20)
+        else:
+            self.size = QSize(50, 50)
+
+        self.setGraphicsItem(self)
+
+        image = QImage(node_gui.icon)
+        self.pixmap = QPixmap.fromImage(image)
+        # self.pixmap = change_svg_color(node.icon, node.color)
+
+
+    def boundingRect(self):
+        return QRectF(QPointF(0, 0), self.size)
+
+    def setGeometry(self, rect):
+        self.prepareGeometryChange()
+        QGraphicsLayoutItem.setGeometry(self, rect)
+        self.setPos(rect.topLeft())
+
+    def sizeHint(self, which, constraint=...):
+        return QSizeF(self.size.width(), self.size.height())
+
+
+    def paint(self, painter, option, widget=None):
+
+        # TODO: anti aliasing for node icons
+        
+        # this doesn't work: ...
+        # painter.setRenderHint(QPainter.Antialiasing, True)
+        # painter.setRenderHint(QPainter.HighQualityAntialiasing, True)
+        # painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+
+        painter.drawPixmap(
+            0, 0,
+            self.size.width(), self.size.height(),
+            self.pixmap
+        )
+
+    
+class TitleLabel(QGraphicsWidget):
+
+    def __init__(self, node_gui: 'NodeGUI', node_item: 'NodeItem'):
+        super(TitleLabel, self).__init__(parent=node_item)
+
+        self.setGraphicsItem(self)
+
+        self.node_gui = node_gui
+        self.node_item = node_item
+
+        font = QFont('Poppins', 15) if self.node_gui.style == 'normal' else \
+            QFont('K2D', 20, QFont.Bold, True)  # should be quite similar to every specific font chosen by the painter
+        self.fm = QFontMetricsF(font)
+        self.title_str, self.width, self.height = None, None, None
+        self.update_shape()
+
+        self.color = QColor(30, 43, 48)
+        self.pen_width = 1.5
+        self.hovering = False  # whether the mouse is hovering over the parent NI (!)
+
+        # # Design.flow_theme_changed.connect(self.theme_changed)
+        # self.update_design()
+
+    def update_shape(self):
+        self.title_str = self.node_gui.display_title
+
+        # approximately!
+        self.width = self.fm.width(get_longest_line(self.title_str)+'___')
+        self.height = self.fm.height() * 0.7 * (self.title_str.count('\n') + 1)
+
+    def boundingRect(self):
+        return QRectF(QPointF(0, 0), self.geometry().size())
+
+    def setGeometry(self, rect):
+        self.prepareGeometryChange()
+        QGraphicsLayoutItem.setGeometry(self, rect)
+        self.setPos(rect.topLeft())
+
+    def sizeHint(self, which, constraint=...):
+        return QSizeF(self.width, self.height)
+
+    def paint(self, painter, option, widget=None):
+        self.node_item.session_design.flow_theme.paint_NI_title_label(
+            self.node_gui, self.node_item.isSelected(), self.hovering, painter, option,
+            self.design_style(), self.title_str,
+            self.node_item.color, self.boundingRect()
+        )
+
+    def design_style(self):
+        return self.node_gui.style
+
+    def set_NI_hover_state(self, hovering: bool):
+        self.hovering = hovering
+        # self.update_design()
+        self.update()
+
+    # ANIMATION STUFF
+    def get_color(self):
+        return self.color
+
+    def set_color(self, val):
+        self.color = val
+        QGraphicsItem.update(self)
+
+    p_color = Property(QColor, get_color, set_color)
+    
+    
 class NodeItemWidget(QGraphicsWidget):
     """The QGraphicsWidget managing all GUI components of a NodeItem in widgets and layouts."""
 
-    def __init__(self, node_gui, node_item):
+    def __init__(self, node_gui: 'NodeGUI', node_item: 'NodeItem'):
         super().__init__(parent=node_item)
 
         self.node_gui = node_gui

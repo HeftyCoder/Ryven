@@ -27,32 +27,34 @@ class Producer(StartNode):
             progress_state = ProgressState(1, 0)
             self.progress = progress_state
             
-            self.set_output_payload(0, [1, 2, 3]) # a list of data produced
+            self.set_output_val(0, ListData([1, 2, 3])) # a list of data produced
 
             self.set_progress_value(0.2, 'Loading Values')
             sleep(1)
             
-            self.set_output_payload(1, 
-                {
-                    'george': 2,
-                    'john': 3,
-                    'damon': 4,
-                }
+            self.set_output_val(1, 
+                DictData(
+                    {
+                        'george': 2,
+                        'john': 3,
+                        'damon': 4,
+                    }
+                )
             )
 
             self.set_progress_value(0.5, 'Setting numbers')
             sleep(3)
             
-            self.set_output_payload(2, 23)
+            self.set_output_val(2, IntegerData(23))
 
-            self.set_output_payload(3, 2+3j)
+            self.set_output_val(3, ComplexData(2+3j))
 
-            self.set_output_payload(4, 'custom info')
+            self.set_output_val(4, StringData('custom info'))
             
             self.set_progress_value(0.9, 'This is my way!')
             sleep(2)
 
-            self.set_output_payload(5, {23, 4, 1, 2})
+            self.set_output_val(5, SetData({23, 4, 1, 2}))
             
             self.set_progress_value(-1, "Nothing to see here!")
             sleep(5)

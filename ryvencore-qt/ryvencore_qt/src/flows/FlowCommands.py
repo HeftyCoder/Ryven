@@ -2,14 +2,17 @@
 This file contains the implementations of undoable actions for FlowView.
 """
 
-from typing import Tuple
+from typing import Tuple, List, TYPE_CHECKING
 
 from qtpy.QtCore import QObject, QPointF
 from qtpy.QtWidgets import QUndoCommand
 
-from ryvencore import InfoMsgs, Flow
+from ryvencore import InfoMsgs, Flow, Node
 
 import traceback
+
+if TYPE_CHECKING:
+    from .FlowView import FlowView
 
 def undo_text_multi(items:list, command: str, to_str=None):
     """Generates a text for an undo command that has zero, one or multiple items"""
@@ -214,7 +217,7 @@ class SelectComponents_Command(FlowUndoCommand):
 
 
 class RemoveComponents_Command(FlowUndoCommand):
-    def __init__(self, flow_view, items, silent: bool = False):
+    def __init__(self, flow_view: 'FlowView', items, silent: bool = False):
         super().__init__(flow_view)
         self.items = items
         self.selection = flow_view._current_selected
@@ -227,18 +230,19 @@ class RemoveComponents_Command(FlowUndoCommand):
         self.internal_connections = set()
 
         self.node_items = []
-        self.nodes = []
+        self.nodes: List[Node] = []
         self.drawings = []
-
-        # importing here to prevent circular imports
+        
         from .nodes.NodeItem import NodeItem
         from .connections.ConnectionItem import ConnectionItem
         from .drawings.DrawingObject import DrawingObject
-        
+    
         for i in self.items:
             if isinstance(i, NodeItem):
                 self.node_items.append(i)
                 self.nodes.append(i.node)
+                i.node_gui._on_deleted()
+                
             elif isinstance(i, DrawingObject):
                 self.drawings.append(i)
 
@@ -251,7 +255,7 @@ class RemoveComponents_Command(FlowUndoCommand):
                 self.broken_connections.add(i.connection)
 
         for n in self.nodes:
-            for i in n.inputs:
+            for i in n._inputs:
                 cp = n.flow.connected_output(i)
                 if cp is not None:
                     cn = cp.node
@@ -259,7 +263,7 @@ class RemoveComponents_Command(FlowUndoCommand):
                         self.broken_connections.add((cp, i))
                     else:
                         self.internal_connections.add((cp, i))
-            for o in n.outputs:
+            for o in n._outputs:
                 for cp in n.flow.connected_inputs(o):
                     cn = cp.node
                     if cn not in self.nodes:

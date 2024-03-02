@@ -1,13 +1,21 @@
 from queue import Queue
-from typing import List, Dict, Tuple, Optional, Union
+from typing import List, Dict, Tuple, Optional, Union, Type, TYPE_CHECKING
 
 from qtpy.QtCore import QObject, Signal
+from qtpy.QtWidgets import QWidget, QApplication
+from qtpy.QtGui import Qt
 
-from .WidgetBaseClasses import NodeMainWidget, NodeInputWidget, NodeInspectorWidget
+from .WidgetBaseClasses import NodeMainWidget, NodeInputWidget, NodeInspectorWidget, NodeViewerWidget
 from .NodeInspector import NodeInspectorDefaultWidget
+from .NodeViewer import NodeViewerDefault
 
 from ryvencore.RC import ProgressState
 from ryvencore import Node
+
+if TYPE_CHECKING:
+    from .NodeItem import NodeItem
+    from ...SessionGUI import SessionGUI
+    from ..FlowView import FlowView
 
 class NodeGUI(QObject):
     """
@@ -16,11 +24,14 @@ class NodeGUI(QObject):
 
     # customizable gui attributes
     description_html: str = None
-    main_widget_class: Optional[NodeMainWidget] = None
+    
+    main_widget_class: Type[Union[NodeMainWidget, QWidget]] = None
     main_widget_pos: str = 'below ports'
-    input_widget_classes: Dict[str, NodeInputWidget] = {}
-    inspector_widget_class: NodeInspectorWidget = NodeInspectorDefaultWidget
+    input_widget_classes: Dict[str, Type[Union[NodeInputWidget, QWidget]]] = {}
+    inspector_widget_class: Type[Union[NodeInspectorWidget, QWidget]] = NodeInspectorDefaultWidget
     wrap_inspector_in_default: bool = False
+    viewer_widget_class: Type[Union[NodeViewerWidget, QWidget]] = NodeViewerDefault
+    
     init_input_widgets: dict = {}
     style: str = 'normal'
     color: str = '#c69a15'
@@ -38,24 +49,20 @@ class NodeGUI(QObject):
     hide_unconnected_ports_triggered = Signal()
     show_unconnected_ports_triggered = Signal()
     progress_updated = Signal(ProgressState)
-
-    def __init__(self, params):
+    
+    def __init__(self, params: Tuple[Node, 'SessionGUI']):
         QObject.__init__(self)
 
-        node, session_gui = params
-        self.node: Node = node
-        self.item = None   # set by the node item directly after this __init__ call
-        self.session_gui = session_gui
-        setattr(node, 'gui', self)
-
-        self.actions = self._init_default_actions()
+        self.node, self.session_gui = params
+        self.item: NodeItem = None   # set by the node item directly after this __init__ call
+        setattr(self.node, 'gui', self)
 
         if self.display_title is None:
             self.display_title = self.node.title
 
         self.input_widgets = {}     # {input: widget name}
         for i, widget_data in self.init_input_widgets.items():
-            self.input_widgets[self.node.inputs[i]] = widget_data
+            self.input_widgets[self.node._inputs[i]] = widget_data
         # using attach_input_widgets() one can buffer input widget
         # names for inputs that are about to get created
         self._next_input_widgets = Queue()
@@ -72,15 +79,35 @@ class NodeGUI(QObject):
         self.node.progress_updated.sub(self._on_progress_updated)
 
         # create the inspector widget
+        self.inspector_widget = self.create_inspector()
+        
+        # create viewer widget
+        self.viewer_widget = self.create_viewer()
+        
+        # init the default actions
+        self.actions = self._init_default_actions()
+
+    def create_viewer(self):
+        """Creates the viewer for this node."""
+        
+        return (
+            self.viewer_widget_class((self.node, self)) 
+            if self.viewer_widget_class else None
+        )
+        
+    def create_inspector(self):
+        """Creates the inspector based on settings of the GUI."""
+        
         inspector_params = (self.node, self)
         if self.wrap_inspector_in_default:
-            self.inspector_widget = NodeInspectorDefaultWidget(
+            inspector_widget = NodeInspectorDefaultWidget(
                 child=self.inspector_widget_class((self.node, self)),
                 params=inspector_params,
             )
         else:
-            self.inspector_widget = self.inspector_widget_class(inspector_params)
-
+            inspector_widget = self.inspector_widget_class(inspector_params)
+        return inspector_widget
+    
     def initialized(self):
         """
         *VIRTUAL*
@@ -136,6 +163,10 @@ class NodeGUI(QObject):
 
     def _on_progress_updated(self, progress: ProgressState):
         self.progress_updated.emit(progress)
+    
+    def _on_deleted(self):
+        if self.viewer_widget:
+            self.hide_viewer()
         
     """
     actions
@@ -147,11 +178,16 @@ class NodeGUI(QObject):
         """
         Returns the default actions every node should have
         """
-        return {
+        result = {
             'update shape': {'method': self.update_shape},
             'hide unconnected ports': {'method': self.hide_unconnected_ports},
             'change title': {'method': self.change_title},
         }
+        
+        if self.viewer_widget_class:
+            result['toggle viewer'] = {'method': self.toggle_viewer}
+        
+        return result
 
     def _deserialize_actions(self, actions_data):
         """
@@ -220,9 +256,38 @@ class NodeGUI(QObject):
     """
     GUI access methods
     """
-
+    def title(self):
+        return self.display_title
+    
+    def show_viewer(self):
+        self.viewer_widget.setWindowTitle(self.title())
+        self.viewer_widget.setParent(self.flow_view())
+        self.viewer_widget.setWindowFlags(
+            self.viewer_widget.windowFlags() |
+            Qt.WindowType.WindowMinimizeButtonHint |
+            Qt.WindowType.Dialog
+        )
+        self.viewer_widget.move(
+            self.flow_view().mapToGlobal(
+                self.item.pos()
+            ).toPoint()
+        )
+        self.viewer_widget.show()
+    
+    def hide_viewer(self):
+        self.viewer_widget.hide()
+        
+    def toggle_viewer(self):
+        
+        if self.viewer_widget.isHidden():
+            self.show_viewer()
+        else:
+            self.hide_viewer()
+            
     def set_display_title(self, t: str):
         self.display_title = t
+        if self.viewer_widget:
+            self.viewer_widget.setWindowTitle(self.display_title)
         self.update_shape()
 
     def flow_view(self):
@@ -283,6 +348,6 @@ class NodeGUI(QObject):
                 self.accept()
 
         d = ChangeTitleDialog(self.display_title)
-        d.exec_()
+        d.exec()
         if d.new_title:
             self.set_display_title(d.new_title)

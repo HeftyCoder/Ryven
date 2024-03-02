@@ -1,32 +1,22 @@
 """The base classes for node custom widgets for nodes."""
-from ryvencore import Data
+
+from ryvencore import Data, Node
 
 from ..FlowCommands import Delegate_Command
+from ...GUIBase import SerializableItem
+
+from typing import Tuple, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .NodeItem import NodeItem
+    from .NodeGUI import NodeGUI
 
 
-class NodeMainWidget:
+class NodeMainWidget(SerializableItem):
     """Base class for the main widget of a node."""
 
-    def __init__(self, params):
+    def __init__(self, params: Tuple[Node, 'NodeItem', 'NodeGUI']):
         self.node, self.node_item, self.node_gui = params
-
-    def get_state(self) -> dict:
-        """
-        *VIRTUAL*
-
-        Return the state of the widget, in a (pickle) serializable format.
-        """
-        data = {}
-        return data
-
-    def set_state(self, data: dict):
-        """
-        *VIRTUAL*
-
-        Set the state of the widget, where data corresponds to the dict
-        returned by get_state().
-        """
-        pass
 
     def update_node(self):
         self.node.update()
@@ -35,30 +25,12 @@ class NodeMainWidget:
         self.node_item.update_shape()
 
 
-class NodeInputWidget:
+class NodeInputWidget(SerializableItem):
     """Base class for the input widget of a node."""
 
     def __init__(self, params):
         self.input, self.input_item, self.node, self.node_gui, self.position = \
             params
-
-    def get_state(self) -> dict:
-        """
-        *VIRTUAL*
-
-        Return the state of the widget, in a (pickle) serializable format.
-        """
-        data = {}
-        return data
-
-    def set_state(self, data: dict):
-        """
-        *VIRTUAL*
-
-        Set the state of the widget, where data corresponds to the dict
-        returned by get_state().
-        """
-        pass
 
     def val_update_event(self, val: Data):
         """
@@ -87,29 +59,11 @@ class NodeInputWidget:
         self.node_gui.update_shape()
 
 
-class NodeInspectorWidget:
+class NodeInspectorWidget(SerializableItem):
     """Base class for the inspector widget of a node."""
 
-    def __init__(self, params):
+    def __init__(self, params: Tuple[Node, 'NodeGUI']):
         self.node, self.node_gui = params
-
-    def get_state(self) -> dict:
-        """
-        *VIRTUAL*
-
-        Return the state of the widget, in a (pickle) serializable format.
-        """
-        data = {}
-        return data
-
-    def set_state(self, data: dict):
-        """
-        *VIRTUAL*
-
-        Set the state of the widget, where data corresponds to the dict
-        returned by get_state().
-        """
-        pass
 
     def load(self):
         """Called when the inspector is loaded into the inspector view in the editor."""
@@ -129,3 +83,69 @@ class NodeInspectorWidget:
                 on_redo=redo_fn,
             )
         )
+
+
+class NodeViewerWidget:
+    """
+    Base class for the view widget of a node.
+    
+    A view is a detached window for interacting with the node other than the inspector.
+    """
+
+    def __init__(self, params: Tuple[Node, 'NodeGUI']):
+        self.node, self.node_gui = params
+    
+    def on_before_shown(self):
+        """
+        VIRTUAL
+        
+        Called before the viewer is shown
+        """
+        pass
+    
+    def on_after_shown(self):
+        """
+        VIRTUAL
+        
+        Called after the viewer is shown
+        """
+        pass
+    
+    def on_before_hidden(self):
+        """
+        VIRTUAL
+        
+        Called before the viewer is hidden.
+        """
+    
+    def on_after_hidden(self):
+        """
+        VIRTUAL
+        
+        Called after the viewer is hidden.
+        """
+        
+    def on_before_closed(self):
+        """
+        VIRTUAL
+        
+        Called before the viewer is closed
+        """
+        pass
+
+    def on_after_closed(self):
+        """
+        VIRTUAL
+        
+        Called after the viewer is closed
+        """
+    
+    def on_node_update(self, data):
+        """
+        VIRTUAL
+        
+        Called when a node is updated (the updated event).
+        The developer can pass any kind of data and update the view.
+        """
+        pass
+        
