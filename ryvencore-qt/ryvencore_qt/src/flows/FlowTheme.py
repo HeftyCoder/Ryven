@@ -1,17 +1,20 @@
-from qtpy.QtCore import Qt, QPointF, QPoint, QRectF, QMargins, QMarginsF
-from qtpy.QtGui import QColor, QPainter, QBrush, QRadialGradient, QLinearGradient, QPen, QPainterPath, QFont, QPolygon
-from qtpy.QtWidgets import QStyle, QStyleOption
-
-from ..flows.nodes.PortItem import PinState
-from ..utils import pythagoras
-
-from typing import Dict
-from dataclasses import dataclass
 #
 #   notice: available themes are hardcoded in Ryven for CLI; make sure to update those
 #   in case of changes affecting it
 #
 
+from qtpy.QtCore import Qt, QPointF, QPoint, QRectF, QMargins, QMarginsF
+from qtpy.QtGui import QColor, QPainter, QBrush, QRadialGradient, QLinearGradient, QPen, QPainterPath, QFont, QPolygon
+from qtpy.QtWidgets import QStyle, QStyleOption
+
+from ..flows.nodes.PortItem import PinState
+from .nodes.GraphicsTextWidget import GraphicsTextWidget, TextStyle
+from ..utils import pythagoras
+
+from typing import Dict
+from dataclasses import dataclass
+
+      
 @dataclass
 class PinStyle:
     pen_width: int = 2
@@ -90,6 +93,12 @@ NodeWidget {
     pin_style_data = DataPinStyle()
     pin_style_exec = ExecPinStyle()
     
+    # Setting for title label
+    title_label_styles: Dict[str, TextStyle] = {
+        'normal': TextStyle(),
+        'small': TextStyle(),
+    }
+    
     EXPORT = []
 
     def __init__(self):
@@ -129,7 +138,11 @@ NodeWidget {
     def paint_NI_title_label(self, node_gui, selected: bool, hovering: bool, painter: QPainter, option: QStyleOption,
                              node_style: str, node_title: str, node_color: QColor, node_item_bounding_rect):
         pass
-
+    
+    def setup_NI_title_label(self, text_graphic: GraphicsTextWidget, selected: bool, hovering: bool, node_style: str, 
+                             node_title: str, node_color: QColor):
+        pass
+    
     def paint_PI_label(self, node_gui, painter: QPainter, option: QStyleOption, type_: str, pin_state: bool, label_str: str,
                        node_color: QColor, bounding_rect: QRectF):
         pass
@@ -148,14 +161,14 @@ NodeWidget {
         if node_style == 'normal':
             self.draw_NI_normal(node_gui, selected, hovered, painter, color, w, h, bounding_rect, title_rect)
         elif node_style == 'small':
-            self.draw_NI_small(node_gui, selected, hovered, painter, color, w, h, bounding_rect)
+            self.draw_NI_small(node_gui, selected, hovered, painter, color, w, h, bounding_rect, title_rect)
 
     def draw_NI_normal(self, node_gui, selected: bool, hovered: bool,
-                       painter: QPainter, c: QColor, w, h, bounding_rect, title_rect):
+                       painter: QPainter, c: QColor, w, h, bounding_rect: QRectF, title_rect: QRectF):
         pass
 
     def draw_NI_small(self, node_gui, selected: bool, hovered: bool,
-                      painter: QPainter, c: QColor, w, h, bounding_rect, background_color=None):
+                      painter: QPainter, c: QColor, w, h, bounding_rect: QRectF, title_rect: QRectF):
         pass
 
     def paint_NI_selection_border(self, ni, painter: QPainter, color: QColor, w, h, bounding_rect):
@@ -175,21 +188,10 @@ NodeWidget {
         painter.drawRoundedRect(rect, 10, 10)
 
     @staticmethod
-    def paint_NI_title_label_default(painter: QPainter, node_style: str, title: str, color: QColor, pen_w: float,
-                                     font: QFont, node_item_bounding_rect):
-        pen = QPen(color)
-        pen.setWidth(pen_w)
-
-        painter.setPen(pen)
-        painter.setFont(font)
-
-        text_rect = node_item_bounding_rect
-        text_rect.setTop(text_rect.top())
-
-        if node_style == 'normal':
-            painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, title)
-        elif node_style == 'small':
-            painter.drawText(text_rect, Qt.AlignTop | Qt.AlignHCenter, title)
+    def setup_NI_title_label_default(text_item: GraphicsTextWidget, title: str, text_style: TextStyle):
+        
+        text_item._text_item.setPlainText(title)
+        text_item.set_text_style(text_style)
 
     @staticmethod
     def paint_PI_label_default(painter: QPainter, label_str: str, color: QColor, font: QFont, bounding_rect: QRectF):
@@ -242,6 +244,20 @@ NodeWidget {
         header_rect.setWidth(node_width)
         header_rect.setHeight(header_height)
         return header_rect
+    
+    @staticmethod
+    def get_rect_no_header(node_width, node_height, bounding_rect, title_rect):
+        return QRectF(
+            QPointF(
+                bounding_rect.left(), 
+                bounding_rect.top() + FlowTheme.get_header_rect(
+                    node_width,
+                    node_height,
+                    title_rect
+                ).height()
+            ),
+            bounding_rect.bottomRight()
+        )
 
     @staticmethod
     def interpolate_color(c1, c2, val):
@@ -327,30 +343,21 @@ class FlowTheme_Toy(FlowTheme):
         valid_color=QColor('#3880ad'),
     )
     
-    def paint_NI_title_label(self, node_gui, selected, hovering, painter, option, node_style, node_title, node_color,
-                             node_item_bounding_rect):
-
+    def setup_NI_title_label(self, text_graphic: GraphicsTextWidget, selected: bool, hovering: bool, node_style: str, node_title: str, node_color: QColor):
+        
         if node_style == 'normal':
-            self.paint_NI_title_label_default(
-                painter=painter,
-                node_style=node_style,
-                title=node_title,
-                color=QColor(30, 43, 48) if not hovering else node_color.lighter(),
-                pen_w=2 if hovering else 1.5,
-                font=QFont('Poppins', 15),
-                node_item_bounding_rect=node_item_bounding_rect
+            text_style = TextStyle(
+                color = QColor(30, 43, 48) if not hovering else node_color.lighter(),
+                font=QFont('Poppins', 15)
             )
         else:
-            self.paint_NI_title_label_default(
-                painter=painter,
-                node_style=node_style,
-                title=node_title,
-                color=QColor(30, 43, 48) if not hovering else node_color.lighter(),
-                pen_w=1.5,
-                font=QFont('K2D', 20, QFont.Bold, True),
-                node_item_bounding_rect=node_item_bounding_rect
+            text_style = TextStyle(
+                color = QColor(30, 43, 48) if not hovering else node_color.lighter(),
+                font=QFont('K2D', 20, QFont.Bold, True)
             )
-
+        
+        self.setup_NI_title_label_default(text_graphic, node_title, text_style)
+        
     def paint_PI_label(self, node_gui, painter, option, type_, pin_state, label_str, node_color, bounding_rect):
         c = QColor('#FFFFFF')
         self.paint_PI_label_default(painter, label_str, c, QFont("Source Code Pro", 10, QFont.Bold), bounding_rect)
@@ -379,27 +386,34 @@ class FlowTheme_Toy(FlowTheme):
         painter.drawRoundedRect(FlowTheme_Toy.get_header_rect(w, h, title_rect), 12, 12)
 
     def draw_NI_small(self, node_gui, selected: bool, hovered: bool,
-                      painter: QPainter, c: QColor, w, h, bounding_rect, background_color=None):
+                      painter: QPainter, c: QColor, w, h, bounding_rect, title_rect):
 
         path = QPainterPath()
+        th = title_rect.height()
         path.moveTo(-w / 2, 0)
 
-        path.cubicTo(-w / 2, -h / 2,
-                     -w / 2, -h / 2,
-                     0, -h / 2)
-        path.cubicTo(+w / 2, -h / 2,
-                     +w / 2, -h / 2,
-                     +w / 2, 0)
-        path.cubicTo(+w / 2, +h / 2,
-                     +w / 2, +h / 2,
-                     0, +h / 2)
-        path.cubicTo(-w / 2, +h / 2,
-                     -w / 2, +h / 2,
-                     -w / 2, 0)
+        body_rect = self.get_rect_no_header(w, h, bounding_rect, title_rect)
+        bh = body_rect.height()
+        
+        pw, ph = w * 0.5, bh * 0.5
+        
+        path.cubicTo(-pw, -ph,
+                     -pw, -ph,
+                     0, -ph)
+        path.cubicTo(+pw, -ph,
+                     +pw, -ph,
+                     +pw, 0)
+        path.cubicTo(+pw, +ph,
+                     +pw, +ph,
+                     0, +ph)
+        path.cubicTo(-pw, +ph,
+                     -pw, +ph,
+                     -pw, 0)
         path.closeSubpath()
-
-        body_gradient = QLinearGradient(bounding_rect.bottomLeft(),
-                                        bounding_rect.topRight())
+        path.translate(0, th * 0.5)
+        
+        body_gradient = QLinearGradient(body_rect.bottomLeft(),
+                                        body_rect.topRight())
         body_gradient.setColorAt(0, QColor(c.red(), c.green(), c.blue(), 150))
         body_gradient.setColorAt(1, QColor(c.red(), c.green(), c.blue(), 80))
 
@@ -426,29 +440,23 @@ class FlowTheme_DarkTron(FlowTheme):
 
     flow_background_brush = QBrush(QColor('#333333'))
 
-    def paint_NI_title_label(self, node_gui, selected, hovering, painter, option, node_style, node_title, node_color,
-                             node_item_bounding_rect):
+
+    def setup_NI_title_label(self, text_graphic: GraphicsTextWidget, selected: bool, hovering: bool, node_style: str, 
+                             node_title: str, node_color: QColor):
+        
         if node_style == 'normal':
-            self.paint_NI_title_label_default(
-                painter=painter,
-                node_style=node_style,
-                title=node_title,
-                color=node_color if not (hovering or selected) else node_color.lighter().lighter(),
-                pen_w=2,
-                font=QFont('Poppins', 15),
-                node_item_bounding_rect=node_item_bounding_rect
+            text_style = TextStyle(
+                color = node_color if not (hovering or selected) else node_color.lighter().lighter(),
+                font = QFont('Poppins', 15),
             )
         else:
-            self.paint_NI_title_label_default(
-                painter=painter,
-                node_style=node_style,
-                title=node_title,
-                color=node_color,
-                pen_w=2,
-                font=QFont('K2D', 20, QFont.Bold, True),
-                node_item_bounding_rect=node_item_bounding_rect
+            text_style = TextStyle(
+                color = node_color,
+                font = QFont('K2D', 20, QFont.Bold, True),
             )
-
+        
+        self.setup_NI_title_label_default(text_graphic, node_title, text_style)
+        
     def paint_PI_label(self, node_gui, painter, option, type_, pin_state, label_str, node_color, bounding_rect):
         if type_ == 'exec':
             c = QColor('#FFFFFF')
@@ -456,20 +464,6 @@ class FlowTheme_DarkTron(FlowTheme):
             c = node_color
 
         self.paint_PI_label_default(painter, label_str, c, QFont("Source Code Pro", 10, QFont.Bold), bounding_rect)
-
-    # def paint_NI(self, node, node_style,
-    #              painter, option,
-    #              color: QColor, w: int, h: int, bounding_rect, title_rect):
-    #
-    #     painter.setRenderHint(QPainter.Antialiasing)
-    #
-    #     if node_style == 'normal':
-    #         self.draw_NI_normal(node, painter, color, w, h, bounding_rect, title_rect)
-    #     elif node_style == 'small':
-    #         if option.state & QStyle.State_MouseOver:  # use special dark background color when mouse hovers
-    #             self.draw_NI_small(node, painter, color, w, h, bounding_rect, color.darker())
-    #         else:
-    #             self.draw_NI_small(node, painter, color, w, h, bounding_rect, QColor('#212429'))
 
     def draw_NI_normal(self, node_gui, selected: bool, hovered: bool,
                        painter, c: QColor, w: int, h: int, bounding_rect, title_rect):
@@ -497,14 +491,14 @@ class FlowTheme_DarkTron(FlowTheme):
         c_s = 10  # corner size
 
         path = QPainterPath()
-        path.moveTo(+w / 2, -h / 2 + c_s)
-        path.lineTo(+w / 2 - c_s, -h / 2)
-        path.lineTo(-w / 2 + c_s, -h / 2)
-        path.lineTo(-w / 2, -h / 2 + c_s)
-        path.lineTo(-w / 2, +h / 2 - c_s)
-        path.lineTo(-w / 2 + c_s, +h / 2)
-        path.lineTo(+w / 2 - c_s, +h / 2)
-        path.lineTo(+w / 2, +h / 2 - c_s)
+        path.moveTo(+w * 0.5, -h * 0.5 + c_s)
+        path.lineTo(+w * 0.5 - c_s, -h * 0.5)
+        path.lineTo(-w * 0.5 + c_s, -h * 0.5)
+        path.lineTo(-w * 0.5, -h * 0.5 + c_s)
+        path.lineTo(-w * 0.5, +h * 0.5 - c_s)
+        path.lineTo(-w * 0.5 + c_s, +h * 0.5)
+        path.lineTo(+w * 0.5 - c_s, +h * 0.5)
+        path.lineTo(+w * 0.5, +h * 0.5 - c_s)
         path.closeSubpath()
         return path
 
@@ -512,23 +506,22 @@ class FlowTheme_DarkTron(FlowTheme):
 
         c_s = 10  # corner size
 
-        # header_height = 35 * (NIPainter_DarkTron.ni.parent_node.title.count('\n') + 1)
         header_height = self.get_header_rect(w, h, title_rect).height()
-        header_bottom = -h / 2 + header_height
+        header_bottom = -h * 0.5 + header_height
         path = QPainterPath()
-        path.moveTo(+w / 2, -h / 2 + c_s)
-        path.lineTo(+w / 2 - c_s, -h / 2)
-        path.lineTo(-w / 2 + c_s, -h / 2)
-        path.lineTo(-w / 2, -h / 2 + c_s)
-        path.lineTo(-w / 2, header_bottom - c_s)
-        path.lineTo(-w / 2 + c_s, header_bottom)
-        path.lineTo(+w / 2 - c_s, header_bottom)
-        path.lineTo(+w / 2, header_bottom - c_s)
+        path.moveTo(+w * 0.5, -h * 0.5 + c_s)
+        path.lineTo(+w * 0.5 - c_s, -h * 0.5)
+        path.lineTo(-w * 0.5 + c_s, -h * 0.5)
+        path.lineTo(-w * 0.5, -h * 0.5 + c_s)
+        path.lineTo(-w * 0.5, header_bottom - c_s)
+        path.lineTo(-w * 0.5 + c_s, header_bottom)
+        path.lineTo(+w * 0.5 - c_s, header_bottom)
+        path.lineTo(+w * 0.5, header_bottom - c_s)
         path.closeSubpath()
         return path
 
     def draw_NI_small(self, node_gui, selected: bool, hovered: bool,
-                      painter: QPainter, c: QColor, w, h, bounding_rect, background_color=None):
+                      painter: QPainter, c: QColor, w, h, bounding_rect, title_rect):
 
         if hovered:
             background_color = c.darker()
@@ -536,19 +529,24 @@ class FlowTheme_DarkTron(FlowTheme):
             background_color = QColor('#212429')
 
         c_s = 10  # corner size
-
+        
+        body_rect = self.get_rect_no_header(w, h, bounding_rect, title_rect)
+        bh = body_rect.height()
+        
         path = QPainterPath()
         path.moveTo(-w / 2, 0)
-
-        path.lineTo(-w / 2 + c_s / 2, -h / 2 + c_s / 2)
-        path.lineTo(0, -h / 2)
-        path.lineTo(+w / 2 - c_s / 2, -h / 2 + c_s / 2)
+        
+        path.lineTo(-w / 2 + c_s / 2, -bh / 2 + c_s / 2)
+        path.lineTo(0, -bh / 2)
+        path.lineTo(+w / 2 - c_s / 2, -bh / 2 + c_s / 2)
         path.lineTo(+w / 2, 0)
-        path.lineTo(+w / 2 - c_s / 2, +h / 2 - c_s / 2)
-        path.lineTo(0, +h / 2)
-        path.lineTo(-w / 2 + c_s / 2, +h / 2 - c_s / 2)
+        path.lineTo(+w / 2 - c_s / 2, +bh / 2 - c_s / 2)
+        path.lineTo(0, +bh / 2)
+        path.lineTo(-w / 2 + c_s / 2, +bh / 2 - c_s / 2)
         path.closeSubpath()
 
+        path.translate(0, +title_rect.height() * 0.5)
+        
         painter.setBrush(background_color)
         pen = QPen(c)
         pen.setWidth(2)
@@ -600,30 +598,22 @@ class FlowTheme_Ghost(FlowTheme):
                 self.flow_background_color = self.hex_to_col(v)
                 self.flow_background_brush = QBrush(self.flow_background_color)
 
-    def paint_NI_title_label(self, node_gui, selected, hovering, painter, option, node_style, node_title, node_color,
-                             node_item_bounding_rect):
-
+    def setup_NI_title_label(self, text_graphic: GraphicsTextWidget, selected: bool, hovering: bool, node_style: str, 
+                             node_title: str, node_color: QColor):
+        
         if node_style == 'normal':
-            self.paint_NI_title_label_default(
-                painter=painter,
-                node_style=node_style,
-                title=node_title,
-                color=node_color if not hovering else node_color.lighter(),
-                pen_w=2,
-                font=QFont('Poppins', 15),
-                node_item_bounding_rect=node_item_bounding_rect
+            text_style = TextStyle(
+                color = node_color if not hovering else node_color.lighter().lighter(),
+                font = QFont('Poppins', 15),
             )
         else:
-            self.paint_NI_title_label_default(
-                painter=painter,
-                node_style=node_style,
-                title=node_title,
-                color=node_color,
-                pen_w=2,
-                font=QFont('K2D', 20, QFont.Bold, True),
-                node_item_bounding_rect=node_item_bounding_rect
+            text_style = TextStyle(
+                color = node_color,
+                font = QFont('K2D', 20, QFont.Bold, True),
             )
-
+        
+        self.setup_NI_title_label_default(text_graphic, node_title, text_style)
+    
     def paint_PI_label(self, node_gui, painter, option, type_, pin_state, label_str, node_color, bounding_rect):
         if type_ == 'exec':
             c = QColor('#FFFFFF')
@@ -632,34 +622,10 @@ class FlowTheme_Ghost(FlowTheme):
 
         self.paint_PI_label_default(painter, label_str, c, QFont("Source Code Pro", 10, QFont.Bold), bounding_rect)
 
-    # def paint_NI(self, node, node_style,
-    #              painter, option,
-    #              color: QColor, w: int, h: int, bounding_rect, title_rect):
-    #
-    #     painter.setRenderHint(QPainter.Antialiasing)
-    #
-    #     if node_style == 'normal':
-    #         self.draw_NI_normal(node, painter, color, w, h, bounding_rect, title_rect)
-    #     elif node_style == 'small':
-    #         if option.state & QStyle.State_MouseOver:  # use special dark background color when mouse hovers
-    #             self.draw_NI_small(node, painter, color, w, h, bounding_rect, background_color=color.darker())
-    #         else:
-    #             self.draw_NI_small(node, painter, color, w, h, bounding_rect)
-
     def draw_NI_normal(self, node_gui, selected: bool, hovered: bool,
                        painter, c, w, h, bounding_rect, title_rect):
 
         background_color = self.node_color
-
-        # body_gradient = QRadialGradient(QPointF(bounding_rect.topLeft().x() + w,
-        #                                         bounding_rect.topLeft().y() - h),
-        #                                 pythagoras(2 * h, 2 * w))
-        # body_gradient.setColorAt(0, QColor(c.red() / 10 + 100, c.green() / 10 + 100, c.blue() / 10 + 100, 100))
-        # body_gradient.setColorAt(0.7, background_color)
-        # body_gradient.setColorAt(1, background_color)
-        #
-        # painter.setBrush(body_gradient)
-
         painter.setBrush(background_color)
         pen = QPen(c.darker())
         pen.setWidth(1 if not selected else 5)
@@ -683,11 +649,12 @@ class FlowTheme_Ghost(FlowTheme):
         return path
 
     def draw_NI_small(self, node_gui, selected: bool, hovered: bool,
-                      painter, c, w, h, bounding_rect, background_color=None):
+                      painter, c, w, h, bounding_rect, title_rect):
 
         background_color = self.node_small_color
         c_s = 10  # corner size
 
+        bh = self.get_rect_no_header(w, h, bounding_rect, title_rect).height()
         path = self.get_extended_body_path(c_s, w, h)  # equals the small in this case
 
         painter.setBrush(background_color)
@@ -739,28 +706,21 @@ class FlowTheme_Blender(FlowTheme):
                 self.flow_background_color = self.hex_to_col(v)
                 self.flow_background_brush = QBrush(self.flow_background_color)
 
-    def paint_NI_title_label(self, node_gui, selected, hovering, painter, option, node_style, node_title, node_color,
-                             node_item_bounding_rect):
+    def setup_NI_title_label(self, text_graphic: GraphicsTextWidget, selected: bool, hovering: bool, node_style: str, 
+                             node_title: str, node_color: QColor):
+        
         if node_style == 'normal':
-            self.paint_NI_title_label_default(
-                painter=painter,
-                node_style=node_style,
-                title=node_title,
-                color=QColor('#FFFFFF'),
-                pen_w=2,
-                font=QFont('Segoe UI', 11),
-                node_item_bounding_rect=node_item_bounding_rect
+            text_style = TextStyle(
+                color = QColor('#FFFFFF'),
+                font = QFont('Segoe UI', 11),
             )
         else:
-            self.paint_NI_title_label_default(
-                painter=painter,
-                node_style=node_style,
-                title=node_title,
-                color=node_color,
-                pen_w=2,
-                font=QFont('Segoe UI', 15, QFont.Bold, True),
-                node_item_bounding_rect=node_item_bounding_rect
+            text_style = TextStyle(
+                color = node_color,
+                font = QFont('Segoe UI', 15, QFont.Bold, True),
             )
+        
+        self.setup_NI_title_label_default(text_graphic, node_title, text_style)
 
     def paint_PI_label(self, node_gui, painter, option, type_, pin_state, label_str, node_color, bounding_rect):
         if type_ == 'exec':
@@ -795,7 +755,7 @@ class FlowTheme_Blender(FlowTheme):
         painter.drawRoundedRect(bounding_rect, self.corner_radius_normal, self.corner_radius_normal)
 
     def draw_NI_small(self, node_gui, selected: bool, hovered: bool,
-                      painter, c, w, h, bounding_rect, background_color=None):
+                      painter, c, w, h, bounding_rect, title_rect):
 
         background_color = QColor('#212429')
         painter.setBrush(self.interpolate_color(c, background_color, 0.97))
@@ -857,28 +817,21 @@ class FlowTheme_Simple(FlowTheme):
                 self.flow_background_color = self.hex_to_col(v)
                 self.flow_background_brush = QBrush(self.flow_background_color)
 
-    def paint_NI_title_label(self, node_gui, selected, hovering, painter, option, node_style, node_title, node_color,
-                             node_item_bounding_rect):
+    def setup_NI_title_label(self, text_graphic: GraphicsTextWidget, selected: bool, hovering: bool, node_style: str, 
+                             node_title: str, node_color: QColor):
+        
         if node_style == 'normal':
-            self.paint_NI_title_label_default(
-                painter=painter,
-                node_style=node_style,
-                title=node_title,
-                color=QColor('#312b29'),
-                pen_w=2,
-                font=QFont('ASAP', 13, QFont.Bold),
-                node_item_bounding_rect=node_item_bounding_rect
+            text_style = TextStyle(
+                color = QColor('#312b29'),
+                font = QFont('ASAP', 13, QFont.Bold),
             )
         else:
-            self.paint_NI_title_label_default(
-                painter=painter,
-                node_style=node_style,
-                title=node_title,
-                color=node_color,
-                pen_w=2,
-                font=QFont('Poppins', 15, QFont.Thin),
-                node_item_bounding_rect=node_item_bounding_rect
+            text_style = TextStyle(
+                color = node_color,
+                font = QFont('Poppins', 15, QFont.Thin),
             )
+        
+        self.setup_NI_title_label_default(text_graphic, node_title, text_style)
 
     def paint_PI_label(self, node_gui, painter, option, type_, pin_state, label_str, node_color, bounding_rect):
         c = None
@@ -914,7 +867,7 @@ class FlowTheme_Simple(FlowTheme):
         painter.drawRoundedRect(bounding_rect, 9, 9)
 
     def draw_NI_small(self, node_gui, selected: bool, hovered: bool,
-                      painter, c, w, h, bounding_rect, background_color=None):
+                      painter, c, w, h, bounding_rect, title_rect):
 
         background_color = self.node_small_background_color
         c_s = 10
@@ -973,22 +926,21 @@ class FlowTheme_Ueli(FlowTheme):
                 self.flow_background_color = self.hex_to_col(v)
                 self.flow_background_brush = QBrush(self.flow_background_color)
 
-    def paint_NI_title_label(self, node_gui, selected, hovering, painter, option, node_style, node_title, node_color,
-                             node_item_bounding_rect):
+    def setup_NI_title_label(self, text_graphic: GraphicsTextWidget, selected: bool, hovering: bool, node_style: str, 
+                             node_title: str, node_color: QColor):
+        
         if node_style == 'normal':
-            painter.setPen(QPen(QColor(node_color.name())))
-            painter.setFont(QFont('Poppins', 13))
-            painter.drawText(node_item_bounding_rect, Qt.AlignLeft | Qt.AlignVCenter, node_title)
-        else:
-            self.paint_NI_title_label_default(
-                painter=painter,
-                node_style=node_style,
-                title=node_title,
-                color=node_color,
-                pen_w=2,
-                font=QFont('Poppins', 15, QFont.Thin),
-                node_item_bounding_rect=node_item_bounding_rect
+            text_style = TextStyle(
+                color = node_color,
+                font = QFont('Poppins', 13),
             )
+        else:
+            text_style = TextStyle(
+                color = node_color,
+                font = QFont('Poppins', 15, QFont.Thin),
+            )
+        
+        self.setup_NI_title_label_default(text_graphic, node_title, text_style)
 
     def paint_PI_label(self, node_gui, painter, option, type_, pin_state, label_str, node_color, bounding_rect):
 
@@ -1030,7 +982,7 @@ class FlowTheme_Ueli(FlowTheme):
         ), 6, 6)
 
     def draw_NI_small(self, node_gui, selected: bool, hovered: bool,
-                      painter, c, w, h, bounding_rect, background_color=None):
+                      painter, c, w, h, bounding_rect, title_rect):
         background_color = self.small_nodes_background_color
         c_s = 10  # corner size
         painter.setBrush(self.interpolate_color(c, background_color, 0.97))
@@ -1083,19 +1035,15 @@ class FlowTheme_PureDark(FlowTheme):
             elif k == 'port pin pen color':
                 self.port_pin_pen_color = self.hex_to_col(v)
 
-    def paint_NI_title_label(self, node_gui, selected, hovering, painter, option, node_style, node_title, node_color,
-                             node_item_bounding_rect):
-
-        painter.setPen(QPen(self.node_title_color))
-
-        if node_style == 'normal':
-            painter.setFont(QFont('Segoe UI', 11))
-            align = Qt.AlignLeft | Qt.AlignVCenter
-        else:
-            painter.setFont(QFont('Segoe UI', 15))
-            align = Qt.AlignCenter
-
-        painter.drawText(node_item_bounding_rect, align, node_title)
+    def setup_NI_title_label(self, text_graphic: GraphicsTextWidget, selected: bool, hovering: bool, node_style: str, 
+                             node_title: str, node_color: QColor):
+        
+        text_style = TextStyle(
+            color = self.node_title_color,
+            font = QFont('Segoe UI', 11) if node_style == 'normal' else QFont('Segoe UI', 15)
+        )
+        
+        self.setup_NI_title_label_default(text_graphic, node_title, text_style)
 
     def paint_PI_label(self, node_gui, painter, option, type_, pin_state, label_str, node_color, bounding_rect):
         c = None
@@ -1156,11 +1104,16 @@ class FlowTheme_PureDark(FlowTheme):
         )
 
     def draw_NI_small(self, node_gui, selected: bool, hovered: bool,
-                      painter, c, w, h, bounding_rect, background_color=None):
+                      painter, c, w, h, bounding_rect, title_rect):
 
         painter.setBrush(QBrush(self.node_small_bg_col))
         painter.setPen(Qt.NoPen)
-        painter.drawRoundedRect(bounding_rect, 4, 4)
+        
+        header_height = self.get_header_rect(w, h, title_rect).height()
+        draw_rect = QRectF(
+            QPointF(bounding_rect.left(), bounding_rect.top() + header_height),
+            bounding_rect.bottomRight())
+        painter.drawRoundedRect(draw_rect, 4, 4)
 
 
 class FlowTheme_PureLight(FlowTheme_PureDark):
@@ -1228,19 +1181,15 @@ class FlowTheme_Colorful(FlowTheme):
             elif k == 'port pin pen color':
                 self.port_pin_pen_color = self.hex_to_col(v)
 
-    def paint_NI_title_label(self, node_gui, selected, hovering, painter, option, node_style, node_title, node_color,
-                             node_item_bounding_rect):
-
-        painter.setPen(QPen(self.node_title_color))
-
-        if node_style == 'normal':
-            painter.setFont(QFont('Segoe UI', 11))
-            align = Qt.AlignLeft | Qt.AlignVCenter
-        else:
-            painter.setFont(QFont('Segoe UI', 15))
-            align = Qt.AlignCenter
-
-        painter.drawText(node_item_bounding_rect, align, node_title)
+    def setup_NI_title_label(self, text_graphic: GraphicsTextWidget, selected: bool, hovering: bool, node_style: str, 
+                             node_title: str, node_color: QColor):
+        
+        text_style = TextStyle(
+            color = self.node_title_color,
+            font = QFont('Segoe UI', 11) if node_style == 'normal' else QFont('Segoe UI', 15)
+        )
+        
+        self.setup_NI_title_label_default(text_graphic, node_title, text_style)
 
     def paint_PI_label(self, node_gui, painter, option, type_, pin_state, label_str, node_color, bounding_rect):
         c = None
@@ -1281,7 +1230,7 @@ class FlowTheme_Colorful(FlowTheme):
         painter.drawRoundedRect(bounding_rect, 7, 7)
 
     def draw_NI_small(self, node_gui, selected: bool, hovered: bool,
-                      painter, c, w, h, bounding_rect, background_color=None):
+                      painter, c, w, h, bounding_rect, title_rect):
 
         painter.setBrush(QBrush(QColor(c.red(), c.green(), c.blue(), 150)))
         painter.setPen(Qt.NoPen)
@@ -1337,7 +1286,7 @@ class FlowTheme_ColorfulLight(FlowTheme_Colorful):
         painter.drawRoundedRect(bounding_rect, 7, 7)
 
     def draw_NI_small(self, node_gui, selected: bool, hovered: bool,
-                      painter, c, w, h, bounding_rect, background_color=None):
+                      painter, c, w, h, bounding_rect, title_rect):
 
         painter.setBrush(QBrush(QColor(c.red(), c.green(), c.blue(), 150)))
         painter.setPen(Qt.NoPen)
@@ -1363,28 +1312,21 @@ class FlowTheme_Industrial(FlowTheme):
     node_color = QColor(10, 10, 10, 250)
     node_item_shadow_color = QColor(0, 0, 0)
 
-    def paint_NI_title_label(self, node_gui, selected, hovering, painter, option, node_style, node_title, node_color,
-                             node_item_bounding_rect):
-        if node_style == 'normal':
-            self.paint_NI_title_label_default(
-                painter=painter,
-                node_style=node_style,
-                title=node_title,
-                color=QColor(200, 200, 200),
-                pen_w=1,
-                font=QFont('Segoe UI', 11, QFont.Normal if not (hovering or selected) else QFont.Bold),
-                node_item_bounding_rect=node_item_bounding_rect
+    def setup_NI_title_label(self, text_graphic: GraphicsTextWidget, selected: bool, hovering: bool, node_style: str, 
+                             node_title: str, node_color: QColor):
+        
+        if node_style == 'normal':    
+            text_style = TextStyle(
+                color = QColor(200, 200, 200),
+                font = QFont('Segoe UI', 11, QFont.Normal if not (hovering or selected) else QFont.Bold)
             )
         else:
-            self.paint_NI_title_label_default(
-                painter=painter,
-                node_style=node_style,
-                title=node_title,
-                color=node_color,
-                pen_w=2,
-                font=QFont('Segoe UI', 15, QFont.Bold),
-                node_item_bounding_rect=node_item_bounding_rect
+            text_style = TextStyle(
+                color = node_color,
+                font = QFont('Segoe UI', 15, QFont.Bold)
             )
+        
+        self.setup_NI_title_label_default(text_graphic, node_title, text_style)
 
     def paint_PI_label(self, node_gui, painter, option, type_, pin_state, label_str, node_color, bounding_rect):
         c = QColor('#FFFFFF')
@@ -1463,7 +1405,7 @@ class FlowTheme_Industrial(FlowTheme):
         painter.drawRoundedRect(bounding_rect, 2, 2)
 
     def draw_NI_small(self, node_gui, selected: bool, hovered: bool,
-                      painter, c, w, h, bounding_rect, background_color=None):
+                      painter, c, w, h, bounding_rect, title_rect):
 
         background_color = QColor(217, 217, 217, 50)
         c_s = 2
@@ -1501,20 +1443,15 @@ class FlowTheme_Fusion(FlowTheme):
 
     node_item_shadow_color = QColor('#cccccc')
 
-
-    def paint_NI_title_label(self, node_gui, selected, hovering, painter, option, node_style, node_title, node_color,
-                             node_item_bounding_rect):
-
-        painter.setPen(QPen(self.node_title_color))
-
-        if node_style == 'normal':
-            painter.setFont(QFont('Segoe UI', 10))
-            align = Qt.AlignLeft | Qt.AlignVCenter
-        else:
-            painter.setFont(QFont('Segoe UI', 12))
-            align = Qt.AlignCenter
-
-        painter.drawText(node_item_bounding_rect, align, node_title)
+    def setup_NI_title_label(self, text_graphic: GraphicsTextWidget, selected: bool, hovering: bool, node_style: str, 
+                             node_title: str, node_color: QColor):
+        
+        text_style = TextStyle(
+            color = self.node_title_color,
+            font = QFont('Segoe UI', 10) if node_style == 'normal' else QFont('Segoe UI', 12)
+        )
+        
+        self.setup_NI_title_label_default(text_graphic, node_title, text_style)
 
 
     def paint_PI_label(self, node_gui, painter, option, type_, pin_state, label_str, node_color, bounding_rect):
@@ -1569,7 +1506,7 @@ class FlowTheme_Fusion(FlowTheme):
 
 
     def draw_NI_small(self, node_gui, selected: bool, hovered: bool,
-                      painter, c, w, h, bounding_rect, background_color=None):
+                      painter, c, w, h, bounding_rect, title_rect):
 
         painter.setBrush(QBrush(self.node_small_bg_col))
         painter.setPen(Qt.NoPen)

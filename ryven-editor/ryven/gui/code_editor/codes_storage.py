@@ -1,6 +1,6 @@
 # statically stores source codes of nodes and their widgets
 from dataclasses import dataclass
-from typing import Type, Optional
+from typing import Type, Optional, Dict
 import inspect
 
 from ryvencore import Node
@@ -50,7 +50,7 @@ def load_src_code(n: Type[Node]):
 class NodeTypeCodes:
     node_cls: str
     main_widget_cls: Optional[str]
-    custom_input_widget_clss: {str: str}
+    custom_input_widget_clss: Dict[str, str]
 
 
 class Inspectable:
@@ -79,7 +79,7 @@ class CustomInputWidgetInspectable(Inspectable):
     pass
 
 
-class_codes: {Type[Node]: {}} = {}
+class_codes: Dict[Type[Node], NodeTypeCodes] = {}
 # {
 #     Type[Node]: NodeTypeCodeInfo
 # }
@@ -91,7 +91,7 @@ class_codes: {Type[Node]: {}} = {}
 
 
 # maps node- or widget classes to their full module source code
-mod_codes: {Type: str} = {}
+mod_codes: Dict[Type, str] = {}
 
 # maps node- or widget objects to their modified source code
-modif_codes: {object: str} = {}
+modif_codes: Dict[object, str] = {}

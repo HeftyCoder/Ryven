@@ -529,12 +529,12 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
 
     def hoverEnterEvent(self, event):
         self.hovered = True
-        self.widget.title_label.set_NI_hover_state(hovering=True)
+        self.widget.update_shape()
         QGraphicsItem.hoverEnterEvent(self, event)
 
     def hoverLeaveEvent(self, event):
         self.hovered = False
-        self.widget.title_label.set_NI_hover_state(hovering=False)
+        self.widget.update_shape()
         QGraphicsItem.hoverLeaveEvent(self, event)
 
     def mousePressEvent(self, event):

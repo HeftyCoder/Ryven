@@ -2,12 +2,16 @@ from qtpy.QtCore import QObject, QPropertyAnimation, Property, QParallelAnimatio
 from qtpy.QtGui import QColor
 from qtpy.QtWidgets import QGraphicsItem
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from .NodeItem import NodeItem
+    
 class NodeItemAnimator(QObject):
 
-    def __init__(self, node_item):
+    def __init__(self, node_item: 'NodeItem'):
         super(NodeItemAnimator, self).__init__()
 
-        self.node_item: QGraphicsItem = node_item
+        self.node_item = node_item
         self.animation_running = False
 
         # title color
@@ -80,10 +84,9 @@ class NodeItemAnimator(QObject):
 
     # TITLE COLOR
     def get_title_color(self):
-        return self.node_item.widget.title_label.color
-
+        return self.node_item.widget.title_label.default_text_color()
+        
     def set_title_color(self, val):
-        self.node_item.widget.title_label.color = val
-        # QGraphicsItem.update(self.node_item)
-
+        self.node_item.widget.title_label.set_default_text_color(val)
+        
     p_title_color = Property(QColor, get_title_color, set_title_color)

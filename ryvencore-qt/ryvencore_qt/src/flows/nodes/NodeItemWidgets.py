@@ -23,6 +23,7 @@ from qtpy.QtGui import (
 )
 from ..FlowViewProxyWidget import FlowViewProxyWidget
 from .PortItem import InputPortItem, OutputPortItem
+from .GraphicsTextWidget import GraphicsTextWidget
 
 from ...utils import get_longest_line, change_svg_color, get_resource
 
@@ -39,7 +40,7 @@ class NodeItem_CollapseButton(QGraphicsWidget):
         self.node_gui = node_gui
         self.node_item = node_item
 
-        self.size = QSizeF(14, 7)
+        self.icon_size = QSizeF(14, 7)
 
         self.setGraphicsItem(self)
         self.setCursor(Qt.PointingHandCursor)
@@ -56,7 +57,7 @@ class NodeItem_CollapseButton(QGraphicsWidget):
 
 
     def boundingRect(self):
-        return QRectF(QPointF(0, 0), self.size)
+        return QRectF(QPointF(0, 0), self.icon_size)
 
     def setGeometry(self, rect):
         self.prepareGeometryChange()
@@ -64,7 +65,7 @@ class NodeItem_CollapseButton(QGraphicsWidget):
         self.setPos(rect.topLeft())
 
     def sizeHint(self, which, constraint=...):
-        return QSizeF(self.size.width(), self.size.height())
+        return QSizeF(self.icon_size.width(), self.icon_size.height())
 
     def mousePressEvent(self, event):
         event.accept()  # make sure the event doesn't get passed on
@@ -94,7 +95,7 @@ class NodeItem_CollapseButton(QGraphicsWidget):
 
         painter.drawPixmap(
             0, 0,
-            self.size.width(), self.size.height(),
+            self.icon_size.width(), self.icon_size.height(),
             pixmap
         )
         
@@ -103,12 +104,7 @@ class NodeItem_Icon(QGraphicsWidget):
     def __init__(self, node_gui: 'NodeGUI', node_item: 'NodeItem'):
         super().__init__(parent=node_item)
 
-        if node_gui.style == 'normal':
-            self.size = QSize(20, 20)
-        else:
-            self.size = QSize(50, 50)
-
-        self.setGraphicsItem(self)
+        self.icon_size = QSize(20, 20) if node_gui.style == 'normal' else QSize(50, 50)
 
         image = QImage(node_gui.icon)
         self.pixmap = QPixmap.fromImage(image)
@@ -116,7 +112,7 @@ class NodeItem_Icon(QGraphicsWidget):
 
 
     def boundingRect(self):
-        return QRectF(QPointF(0, 0), self.size)
+        return QRectF(QPointF(0, 0), self.icon_size)
 
     def setGeometry(self, rect):
         self.prepareGeometryChange()
@@ -124,7 +120,7 @@ class NodeItem_Icon(QGraphicsWidget):
         self.setPos(rect.topLeft())
 
     def sizeHint(self, which, constraint=...):
-        return QSizeF(self.size.width(), self.size.height())
+        return QSizeF(self.icon_size.width(), self.icon_size.height())
 
 
     def paint(self, painter, option, widget=None):
@@ -138,76 +134,9 @@ class NodeItem_Icon(QGraphicsWidget):
 
         painter.drawPixmap(
             0, 0,
-            self.size.width(), self.size.height(),
+            self.icon_size.width(), self.icon_size.height(),
             self.pixmap
         )
-
-    
-class TitleLabel(QGraphicsWidget):
-
-    def __init__(self, node_gui: 'NodeGUI', node_item: 'NodeItem'):
-        super(TitleLabel, self).__init__(parent=node_item)
-
-        self.setGraphicsItem(self)
-
-        self.node_gui = node_gui
-        self.node_item = node_item
-
-        font = QFont('Poppins', 15) if self.node_gui.style == 'normal' else \
-            QFont('K2D', 20, QFont.Bold, True)  # should be quite similar to every specific font chosen by the painter
-        self.fm = QFontMetricsF(font)
-        self.title_str, self.width, self.height = None, None, None
-        self.update_shape()
-
-        self.color = QColor(30, 43, 48)
-        self.pen_width = 1.5
-        self.hovering = False  # whether the mouse is hovering over the parent NI (!)
-
-        # # Design.flow_theme_changed.connect(self.theme_changed)
-        # self.update_design()
-
-    def update_shape(self):
-        self.title_str = self.node_gui.display_title
-
-        # approximately!
-        self.width = self.fm.width(get_longest_line(self.title_str)+'___')
-        self.height = self.fm.height() * 0.7 * (self.title_str.count('\n') + 1)
-
-    def boundingRect(self):
-        return QRectF(QPointF(0, 0), self.geometry().size())
-
-    def setGeometry(self, rect):
-        self.prepareGeometryChange()
-        QGraphicsLayoutItem.setGeometry(self, rect)
-        self.setPos(rect.topLeft())
-
-    def sizeHint(self, which, constraint=...):
-        return QSizeF(self.width, self.height)
-
-    def paint(self, painter, option, widget=None):
-        self.node_item.session_design.flow_theme.paint_NI_title_label(
-            self.node_gui, self.node_item.isSelected(), self.hovering, painter, option,
-            self.design_style(), self.title_str,
-            self.node_item.color, self.boundingRect()
-        )
-
-    def design_style(self):
-        return self.node_gui.style
-
-    def set_NI_hover_state(self, hovering: bool):
-        self.hovering = hovering
-        # self.update_design()
-        self.update()
-
-    # ANIMATION STUFF
-    def get_color(self):
-        return self.color
-
-    def set_color(self, val):
-        self.color = val
-        QGraphicsItem.update(self)
-
-    p_color = Property(QColor, get_color, set_color)
     
     
 class NodeItemWidget(QGraphicsWidget):
@@ -226,7 +155,13 @@ class NodeItemWidget(QGraphicsWidget):
 
         self.icon = NodeItem_Icon(node_gui, node_item) if node_gui.icon else None
         self.collapse_button = NodeItem_CollapseButton(node_gui, node_item) if node_gui.style == 'normal' else None
-        self.title_label = TitleLabel(node_gui, node_item)
+        
+        self.title_label = GraphicsTextWidget()
+        self.title_label.set_font(
+            QFont('Poppins', 15) if self.node_gui.style == 'normal' else
+            QFont('K2D', 20, QFont.Bold, True)
+        )
+        
         self.main_widget_proxy: FlowViewProxyWidget = None
         if self.node_item.main_widget:
             self.main_widget_proxy = FlowViewProxyWidget(self.flow_view)
@@ -248,31 +183,40 @@ class NodeItemWidget(QGraphicsWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
+        self.header_widget = QGraphicsWidget()
+        self.header_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.header_layout = QGraphicsLinearLayout(Qt.Horizontal)
+        self.header_widget.setLayout(self.header_layout)
+        
         if self.node_gui.style == 'normal':
-            self.header_widget = QGraphicsWidget()
             # self.header_widget.setContentsMargins(0, 0, 0, 0)
-            self.header_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-            self.header_layout = QGraphicsLinearLayout(Qt.Horizontal)
             self.header_layout.setSpacing(5)
             self.header_layout.setContentsMargins(
                 *self.header_padding
             )
+            
             if self.icon:
                 self.header_layout.addItem(self.icon)
-                self.header_layout.setAlignment(self.icon, Qt.AlignVCenter | Qt.AlignLeft)
+                self.header_layout.setAlignment(
+                    self.icon, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft
+                )
 
             self.header_layout.addItem(self.title_label)
-
+            
             self.header_layout.addItem(self.collapse_button)
-            self.header_layout.setAlignment(self.collapse_button, Qt.AlignVCenter | Qt.AlignRight)
+            self.header_layout.setAlignment(
+                self.collapse_button, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight
+            )
 
-            self.header_widget.setLayout(self.header_layout)
-            # layout.addItem(self.header_layout)
             layout.addItem(self.header_widget)
-            # layout.setAlignment(self.title_label, Qt.AlignTop)
-        else:
-            self.setZValue(self.title_label.zValue() + 1)
 
+        else:
+            self.header_layout.addItem(self.title_label)
+            self.header_layout.setAlignment(
+                self.title_label, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight
+            )
+            layout.addItem(self.header_widget)
+            
         #   inputs
         self.inputs_layout = QGraphicsLinearLayout(Qt.Vertical)
         self.inputs_layout.setSpacing(2)
@@ -312,15 +256,17 @@ class NodeItemWidget(QGraphicsWidget):
         way around that yet, so for now I have to recreate the whole layout and make sure the widget uses the smallest
         size possible."""
 
-        # if I don't manually remove the ports from the layouts,
+        # if we don't manually remove the ports from the layouts,
         # they get deleted when setting the widget's layout to None below
-        for i, inp in enumerate(self.node_item.inputs):
-            self.inputs_layout.removeAt(0)
-            # inp.rebuild_ui()
-        for i, out in enumerate(self.node_item.outputs):
-            self.outputs_layout.removeAt(0)
-            # out.rebuild_ui()
-
+        
+        if self.inputs_layout.count() > 0:
+            for i, inp in enumerate(self.node_item.inputs):
+                self.inputs_layout.removeAt(0)
+        
+        if self.outputs_layout.count() > 0:
+            for i, out in enumerate(self.node_item.outputs):
+                self.outputs_layout.removeAt(0)
+        
         self.setLayout(None)
         self.resize(self.minimumSize())
         self.setLayout(self.setup_layout())
@@ -337,8 +283,15 @@ class NodeItemWidget(QGraphicsWidget):
             self.add_main_widget_to_layout()
 
     def update_shape(self):
-
-        self.title_label.update_shape()
+        
+        self.node_item.session_design.flow_theme.setup_NI_title_label(
+            self.title_label,
+            self.isSelected(),
+            self.node_item.hovered,
+            self.node_gui.style,
+            self.node_gui.title(),
+            self.node_item.color,
+        )
 
         # makes extended node items shrink according to resizing input widgets
         if not self.node_item.initializing:
@@ -367,8 +320,8 @@ class NodeItemWidget(QGraphicsWidget):
             # making it recompute its true minimumWidth here
             self.adjustSize()
 
-            if self.layout().minimumWidth() < self.title_label.width + 15:
-                self.layout().setMinimumWidth(self.title_label.width + 15)
+            if self.layout().minimumWidth() < self.title_label.size().width() + 15:
+                self.layout().setMinimumWidth(self.title_label.size().width() + 15)
                 self.layout().activate()
 
         w = self.boundingRect().width()

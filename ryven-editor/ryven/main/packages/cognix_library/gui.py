@@ -4,8 +4,15 @@ from ryven.gui_env import *
 from .nodes import *
 from qtpy.QtGui import QKeySequence
 from qtpy.QtCore import Signal
-from qtpy.QtWidgets import QLineEdit, QDialog, QDialogButtonBox, QMessageBox, QPlainTextEdit, QShortcut, QVBoxLayout
-
+from qtpy.QtWidgets import (
+    QLineEdit, 
+    QDialog, 
+    QDialogButtonBox, 
+    QMessageBox, 
+    QPlainTextEdit, 
+    QShortcut, 
+    QVBoxLayout
+)
 
 class Result_Node_MainWidget(NodeMainWidget, QLineEdit):
     
@@ -188,8 +195,8 @@ class SetVarGui(NodeGUI):
     def __init__(self, params):
         super().__init__(params)
 
-        self.input_widgets[self.node.inputs[-2]] = {'name': 'varname', 'pos': 'besides'}
-        self.input_widgets[self.node.inputs[-1]] = {'name': 'val', 'pos': 'besides'}
+        self.input_widgets[self.node._inputs[-2]] = {'name': 'varname', 'pos': 'besides'}
+        self.input_widgets[self.node._inputs[-1]] = {'name': 'val', 'pos': 'besides'}
 
 @node_gui(GetVar_Node)
 class GetVarGui(NodeGUI):

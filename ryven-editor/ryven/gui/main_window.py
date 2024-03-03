@@ -2,6 +2,8 @@ import sys
 import os
 import os.path
 
+from typing import List
+
 from qtpy.QtGui import QIcon, QKeySequence
 from qtpy.QtWidgets import (
     QMainWindow,
@@ -496,7 +498,7 @@ CONTROLS
     def focus_on_flow(self, flow):
         self.ui.flows_tab_widget.setCurrentWidget(self.flow_UIs[flow])
 
-    def import_packages(self, packages_list: [NodesPackage]):
+    def import_packages(self, packages_list: List[NodesPackage]):
         for p in packages_list:
             self.import_nodes(p)
 

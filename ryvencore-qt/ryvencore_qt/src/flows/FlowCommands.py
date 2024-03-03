@@ -39,7 +39,7 @@ class FlowUndoCommand(QObject, QUndoCommand):
     # prevent recursive calls of redo() and undo()
     _any_cmd_active = False
 
-    def __init__(self, flow_view):
+    def __init__(self, flow_view: 'FlowView'):
         self.flow_view = flow_view
         self.flow: Flow = flow_view.flow
         self._activated = False
@@ -154,7 +154,7 @@ class MoveComponents_Command(FlowUndoCommand):
 
 
 class PlaceNode_Command(FlowUndoCommand):
-    def __init__(self, flow_view, node_class, pos):
+    def __init__(self, flow_view: 'FlowView', node_class, pos):
         super().__init__(flow_view)
 
         self.node_class = node_class
@@ -179,7 +179,7 @@ class PlaceNode_Command(FlowUndoCommand):
 
 
 class PlaceDrawing_Command(FlowUndoCommand):
-    def __init__(self, flow_view, posF, drawing):
+    def __init__(self, flow_view: 'FlowView', posF, drawing):
         super().__init__(flow_view)
 
         self.drawing = drawing
@@ -203,7 +203,7 @@ class PlaceDrawing_Command(FlowUndoCommand):
 
 
 class SelectComponents_Command(FlowUndoCommand):
-    def __init__(self, flow_view, new_items, prev_items):
+    def __init__(self, flow_view: 'FlowView', new_items, prev_items):
         super().__init__(flow_view)
         self.items = new_items
         self.prev_items = prev_items

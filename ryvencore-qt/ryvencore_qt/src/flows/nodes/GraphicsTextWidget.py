@@ -1,6 +1,7 @@
 from typing import Optional
-from PySide6.QtCore import QRectF, Qt
-from PySide6.QtWidgets import QGraphicsItem
+from qtpy.QtCore import QRectF, Qt
+from qtpy.QtWidgets import QGraphicsItem
+from qtpy.QtGui import QFont
 
 from qtpy.QtWidgets import (
     QGraphicsWidget,
@@ -9,6 +10,13 @@ from qtpy.QtWidgets import (
 )
 
 from qtpy.QtGui import QColor
+from dataclasses import dataclass
+
+
+@dataclass
+class TextStyle:
+    color: QColor = QColor('#FFFFFF')
+    font: QFont = QFont()
 
 
 class GraphicsTextWidget(QGraphicsWidget):
@@ -31,14 +39,27 @@ class GraphicsTextWidget(QGraphicsWidget):
     def set_text(self, value: str):
         self._text_item.setPlainText(value)
         self.update()
-    
+        
     def set_html(self, html: str):
         self._text_item.setHtml(html)
         self.update()
-    
+        
     def set_text_width(self, width):
         self._text_item.setTextWidth(width)
         self.update()
-    
+        
     def set_default_text_color(self, color: QColor):
         self._text_item.setDefaultTextColor(color)
+        self.update()
+        
+    def default_text_color(self):
+        return self._text_item.defaultTextColor()
+    
+    def set_font(self, font):
+        self._text_item.setFont(font)
+        self.update()
+        
+    def set_text_style(self, style: TextStyle):
+        self._text_item.setFont(style.font)
+        self._text_item.setDefaultTextColor(style.color)
+        self.update()

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Type, Optional
+from typing import Type, Optional, TYPE_CHECKING
 
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import (
@@ -12,12 +12,16 @@ from qtpy.QtWidgets import (
     QGridLayout,
     QPushButton
 )
+
 from ryvencore import Node
 
-from ryven.gui.code_editor.EditSrcCodeInfoDialog import EditSrcCodeInfoDialog
-from ryven.gui.code_editor.CodeEditorWidget import CodeEditorWidget
-from ryven.gui.code_editor.SourceCodeUpdater import SrcCodeUpdater
-from ryven.gui.code_editor.codes_storage import (
+from ryvencore_qt.src.flows.FlowView import FlowView
+from ryvencore_qt import NodeGUI
+
+from ...gui.code_editor.EditSrcCodeInfoDialog import EditSrcCodeInfoDialog
+from ...gui.code_editor.CodeEditorWidget import CodeEditorWidget
+from ...gui.code_editor.SourceCodeUpdater import SrcCodeUpdater
+from ...gui.code_editor.codes_storage import (
     class_codes, 
     mod_codes, 
     modif_codes, 
@@ -29,11 +33,13 @@ from ryven.gui.code_editor.codes_storage import (
     load_src_code,
 )
 
+if TYPE_CHECKING:
+    from ..main_window import MainWindow
 
 class LoadSrcCodeButton(QPushButton):
     def __init__(self):
         super().__init__('load source code')
-        self._node = None
+        self._node: Node = None
     
     @property
     def node(self):
@@ -53,7 +59,7 @@ class LinkedRadioButton(QRadioButton):
 
 
 class CodePreviewWidget(QWidget):
-    def __init__(self, main_window, flow_view):
+    def __init__(self, main_window: 'MainWindow', flow_view: FlowView):
         super().__init__()
 
         self.edits_enabled = main_window.config.src_code_edits_enabled
@@ -169,6 +175,7 @@ class CodePreviewWidget(QWidget):
         self._clear_class_layout()
         self.radio_buttons.clear()
 
+        node_gui: NodeGUI = node.gui
         codes: NodeTypeCodes = class_codes[node.__class__]
 
         def register_rb(rb: QRadioButton):
@@ -183,20 +190,20 @@ class CodePreviewWidget(QWidget):
 
         # main widget radio button
         if codes.main_widget_cls is not None:
-            mw = node.gui.main_widget()
+            mw = node_gui.main_widget()
             code = codes.main_widget_cls
             code = modif_codes.get(mw, code)
             register_rb(LinkedRadioButton(
                 'main widget',
-                MainWidgetInspectable(node, node.gui.main_widget(), code)
+                MainWidgetInspectable(node, node_gui.main_widget(), code)
             ))
 
         # custom input widgets
-        for i in range(len(node.inputs)):
-            inp = node.inputs[i]
-            if inp in node.gui.input_widgets:
-                name = node.gui.input_widgets[inp]['name']
-                widget = node.gui.item.inputs[i].widget
+        for i in range(len(node._inputs)):
+            inp = node._inputs[i]
+            if inp in node_gui.input_widgets:
+                name = node_gui.input_widgets[inp]['name']
+                widget = node_gui.item.inputs[i].widget
                 code = codes.custom_input_widget_clss[name]
                 code = modif_codes.get(widget, code)
                 register_rb(LinkedRadioButton(
