@@ -135,17 +135,21 @@ NodeWidget {
     def build_node_selection_stylesheet(self):
         return self.node_selection_stylesheet__base + '\n' + self.node_selection_stylesheet
     
-    def paint_NI_title_label(self, node_gui, selected: bool, hovering: bool, painter: QPainter, option: QStyleOption,
-                             node_style: str, node_title: str, node_color: QColor, node_item_bounding_rect):
-        pass
-    
     def setup_NI_title_label(self, text_graphic: GraphicsTextWidget, selected: bool, hovering: bool, node_style: str, 
                              node_title: str, node_color: QColor):
         pass
     
-    def paint_PI_label(self, node_gui, painter: QPainter, option: QStyleOption, type_: str, pin_state: bool, label_str: str,
-                       node_color: QColor, bounding_rect: QRectF):
-        pass
+    def setup_PI_label(self, text_graphic: GraphicsTextWidget, type_: str, pin_state: PinState, 
+                       label_str: str, node_color: QColor):
+        
+        self.setup_label(
+            text_graphic,
+            label_str,
+            TextStyle(
+                QColor('#FFFFFF') if type_ == 'exec' else node_color,
+                QFont("Source Code Pro", 10, QFont.Bold)
+            )
+        )
 
     def paint_PI(self, node_gui, painter: QPainter, option: QStyleOption, node_color: QColor, type_: str, pin_state: PinState,
                  rect: QRectF):  # padding, w, h):
@@ -188,7 +192,7 @@ NodeWidget {
         painter.drawRoundedRect(rect, 10, 10)
 
     @staticmethod
-    def setup_NI_title_label_default(text_item: GraphicsTextWidget, title: str, text_style: TextStyle):
+    def setup_label(text_item: GraphicsTextWidget, title: str, text_style: TextStyle):
         
         text_item._text_item.setPlainText(title)
         text_item.set_text_style(text_style)
@@ -353,15 +357,23 @@ class FlowTheme_Toy(FlowTheme):
         else:
             text_style = TextStyle(
                 color = QColor(30, 43, 48) if not hovering else node_color.lighter(),
-                font=QFont('K2D', 20, QFont.Bold, True)
+                font=QFont('K2D', 15, QFont.Bold, True)
             )
         
-        self.setup_NI_title_label_default(text_graphic, node_title, text_style)
+        self.setup_label(text_graphic, node_title, text_style)
         
-    def paint_PI_label(self, node_gui, painter, option, type_, pin_state, label_str, node_color, bounding_rect):
-        c = QColor('#FFFFFF')
-        self.paint_PI_label_default(painter, label_str, c, QFont("Source Code Pro", 10, QFont.Bold), bounding_rect)
-
+    def setup_PI_label(self, text_graphic: GraphicsTextWidget, type_: str, pin_state: PinState, 
+                       label_str: str, node_color: QColor):
+        
+        self.setup_label(
+            text_graphic,
+            label_str,
+            TextStyle(
+                QColor('#FFFFFF'),
+                QFont("Source Code Pro", 10, QFont.Bold)
+            )
+        )
+        
     def draw_NI_normal(self, node_gui, selected: bool, hovered: bool,
                        painter: QPainter, c: QColor, w, h, bounding_rect, title_rect):
 
@@ -452,18 +464,10 @@ class FlowTheme_DarkTron(FlowTheme):
         else:
             text_style = TextStyle(
                 color = node_color,
-                font = QFont('K2D', 20, QFont.Bold, True),
+                font = QFont('K2D', 15, QFont.Bold, True),
             )
         
-        self.setup_NI_title_label_default(text_graphic, node_title, text_style)
-        
-    def paint_PI_label(self, node_gui, painter, option, type_, pin_state, label_str, node_color, bounding_rect):
-        if type_ == 'exec':
-            c = QColor('#FFFFFF')
-        else:
-            c = node_color
-
-        self.paint_PI_label_default(painter, label_str, c, QFont("Source Code Pro", 10, QFont.Bold), bounding_rect)
+        self.setup_label(text_graphic, node_title, text_style)
 
     def draw_NI_normal(self, node_gui, selected: bool, hovered: bool,
                        painter, c: QColor, w: int, h: int, bounding_rect, title_rect):
@@ -609,18 +613,10 @@ class FlowTheme_Ghost(FlowTheme):
         else:
             text_style = TextStyle(
                 color = node_color,
-                font = QFont('K2D', 20, QFont.Bold, True),
+                font = QFont('K2D', 15, QFont.Bold, True),
             )
         
-        self.setup_NI_title_label_default(text_graphic, node_title, text_style)
-    
-    def paint_PI_label(self, node_gui, painter, option, type_, pin_state, label_str, node_color, bounding_rect):
-        if type_ == 'exec':
-            c = QColor('#FFFFFF')
-        else:
-            c = node_color
-
-        self.paint_PI_label_default(painter, label_str, c, QFont("Source Code Pro", 10, QFont.Bold), bounding_rect)
+        self.setup_label(text_graphic, node_title, text_style)
 
     def draw_NI_normal(self, node_gui, selected: bool, hovered: bool,
                        painter, c, w, h, bounding_rect, title_rect):
@@ -655,14 +651,11 @@ class FlowTheme_Ghost(FlowTheme):
         c_s = 10  # corner size
 
         bh = self.get_rect_no_header(w, h, bounding_rect, title_rect).height()
-        path = self.get_extended_body_path(c_s, w, h)  # equals the small in this case
-
+        path = self.get_extended_body_path(c_s, w, bh)  # equals the small in this case
+        path.translate(0, title_rect.height() * 0.5)
+        
         painter.setBrush(background_color)
-        # pen = QPen(QColor('#333333'))  # QPen(c)
-        # pen.setWidth(1)
-        # painter.setPen(pen)
         painter.setPen(Qt.NoPen)
-
         painter.drawPath(path)
 
 
@@ -717,18 +710,10 @@ class FlowTheme_Blender(FlowTheme):
         else:
             text_style = TextStyle(
                 color = node_color,
-                font = QFont('Segoe UI', 15, QFont.Bold, True),
+                font = QFont('Segoe UI', 11, QFont.Bold, True),
             )
         
-        self.setup_NI_title_label_default(text_graphic, node_title, text_style)
-
-    def paint_PI_label(self, node_gui, painter, option, type_, pin_state, label_str, node_color, bounding_rect):
-        if type_ == 'exec':
-            c = QColor('#FFFFFF')
-        else:
-            c = node_color
-
-        self.paint_PI_label_default(painter, label_str, c, QFont("Source Code Pro", 10, QFont.Bold), bounding_rect)
+        self.setup_label(text_graphic, node_title, text_style)
 
     def draw_NI_normal(self, node_gui, selected: bool, hovered: bool,
                        painter, c, w, h, bounding_rect, title_rect):
@@ -764,7 +749,12 @@ class FlowTheme_Blender(FlowTheme):
             if not selected else
             QPen(QColor(200, 200, 200))
         )
-        painter.drawRoundedRect(bounding_rect, self.corner_radius_small, self.corner_radius_small)
+        
+        painter.drawRoundedRect(
+            self.get_rect_no_header(w, h, bounding_rect, title_rect), 
+            self.corner_radius_small, 
+            self.corner_radius_small
+        )
 
 
 class FlowTheme_Simple(FlowTheme):
@@ -828,13 +818,14 @@ class FlowTheme_Simple(FlowTheme):
         else:
             text_style = TextStyle(
                 color = node_color,
-                font = QFont('Poppins', 15, QFont.Thin),
+                font = QFont('Poppins', 13, QFont.Thin),
             )
         
-        self.setup_NI_title_label_default(text_graphic, node_title, text_style)
+        self.setup_label(text_graphic, node_title, text_style)
 
-    def paint_PI_label(self, node_gui, painter, option, type_, pin_state, label_str, node_color, bounding_rect):
-        c = None
+    def setup_PI_label(self, text_graphic: GraphicsTextWidget, type_: str, pin_state: PinState, 
+                       label_str: str, node_color: QColor):
+        
         if pin_state != PinState.CONNECTED:
             c = QColor('#53585c')
         else:
@@ -842,9 +833,16 @@ class FlowTheme_Simple(FlowTheme):
                 c = QColor('#cccccc')
             else:
                 c = node_color
-
-        self.paint_PI_label_default(painter, label_str, c, QFont("Courier New", 10, QFont.Bold), bounding_rect)
-
+                
+        self.setup_label(
+            text_graphic,
+            label_str,
+            TextStyle(
+                c,
+                QFont("Courier New", 10, QFont.Bold)
+            )
+        )
+        
     def draw_NI_normal(self, node_gui, selected: bool, hovered: bool,
                        painter, c, w, h, bounding_rect, title_rect):
 
@@ -873,7 +871,7 @@ class FlowTheme_Simple(FlowTheme):
         c_s = 10
         painter.setBrush(self.interpolate_color(c, background_color, 0.97))
         painter.setPen(Qt.NoPen)
-        painter.drawRoundedRect(bounding_rect, c_s, c_s)
+        painter.drawRoundedRect(self.get_rect_no_header(w, h, bounding_rect, title_rect), c_s, c_s)
 
 
 class FlowTheme_Ueli(FlowTheme):
@@ -937,24 +935,30 @@ class FlowTheme_Ueli(FlowTheme):
         else:
             text_style = TextStyle(
                 color = node_color,
-                font = QFont('Poppins', 15, QFont.Thin),
+                font = QFont('Poppins', 13, QFont.Thin),
             )
         
-        self.setup_NI_title_label_default(text_graphic, node_title, text_style)
+        self.setup_label(text_graphic, node_title, text_style)
 
-    def paint_PI_label(self, node_gui, painter, option, type_, pin_state, label_str, node_color, bounding_rect):
-
-        c = None
+    def setup_PI_label(self, text_graphic: GraphicsTextWidget, type_: str, pin_state: PinState, 
+                       label_str: str, node_color: QColor):
+        
         if pin_state != PinState.CONNECTED:
-            c = '#53585c'
+            c = QColor('#53585c')
         else:
             if type_ == 'exec':
-                c = '#cccccc'
+                c = QColor('#cccccc')
             else:
                 c = node_color
-        color = QColor(c)
-
-        self.paint_PI_label_default(painter, label_str, color, QFont("Courier New", 10, QFont.Bold), bounding_rect)
+                
+        self.setup_label(
+            text_graphic,
+            label_str,
+            TextStyle(
+                c,
+                QFont("Courier New", 10, QFont.Bold)
+            )
+        )
 
     def draw_NI_normal(self, node_gui, selected: bool, hovered: bool,
                        painter, c, w, h, bounding_rect: QRectF, title_rect):
@@ -987,7 +991,7 @@ class FlowTheme_Ueli(FlowTheme):
         c_s = 10  # corner size
         painter.setBrush(self.interpolate_color(c, background_color, 0.97))
         painter.setPen(Qt.NoPen)
-        painter.drawRoundedRect(bounding_rect, c_s, c_s)
+        painter.drawRoundedRect(self.get_header_rect(w, h, bounding_rect, title_rect), c_s, c_s)
 
 
 class FlowTheme_PureDark(FlowTheme):
@@ -1040,13 +1044,14 @@ class FlowTheme_PureDark(FlowTheme):
         
         text_style = TextStyle(
             color = self.node_title_color,
-            font = QFont('Segoe UI', 11) if node_style == 'normal' else QFont('Segoe UI', 15)
+            font = QFont('Segoe UI', 12)
         )
         
-        self.setup_NI_title_label_default(text_graphic, node_title, text_style)
+        self.setup_label(text_graphic, node_title, text_style)
 
-    def paint_PI_label(self, node_gui, painter, option, type_, pin_state, label_str, node_color, bounding_rect):
-        c = None
+    def setup_PI_label(self, text_graphic: GraphicsTextWidget, type_: str, pin_state: PinState, 
+                       label_str: str, node_color: QColor):
+        
         if pin_state != PinState.CONNECTED:
             c = QColor('#53585c')
         else:
@@ -1054,8 +1059,15 @@ class FlowTheme_PureDark(FlowTheme):
                 c = QColor('#cccccc')
             else:
                 c = node_color
-
-        self.paint_PI_label_default(painter, label_str, c, QFont("Segoe UI", 10), bounding_rect)
+                
+        self.setup_label(
+            text_graphic,
+            label_str,
+            TextStyle(
+                c,
+                QFont("Segoe UI", 10, QFont.Bold)
+            )
+        )
 
     def paint_PI(self, node_gui, painter, option, node_color, type_, pin_state, rect):
         
@@ -1109,11 +1121,7 @@ class FlowTheme_PureDark(FlowTheme):
         painter.setBrush(QBrush(self.node_small_bg_col))
         painter.setPen(Qt.NoPen)
         
-        header_height = self.get_header_rect(w, h, title_rect).height()
-        draw_rect = QRectF(
-            QPointF(bounding_rect.left(), bounding_rect.top() + header_height),
-            bounding_rect.bottomRight())
-        painter.drawRoundedRect(draw_rect, 4, 4)
+        painter.drawRoundedRect(self.get_rect_no_header(w, h, bounding_rect, title_rect), 4, 4)
 
 
 class FlowTheme_PureLight(FlowTheme_PureDark):
@@ -1186,13 +1194,14 @@ class FlowTheme_Colorful(FlowTheme):
         
         text_style = TextStyle(
             color = self.node_title_color,
-            font = QFont('Segoe UI', 11) if node_style == 'normal' else QFont('Segoe UI', 15)
+            font = QFont('Segoe UI', 12)
         )
         
-        self.setup_NI_title_label_default(text_graphic, node_title, text_style)
+        self.setup_label(text_graphic, node_title, text_style)
 
-    def paint_PI_label(self, node_gui, painter, option, type_, pin_state, label_str, node_color, bounding_rect):
-        c = None
+    def setup_PI_label(self, text_graphic: GraphicsTextWidget, type_: str, pin_state: PinState, 
+                       label_str: str, node_color: QColor):
+        
         if pin_state != PinState.CONNECTED:
             c = QColor('#dddddd')
         else:
@@ -1200,8 +1209,15 @@ class FlowTheme_Colorful(FlowTheme):
                 c = QColor('#cccccc')
             else:
                 c = node_color
-
-        self.paint_PI_label_default(painter, label_str, c, QFont("Segoe UI", 10), bounding_rect)
+                
+        self.setup_label(
+            text_graphic,
+            label_str,
+            TextStyle(
+                c,
+                QFont("Segoe UI", 10, QFont.Bold)
+            )
+        )
 
     def paint_PI(self, node_gui, painter, option, node_color, type_, pin_state, rect):
         
@@ -1234,7 +1250,7 @@ class FlowTheme_Colorful(FlowTheme):
 
         painter.setBrush(QBrush(QColor(c.red(), c.green(), c.blue(), 150)))
         painter.setPen(Qt.NoPen)
-        painter.drawRoundedRect(bounding_rect, 8, 8)
+        painter.drawRoundedRect(self.get_rect_no_header(w, h, bounding_rect, title_rect), 8, 8)
 
 
 class FlowTheme_ColorfulLight(FlowTheme_Colorful):
@@ -1255,8 +1271,9 @@ class FlowTheme_ColorfulLight(FlowTheme_Colorful):
 
     node_item_shadow_color = QColor('#cccccc')
 
-    def paint_PI_label(self, node_gui, painter, option, type_, pin_state, label_str, node_color, bounding_rect):
-        c = None
+    def setup_PI_label(self, text_graphic: GraphicsTextWidget, type_: str, pin_state: PinState, 
+                       label_str: str, node_color: QColor):
+        
         if pin_state != PinState.CONNECTED:
             c = QColor('#1f1f1f')
         else:
@@ -1264,8 +1281,15 @@ class FlowTheme_ColorfulLight(FlowTheme_Colorful):
                 c = QColor('#cccccc')
             else:
                 c = node_color
-
-        self.paint_PI_label_default(painter, label_str, c, QFont("Segoe UI", 10), bounding_rect)
+                
+        self.setup_label(
+            text_graphic,
+            label_str,
+            TextStyle(
+                c,
+                QFont("Segoe UI", 10, QFont.Bold)
+            )
+        )
 
     def draw_NI_normal(self, node_gui, selected: bool, hovered: bool, painter, c, w, h, bounding_rect: QRectF, title_rect):
 
@@ -1290,7 +1314,7 @@ class FlowTheme_ColorfulLight(FlowTheme_Colorful):
 
         painter.setBrush(QBrush(QColor(c.red(), c.green(), c.blue(), 150)))
         painter.setPen(Qt.NoPen)
-        painter.drawRoundedRect(bounding_rect, 8, 8)
+        painter.drawRoundedRect(self.get_rect_no_header(w, h, bounding_rect, title_rect), 8, 8)
 
 
 class FlowTheme_Industrial(FlowTheme):
@@ -1323,14 +1347,22 @@ class FlowTheme_Industrial(FlowTheme):
         else:
             text_style = TextStyle(
                 color = node_color,
-                font = QFont('Segoe UI', 15, QFont.Bold)
+                font = QFont('Segoe UI', 12, QFont.Bold)
             )
         
-        self.setup_NI_title_label_default(text_graphic, node_title, text_style)
+        self.setup_label(text_graphic, node_title, text_style)
 
-    def paint_PI_label(self, node_gui, painter, option, type_, pin_state, label_str, node_color, bounding_rect):
-        c = QColor('#FFFFFF')
-        self.paint_PI_label_default(painter, label_str, c, QFont("Segoe UI", 8, QFont.Normal), bounding_rect)
+    def setup_PI_label(self, text_graphic: GraphicsTextWidget, type_: str, pin_state: PinState, 
+                       label_str: str, node_color: QColor):
+        
+        self.setup_label(
+            text_graphic,
+            label_str,
+            TextStyle(
+                QColor('#FFFFFF'),
+                QFont("Segoe UI", 8, QFont.Normal)
+            )
+        )
 
     def paint_PI(self, node_gui, painter, option, node_color, type_, pin_state, rect):
 
@@ -1412,7 +1444,7 @@ class FlowTheme_Industrial(FlowTheme):
         painter.setBrush(self.interpolate_color(c, background_color, 0.97))
         pen = QPen(QColor(130, 130, 130))
         painter.setPen(pen)
-        painter.drawRoundedRect(bounding_rect, c_s, c_s)
+        painter.drawRoundedRect(self.get_rect_no_header(w, h, bounding_rect, title_rect), c_s, c_s)
 
 
 class FlowTheme_Fusion(FlowTheme):
@@ -1448,12 +1480,23 @@ class FlowTheme_Fusion(FlowTheme):
         
         text_style = TextStyle(
             color = self.node_title_color,
-            font = QFont('Segoe UI', 10) if node_style == 'normal' else QFont('Segoe UI', 12)
+            font = QFont('Segoe UI', 11)
         )
         
-        self.setup_NI_title_label_default(text_graphic, node_title, text_style)
+        self.setup_label(text_graphic, node_title, text_style)
 
-
+    def setup_PI_label(self, text_graphic: GraphicsTextWidget, type_: str, pin_state: PinState, 
+                       label_str: str, node_color: QColor):
+        
+        self.setup_label(
+            text_graphic,
+            label_str,
+            TextStyle(
+                QColor(0, 0, 0),
+                QFont("Segoe UI", 8)
+            )
+        )
+        
     def paint_PI_label(self, node_gui, painter, option, type_, pin_state, label_str, node_color, bounding_rect):
         pen = QPen(QColor('#000000'))
         pen.setWidthF(1.2)
@@ -1510,7 +1553,7 @@ class FlowTheme_Fusion(FlowTheme):
 
         painter.setBrush(QBrush(self.node_small_bg_col))
         painter.setPen(Qt.NoPen)
-        painter.drawRoundedRect(bounding_rect, 4, 4)
+        painter.drawRoundedRect(self.get_rect_no_header(w, h, bounding_rect, title_rect), 4, 4)
 
 
 flow_themes = [

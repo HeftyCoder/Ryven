@@ -154,7 +154,7 @@ class NodeItemWidget(QGraphicsWidget):
         self.header_padding = (0, 0, 0, 0)  # theme dependent and hence updated in setup_layout()!
 
         self.icon = NodeItem_Icon(node_gui, node_item) if node_gui.icon else None
-        self.collapse_button = NodeItem_CollapseButton(node_gui, node_item) if node_gui.style == 'normal' else None
+        self.collapse_button = NodeItem_CollapseButton(node_gui, node_item)
         
         self.title_label = GraphicsTextWidget()
         self.title_label.set_font(
@@ -188,34 +188,26 @@ class NodeItemWidget(QGraphicsWidget):
         self.header_layout = QGraphicsLinearLayout(Qt.Horizontal)
         self.header_widget.setLayout(self.header_layout)
         
-        if self.node_gui.style == 'normal':
-            # self.header_widget.setContentsMargins(0, 0, 0, 0)
-            self.header_layout.setSpacing(5)
-            self.header_layout.setContentsMargins(
-                *self.header_padding
-            )
-            
-            if self.icon:
-                self.header_layout.addItem(self.icon)
-                self.header_layout.setAlignment(
-                    self.icon, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft
-                )
-
-            self.header_layout.addItem(self.title_label)
-            
-            self.header_layout.addItem(self.collapse_button)
+        self.header_layout.setSpacing(5)
+        self.header_layout.setContentsMargins(
+            *self.header_padding
+        )
+        
+        if self.icon:
+            self.header_layout.addItem(self.icon)
             self.header_layout.setAlignment(
-                self.collapse_button, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight
+                self.icon, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft
             )
 
-            layout.addItem(self.header_widget)
-
-        else:
-            self.header_layout.addItem(self.title_label)
-            self.header_layout.setAlignment(
-                self.title_label, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight
-            )
-            layout.addItem(self.header_widget)
+        self.header_layout.addItem(self.title_label)
+        
+        self.header_layout.addItem(self.collapse_button)
+        self.header_layout.setAlignment(
+            self.collapse_button, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight
+        )
+        
+        layout.addItem(self.header_widget)
+        layout.setAlignment(self.header_widget, Qt.AlignmentFlag.AlignHCenter)
             
         #   inputs
         self.inputs_layout = QGraphicsLinearLayout(Qt.Vertical)
@@ -281,9 +273,15 @@ class NodeItemWidget(QGraphicsWidget):
 
         if self.node_item.main_widget:
             self.add_main_widget_to_layout()
-
+=
     def update_shape(self):
         
+        for inp in self.node_item.inputs:
+            inp.update()
+        
+        for out in self.node_item.outputs:
+            out.update()
+            
         self.node_item.session_design.flow_theme.setup_NI_title_label(
             self.title_label,
             self.isSelected(),

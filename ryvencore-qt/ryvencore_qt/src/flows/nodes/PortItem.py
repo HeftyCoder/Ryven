@@ -1,4 +1,6 @@
-from typing import Tuple
+from typing import Tuple, TYPE_CHECKING
+from PySide6.QtGui import QPainter
+from PySide6.QtWidgets import QStyleOptionGraphicsItem, QWidget
 
 from qtpy.QtWidgets import QGraphicsGridLayout, QGraphicsWidget, QGraphicsLayoutItem
 from qtpy.QtCore import Qt, QRectF, QPointF, QSizeF
@@ -11,9 +13,14 @@ from ryvencore.utils import deserialize
 from ...GUIBase import GUIBase
 from ...utils import get_longest_line, shorten
 from ..FlowViewProxyWidget import FlowViewProxyWidget
+from .GraphicsTextWidget import GraphicsTextWidget
 
 from enum import IntEnum
 
+if TYPE_CHECKING:
+    from .NodeGUI import NodeGUI
+    from .NodeItem import NodeItem
+    
 # utils
 
 
@@ -53,7 +60,7 @@ def connections(port):
 class PortItem(GUIBase, QGraphicsWidget):
     """The GUI representative for ports of nodes, also handling mouse events for connections."""
 
-    def __init__(self, node_gui, node_item, port, flow_view):
+    def __init__(self, node_gui: 'NodeGUI', node_item: 'NodeItem', port: NodePort, flow_view):
         GUIBase.__init__(self, representing_component=port)
         QGraphicsWidget.__init__(self)
 
@@ -64,13 +71,11 @@ class PortItem(GUIBase, QGraphicsWidget):
         self.port: NodePort = port
         self.flow_view = flow_view
 
-        # self.port.has_been_connected.connect(self.port_connected)
-        # self.port.has_been_disconnected.connect(self.port_disconnected)
-
         self.pin = PortItemPin(self.port, self, self.node_gui, self.node_item)
 
-        self.label = PortItemLabel(self.port, self, self.node_gui, self.node_item)
-
+        self.label = GraphicsTextWidget(self)
+        self.label.set_font(QFont("Source Code Pro", 10, QFont.Bold))
+        
         self._layout = QGraphicsGridLayout()
         self._layout.setSpacing(0)
         self._layout.setContentsMargins(0, 0, 0, 0)
@@ -86,6 +91,16 @@ class PortItem(GUIBase, QGraphicsWidget):
         self.setPos(rect.topLeft())
     # <<< interaction boilerplate <<<
 
+    def update(self):
+        self.node_item.session_design.flow_theme.setup_PI_label(
+            self.label,
+            self.port.type_,
+            self.pin.state,
+            self.port.label_str,
+            self.node_gui.color,
+        )
+        super().update()
+        
     def setup_ui(self):
         pass
 
@@ -371,45 +386,3 @@ class PortItemPin(QGraphicsWidget):
                 return self.node_item.get_left_body_header_vertex_scene_pos()
             else:
                 return self.node_item.get_right_body_header_vertex_scene_pos()
-
-
-class PortItemLabel(QGraphicsWidget):
-    def __init__(self, port, port_item, node_gui, node_item):
-        super(PortItemLabel, self).__init__(node_item)
-        self.setGraphicsItem(self)
-
-        self.port = port
-        self.port_item = port_item
-        self.node_gui = node_gui
-        self.node_item = node_item
-
-        self.font = QFont("Source Code Pro", 10, QFont.Bold)
-        font_metrics = QFontMetricsF(
-            self.font
-        )  # approximately! the designs can use different fonts
-        self.width = font_metrics.width(get_longest_line(self.port.label_str))
-        self.height = font_metrics.height() * (self.port.label_str.count('\n') + 1)
-        self.port_local_pos = None
-
-    def boundingRect(self):
-        return QRectF(QPointF(0, 0), self.geometry().size())
-
-    def setGeometry(self, rect):
-        self.prepareGeometryChange()
-        QGraphicsLayoutItem.setGeometry(self, rect)
-        self.setPos(rect.topLeft())
-
-    def sizeHint(self, which, constraint=...):
-        return QSizeF(self.width, self.height)
-
-    def paint(self, painter, option, widget=None):
-        self.node_item.session_design.flow_theme.paint_PI_label(
-            self.node_gui,
-            painter,
-            option,
-            self.port.type_,
-            is_connected(self.port),
-            self.port.label_str,
-            self.node_gui.color,
-            self.boundingRect(),
-        )
