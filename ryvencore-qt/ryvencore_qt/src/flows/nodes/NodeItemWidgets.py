@@ -273,7 +273,7 @@ class NodeItemWidget(QGraphicsWidget):
 
         if self.node_item.main_widget:
             self.add_main_widget_to_layout()
-=
+
     def update_shape(self):
         
         for inp in self.node_item.inputs:
