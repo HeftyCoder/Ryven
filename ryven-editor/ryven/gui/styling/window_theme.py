@@ -103,7 +103,9 @@ __flow_theme_light = 'pure light'
 __flow_theme_dark = 'pure dark'
 
 def __apply_plain(app: 'QApplication'):
+    from qtpy.QtWidgets import QApplication
     app.setStyleSheet(None)
+    app.setPalette(QApplication.style().standardPalette())
     return (RyvenPlainPalette(), __flow_theme_light)
 
 # ryven originals 
