@@ -156,11 +156,15 @@ class NodeItemWidget(QGraphicsWidget):
         self.icon = NodeItem_Icon(node_gui, node_item) if node_gui.icon else None
         self.collapse_button = NodeItem_CollapseButton(node_gui, node_item)
         
+        # title
         self.title_label = GraphicsTextWidget()
         self.title_label.set_font(
             QFont('Poppins', 15) if self.node_gui.style == 'normal' else
             QFont('K2D', 20, QFont.Bold, True)
         )
+        
+        self.max_title_length_normal = 30
+        self.max_title_length_small = 12
         
         self.main_widget_proxy: FlowViewProxyWidget = None
         if self.node_item.main_widget:
@@ -172,6 +176,9 @@ class NodeItemWidget(QGraphicsWidget):
         self.body_widget: QGraphicsWidget = None
         self.inputs_layout: QGraphicsLinearLayout = None
         self.outputs_layout: QGraphicsLinearLayout = None
+        
+        # layout
+        self.min_size = QSize(150, 30) if node_gui.style == 'normal' else QSize(115, 40)
         self.setLayout(self.setup_layout())
 
     def setup_layout(self) -> QGraphicsLinearLayout:
@@ -180,11 +187,13 @@ class NodeItemWidget(QGraphicsWidget):
 
         #   main layout
         layout = QGraphicsLinearLayout(Qt.Vertical)
+        layout.setMinimumSize(self.min_size)
+        layout.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
         self.header_widget = QGraphicsWidget()
-        self.header_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.header_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.header_layout = QGraphicsLinearLayout(Qt.Horizontal)
         self.header_widget.setLayout(self.header_layout)
         
@@ -246,12 +255,8 @@ class NodeItemWidget(QGraphicsWidget):
         way around that yet, so for now I have to recreate the whole layout and make sure the widget uses the smallest
         size possible."""
 
-        # if we don't manually remove the ports from the layouts,
-        # they get deleted when setting the widget's layout to None below
-        
         self.setLayout(self.setup_layout())
-        self.resize(self.minimumSize())
-
+        
         if self.node_item.collapsed:
             return
 
@@ -270,13 +275,25 @@ class NodeItemWidget(QGraphicsWidget):
         
         for out in self.node_item.outputs:
             out.update()
+        
+        # truncate the title if it's too big
+        display_title = title = self.node_gui.title()
+        max_title_length = (
+            self.max_title_length_normal 
+            if self.node_gui.style == 'normal' 
+            else self.max_title_length_small
+        )
+        if len(display_title) > max_title_length:
+            display_title = f'{title[0:max_title_length]}...'
+        
+        self.title_label.setToolTip(title)
             
         self.node_item.session_design.flow_theme.setup_NI_title_label(
             self.title_label,
             self.isSelected(),
             self.node_item.hovered,
             self.node_gui.style,
-            self.node_gui.title(),
+            display_title,
             self.node_item.color,
         )
 
@@ -290,7 +307,7 @@ class NodeItemWidget(QGraphicsWidget):
             self.main_widget_proxy.setMaximumSize(QSizeF(mw.size()))
             self.main_widget_proxy.setMinimumSize(QSizeF(mw.size()))
 
-            self.adjustSize()
+        self.adjustSize()
 
         self.body_layout.invalidate()
         self.layout().invalidate()

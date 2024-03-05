@@ -356,7 +356,7 @@ class FlowTheme_Toy(FlowTheme):
             )
         else:
             text_style = TextStyle(
-                color = QColor(30, 43, 48) if not hovering else node_color.lighter(),
+                color = node_color if not hovering else node_color.lighter(),
                 font=QFont('K2D', 15, QFont.Bold, True)
             )
         
