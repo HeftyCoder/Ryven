@@ -1,5 +1,9 @@
 from ...main.utils import abs_path_from_package_dir
 from enum import Enum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from qtpy.QtWidgets import QApplication
 
 def hex_to_rgb(hex: str):
     if hex is None:
@@ -98,13 +102,13 @@ class RyvenPlainPalette(RyvenPalette):
 __flow_theme_light = 'pure light'
 __flow_theme_dark = 'pure dark'
 
-def __apply_plain(app):
+def __apply_plain(app: 'QApplication'):
     app.setStyleSheet(None)
     return (RyvenPlainPalette(), __flow_theme_light)
 
 # ryven originals 
 
-def __apply_ryven_theme(app, ryven_palette: RyvenPalette, flow_theme: str) :
+def __apply_ryven_theme(app: 'QApplication', ryven_palette: RyvenPalette, flow_theme: str) :
     from jinja2 import Template
     # path to the template stylesheet file
     template_file = abs_path_from_package_dir('resources/stylesheets/style_template.css')
@@ -115,38 +119,38 @@ def __apply_ryven_theme(app, ryven_palette: RyvenPalette, flow_theme: str) :
     app.setStyleSheet(stylesheet)
     return (ryven_palette, flow_theme)
 
-def __apply_ryven_dark(app):
+def __apply_ryven_dark(app: 'QApplication'):
     return __apply_ryven_theme(app, RyvenDarkPalette(), __flow_theme_dark)
 
-def __apply_ryven_light(app):
+def __apply_ryven_light(app: 'QApplication'):
     return __apply_ryven_theme(app, RyvenLightPalette(), __flow_theme_light)
 
 # qdarkstyle
 
-def __apply_qdarkstyle(app, ryven_palette: RyvenPalette, flow_theme: str, palette = None):
+def __apply_qdarkstyle(app: 'QApplication', ryven_palette: RyvenPalette, flow_theme: str, palette = None):
     from qdarkstyle import load_stylesheet
-    def __apply_internal(app):
+    def __apply_internal():
         if palette:
             style_sheet = load_stylesheet(palette=palette)
         else:
             style_sheet = load_stylesheet()
         app.setStyleSheet(style_sheet)
         return (ryven_palette, flow_theme)
-    return __apply_internal(app)
+    return __apply_internal()
 
-def __apply_qdarkstyle_dark(app):
+def __apply_qdarkstyle_dark(app: 'QApplication'):
     return __apply_qdarkstyle(app, RyvenDarkPalette(), __flow_theme_dark)
 
-def __apply_qdarkstyle_light(app):
+def __apply_qdarkstyle_light(app: 'QApplication'):
     from qdarkstyle import LightPalette as l
     return __apply_qdarkstyle(app, RyvenLightPalette(), __flow_theme_light, l)
     
     
 # qdarktheme
 
-def __apply_qdarktheme(app, theme: str, ryven_palette: RyvenPalette, flow_theme: str):
+def __apply_qdarktheme(app: 'QApplication', theme: str, ryven_palette: RyvenPalette, flow_theme: str):
     from qdarktheme import setup_theme
-    def __apply_internal(app):
+    def __apply_internal():
         qss = """
         QToolTip {
             color: black;
@@ -154,12 +158,12 @@ def __apply_qdarktheme(app, theme: str, ryven_palette: RyvenPalette, flow_theme:
         """
         setup_theme(theme, additional_qss=qss)
         return (ryven_palette, flow_theme)
-    return __apply_internal(app)
+    return __apply_internal()
 
-def __apply_qdarktheme_dark(app):
+def __apply_qdarktheme_dark(app: 'QApplication'):
     return __apply_qdarktheme(app, 'dark', RyvenLightPalette(), __flow_theme_dark)
 
-def __apply_qdarktheme_light(app):
+def __apply_qdarktheme_light(app: 'QApplication'):
     return __apply_qdarktheme(app, 'light', RyvenLightPalette(), __flow_theme_light)
 
 

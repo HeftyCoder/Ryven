@@ -1,6 +1,6 @@
 from typing import Tuple, TYPE_CHECKING
-from PySide6.QtGui import QPainter
-from PySide6.QtWidgets import QStyleOptionGraphicsItem, QWidget
+from qtpy.QtGui import QPainter
+from qtpy.QtWidgets import QStyleOptionGraphicsItem, QWidget
 
 from qtpy.QtWidgets import QGraphicsGridLayout, QGraphicsWidget, QGraphicsLayoutItem
 from qtpy.QtCore import Qt, QRectF, QPointF, QSizeF
@@ -114,7 +114,7 @@ class PortItem(GUIBase, QGraphicsWidget):
 
 
 class InputPortItem(PortItem):
-    def __init__(self, node_gui, node_item, port, input_widget: Tuple[type, str] = None):
+    def __init__(self, node_gui: 'NodeGUI', node_item: 'NodeItem', port: NodePort, input_widget: Tuple[type, str] = None):
         super().__init__(node_gui, node_item, port, node_gui.flow_view())
 
         self.proxy = None  # widget proxy
@@ -211,7 +211,7 @@ class InputPortItem(PortItem):
 
 
 class OutputPortItem(PortItem):
-    def __init__(self, node_gui, node_item, port):
+    def __init__(self, node_gui: 'NodeGUI', node_item: 'NodeItem', port: NodePort):
         super().__init__(node_gui, node_item, port, node_gui.flow_view())
         # super(OutputPortItem, self).__init__(parent_node_instance, PortObjPos.OUTPUT, type_, label_str)
 
@@ -239,7 +239,7 @@ class PinState(IntEnum):
         
 class PortItemPin(QGraphicsWidget):
     
-    def __init__(self, port, port_item, node_gui, node_item):
+    def __init__(self, port: NodePort, port_item, node_gui: 'NodeGUI', node_item: 'NodeItem'):
         super(PortItemPin, self).__init__(node_item)
 
         self.port = port
@@ -257,10 +257,6 @@ class PortItemPin(QGraphicsWidget):
         self.tool_tip_pos = None
 
         self.padding = 2
-        # self.painting_width = 17
-        # self.painting_height = 17
-        # self.width = self.painting_width+2*self.padding
-        # self.height = self.painting_height+2*self.padding
         self.width = 17
         self.height = 17
         self.port_local_pos = None
@@ -268,7 +264,6 @@ class PortItemPin(QGraphicsWidget):
     @property
     def state(self):
         """Returns the pin state, regardless of whether it's connected"""
-        
         return self._state
     
     @state.setter
@@ -335,9 +330,9 @@ class PortItemPin(QGraphicsWidget):
                 i.recompute()
 
     def hoverEnterEvent(self, event):
-        if self.port.type_ == 'data':  # and self.parent_port_instance.io_pos == PortPos.OUTPUT:
+        if self.port.type_ == 'data':
             value = val(self.port)
-            tooltip = "None"
+            tooltip_str = "None"
             if not isinstance(value, str):
                 # if there is a __len__ function, get a subset if it's too big
                 if hasattr(value, '__len__') and len(value) > 10:

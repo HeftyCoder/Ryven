@@ -1,4 +1,4 @@
-from PySide6.QtCore import QRectF
+from qtpy.QtCore import QRectF
 from qtpy.QtWidgets import (
     QWidget, 
     QGraphicsItem, 

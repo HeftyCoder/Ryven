@@ -83,7 +83,7 @@ def run(*args_,
     from ..gui.main_console import init_main_console
     from ..gui.main_window import MainWindow
     from ..gui.styling.window_theme import apply_stylesheet
-
+    
     # Init Qt application
     if qt_app is None:
         from qtpy.QtWidgets import QApplication
@@ -120,7 +120,7 @@ def run(*args_,
 
         sw = StartupDialog(config=conf, parent=gui_parent)
         # Exit if dialog couldn't initialize or is exited
-        if sw.exec_() <= 0:
+        if sw.exec() <= 0:
             sys.exit('Start-up screen dismissed')
 
     # Replace node directories with `NodePackage` instances

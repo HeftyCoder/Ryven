@@ -1,5 +1,5 @@
 from typing import Tuple, TYPE_CHECKING
-from PySide6.QtGui import QCloseEvent, QHideEvent, QShowEvent
+from qtpy.QtGui import QCloseEvent, QHideEvent, QShowEvent
 from ryvencore import Node
 from .WidgetBaseClasses import NodeViewerWidget
 from qtpy.QtWidgets import QDialog, QVBoxLayout, QSplitter

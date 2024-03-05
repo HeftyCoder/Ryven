@@ -991,7 +991,7 @@ class FlowTheme_Ueli(FlowTheme):
         c_s = 10  # corner size
         painter.setBrush(self.interpolate_color(c, background_color, 0.97))
         painter.setPen(Qt.NoPen)
-        painter.drawRoundedRect(self.get_header_rect(w, h, bounding_rect, title_rect), c_s, c_s)
+        painter.drawRoundedRect(self.get_rect_no_header(w, h, bounding_rect, title_rect), c_s, c_s)
 
 
 class FlowTheme_PureDark(FlowTheme):

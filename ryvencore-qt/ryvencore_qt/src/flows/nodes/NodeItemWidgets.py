@@ -219,7 +219,6 @@ class NodeItemWidget(QGraphicsWidget):
 
         #   body
         self.body_widget = QGraphicsWidget()
-        # self.body_widget.setContentsMargins(0, 0, 0, 0)
         self.body_layout = QGraphicsLinearLayout(Qt.Horizontal)
         self.body_layout.setContentsMargins(
             self.body_padding,
@@ -237,7 +236,6 @@ class NodeItemWidget(QGraphicsWidget):
 
         self.body_widget.setLayout(self.body_layout)
 
-        # layout.addItem(self.body_layout)
         layout.addItem(self.body_widget)
 
         return layout
@@ -251,17 +249,8 @@ class NodeItemWidget(QGraphicsWidget):
         # if we don't manually remove the ports from the layouts,
         # they get deleted when setting the widget's layout to None below
         
-        if self.inputs_layout.count() > 0:
-            for i, inp in enumerate(self.node_item.inputs):
-                self.inputs_layout.removeAt(0)
-        
-        if self.outputs_layout.count() > 0:
-            for i, out in enumerate(self.node_item.outputs):
-                self.outputs_layout.removeAt(0)
-        
-        self.setLayout(None)
-        self.resize(self.minimumSize())
         self.setLayout(self.setup_layout())
+        self.resize(self.minimumSize())
 
         if self.node_item.collapsed:
             return
@@ -294,18 +283,13 @@ class NodeItemWidget(QGraphicsWidget):
         # makes extended node items shrink according to resizing input widgets
         if not self.node_item.initializing:
             self.rebuild_ui()
-        # strangely, this only works for small node items without this, not for normal ones
-
+            
         mw = self.node_item.main_widget
         if mw is not None:  # maybe the main_widget got resized
-            # self.main_widget_proxy.setMaximumSize(mw.size())
-
-            # self.main_widget_proxy.setMaximumSize(mw.maximumSize())
-
+            
             self.main_widget_proxy.setMaximumSize(QSizeF(mw.size()))
             self.main_widget_proxy.setMinimumSize(QSizeF(mw.size()))
 
-            self.adjustSize()
             self.adjustSize()
 
         self.body_layout.invalidate()
@@ -313,34 +297,11 @@ class NodeItemWidget(QGraphicsWidget):
         self.layout().activate()
         # very essential; repositions everything in case content has changed (inputs/outputs/widget)
 
-        if self.node_gui.style == 'small':
-
-            # making it recompute its true minimumWidth here
-            self.adjustSize()
-
-            if self.layout().minimumWidth() < self.title_label.size().width() + 15:
-                self.layout().setMinimumWidth(self.title_label.size().width() + 15)
-                self.layout().activate()
-
         w = self.boundingRect().width()
         h = self.boundingRect().height()
         rect = QRectF(QPointF(-w / 2, -h / 2),
                       QPointF(w / 2, h / 2))
         self.setPos(rect.left(), rect.top())
-
-        if not self.node_gui.style == 'normal':
-            if self.icon:
-                self.icon.setPos(
-                    QPointF(-self.icon.boundingRect().width() / 2,
-                            -self.icon.boundingRect().height() / 2)
-                )
-                self.title_label.hide()
-            else:
-                self.title_label.setPos(
-                    QPointF(-self.title_label.boundingRect().width() / 2,
-                            -self.title_label.boundingRect().height() / 2)
-                )
-
 
     def add_main_widget_to_layout(self):
         if self.node_gui.main_widget_pos == 'between ports':
