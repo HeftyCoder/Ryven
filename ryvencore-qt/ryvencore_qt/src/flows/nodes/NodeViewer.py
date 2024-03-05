@@ -1,9 +1,10 @@
 from typing import Tuple, TYPE_CHECKING
 from qtpy.QtGui import QCloseEvent, QHideEvent, QShowEvent
+from qtpy.QtWidgets import QTabWidget, QVBoxLayout, QDialog, QSplitter
+from qtpy.QtCore import Qt
+
 from ryvencore import Node
 from .WidgetBaseClasses import NodeViewerWidget
-from qtpy.QtWidgets import QDialog, QVBoxLayout, QSplitter
-from qtpy.QtCore import Qt
 
 if TYPE_CHECKING:
     from .NodeGUI import NodeGUI
@@ -19,20 +20,24 @@ class NodeViewerDefault(NodeViewerWidget, QDialog):
     it connects to other qt events.
     """
     
-    attach_inspector = True
+    attach_inspect_widgets = True
     
     def __init__(self, params: Tuple[Node, 'NodeGUI'], parent=None):
         NodeViewerWidget.__init__(self, params)
         QDialog.__init__(self, parent)
         
         self.setLayout(QVBoxLayout())
-        
+        self.setWindowFlag(Qt.Widget)
+    
         self.content = QSplitter()
         self.content.setOrientation(Qt.Orientation.Horizontal)
         self.layout().addWidget(self.content)
         
-        if self.attach_inspector:
-            self.content.addWidget(self.node_gui.create_inspector())
+        if self.attach_inspect_widgets:
+            self.inspect_tab_widget = QTabWidget()
+            self.inspect_tab_widget.addTab(self.node_gui.create_inspector(), 'Inspector')
+            
+            self.content.addWidget(self.inspect_tab_widget)
         
         self.setWindowTitle(f'{self.node_gui.display_title} Viewer')
         
