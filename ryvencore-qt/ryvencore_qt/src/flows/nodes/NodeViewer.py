@@ -4,7 +4,9 @@ from qtpy.QtWidgets import QTabWidget, QVBoxLayout, QDialog, QSplitter
 from qtpy.QtCore import Qt
 
 from ryvencore import Node
+
 from .WidgetBaseClasses import NodeViewerWidget
+from ...code_editor.CodePreviewWidget import CodePreviewWidget
 
 if TYPE_CHECKING:
     from .NodeGUI import NodeGUI
@@ -35,7 +37,14 @@ class NodeViewerDefault(NodeViewerWidget, QDialog):
         
         if self.attach_inspect_widgets:
             self.inspect_tab_widget = QTabWidget()
-            self.inspect_tab_widget.addTab(self.node_gui.create_inspector(), 'Inspector')
+            
+            self.inspector_widget = self.node_gui.create_inspector()
+            self.inspect_tab_widget.addTab(self.inspector_widget, 'Inspector')
+            
+            self.code_preview_widget = CodePreviewWidget(
+                self.node_gui.session_gui.cd_storage,
+            )
+            self.inspect_tab_widget.addTab(self.code_preview_widget, 'Source Code')
             
             self.content.addWidget(self.inspect_tab_widget)
         
@@ -44,6 +53,10 @@ class NodeViewerDefault(NodeViewerWidget, QDialog):
     # Connect Viewer functons to QT events
     
     def showEvent(self, show_event: QShowEvent):
+        
+        if self.code_preview_widget:
+            self.code_preview_widget._set_node(self.node)
+            
         self.on_before_shown()
         super().showEvent(show_event)
         self.on_after_shown()

@@ -1,5 +1,9 @@
-from qtpy.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QPushButton, QCheckBox, QHBoxLayout, QGridLayout
-
+from qtpy.QtWidgets import (
+    QDialog, 
+    QTextEdit, 
+    QPushButton, 
+    QGridLayout
+)
 
 class EditSrcCodeInfoDialog(QDialog):
 
@@ -22,7 +26,7 @@ class EditSrcCodeInfoDialog(QDialog):
                     you should be a bit careful, it's not exactly bulletproof, and doesnt <i>always</i> work.
                     When you override a method implementation, a new function object will be created using python's ast 
                     module, which then gets bound to the object as method, which essentially shadows the old implementation. 
-                    Therefore, you might need to add imports etc. you node uses in the original nodes package. 
+                    Therefore, you might need to add imports etc. you noder uses in the original nodes package. 
                     All changes are temporary and only apply on a single 
                     object.
                 </p>

@@ -79,15 +79,15 @@ def import_nodes_package(
             """
         )
 
-    from ryven import node_env
+    from .node_env import NodesEnvRegistry
 
-    node_env.NodesEnvRegistry.current_package = package
+    NodesEnvRegistry.current_package = package
     load_from_file(package.file_path)
 
     # obsolete node_types = node_env.NodesEnvRegistry.exported_nodes[-1]
     # obsolote data_types = node_env.NodesEnvRegistry.exported_data_types[-1]
 
-    node_types, data_types = node_env.NodesEnvRegistry.consume_last_exported_package()
+    node_types, data_types = NodesEnvRegistry.consume_last_exported_package()
     
     # load guis
     if in_gui_mode():
@@ -95,9 +95,11 @@ def import_nodes_package(
     
     # load soruce codes
     if in_gui_mode():
-        from ryven.gui.code_editor.codes_storage import register_node_type
+        from ...gui.main_window import MainWindow
+        from ryven.main.config import instance
         for node_type in node_types:
-            register_node_type(node_type)
+            MainWindow.get_session_gui_instance() \
+                .cd_storage.register_node_type(node_type, defer_code_loading=instance.defer_code_loading)
     
     return node_types, data_types
 

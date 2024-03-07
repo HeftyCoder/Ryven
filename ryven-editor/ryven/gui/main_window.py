@@ -37,10 +37,16 @@ import ryvencore_qt as rc
 import ryvencore_qt.src.widgets as rc_GUI
 
 from ryvencore import InfoMsgs, Flow
-from cognix.graph_player import CognixPlayer
 
+    
 class MainWindow(QMainWindow):
 
+    __session_gui_instance = None
+    
+    @classmethod
+    def get_session_gui_instance(cls) -> rc.SessionGUI:
+        return cls.__session_gui_instance
+        
     def __init__(
         self,
         config: Config,
@@ -62,6 +68,10 @@ class MainWindow(QMainWindow):
         # Init Session GUI
 
         self.session_gui = rc.SessionGUI(self)
+        MainWindow.__session_gui_instance = self.session_gui
+
+        self.session_gui.cd_storage.edit_src_codes = self.config.src_code_edits_enabled
+        
         self.core_session = self.session_gui.core_session
         if self.config.verbose:
             self.core_session._info_messenger().enable(traceback=True)

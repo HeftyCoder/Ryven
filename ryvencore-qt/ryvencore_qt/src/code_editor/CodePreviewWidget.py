@@ -15,26 +15,21 @@ from qtpy.QtWidgets import (
 
 from ryvencore import Node
 
-from ryvencore_qt.src.flows.FlowView import FlowView
-from ryvencore_qt import NodeGUI
-
-from ...gui.code_editor.EditSrcCodeInfoDialog import EditSrcCodeInfoDialog
-from ...gui.code_editor.CodeEditorWidget import CodeEditorWidget
-from ...gui.code_editor.SourceCodeUpdater import SrcCodeUpdater
-from ...gui.code_editor.codes_storage import (
-    class_codes, 
-    mod_codes, 
-    modif_codes, 
+from .EditSrcCodeInfoDialog import EditSrcCodeInfoDialog
+from .CodeEditorWidget import CodeEditorWidget
+from .SourceCodeUpdater import SrcCodeUpdater
+from .codes_storage import ( 
     NodeTypeCodes,
     Inspectable, 
     NodeInspectable, 
     MainWidgetInspectable, 
     CustomInputWidgetInspectable,
-    load_src_code,
+    SourceCodeStorage,
 )
 
 if TYPE_CHECKING:
-    from ..main_window import MainWindow
+    from ryvencore_qt.src.flows.FlowView import FlowView
+    from ryvencore_qt import NodeGUI
 
 class LoadSrcCodeButton(QPushButton):
     def __init__(self):
@@ -59,19 +54,18 @@ class LinkedRadioButton(QRadioButton):
 
 
 class CodePreviewWidget(QWidget):
-    def __init__(self, main_window: 'MainWindow', flow_view: FlowView):
+    def __init__(self, src_code_storage: SourceCodeStorage, window_theme='dark'):
         super().__init__()
 
-        self.edits_enabled = main_window.config.src_code_edits_enabled
         self.current_insp: Optional[Inspectable] = None
+        self.cd_storage = src_code_storage
 
         # widgets
         self.radio_buttons = []
-        self.text_edit = CodeEditorWidget(main_window.theme)
+        self.text_edit = CodeEditorWidget(window_theme)
 
         self.setup_ui()
         self._set_node(None)
-        flow_view.nodes_selection_changed.connect(self.set_selected_nodes)
 
     def setup_ui(self):
 
@@ -92,7 +86,7 @@ class CodePreviewWidget(QWidget):
         # secondary_layout.setAlignment(self.class_selection_layout, Qt.AlignLeft)
 
         # edit source code buttons
-        if self.edits_enabled:
+        if self.cd_storage.edit_src_codes:
             self.edit_code_button = QPushButton('edit')
             self.edit_code_button.setProperty('class', 'small_button')
             self.edit_code_button.setMaximumWidth(100)
@@ -134,14 +128,14 @@ class CodePreviewWidget(QWidget):
 
         if node is None:
             # clear view
-            if self.edits_enabled:
+            if self.cd_storage.edit_src_codes:
                 self.edit_code_button.setEnabled(False)
                 self.override_code_button.setEnabled(False)
                 self.reset_code_button.setEnabled(False)
             self.text_edit.set_code('')
             self._clear_class_layout()
         else:
-            if class_codes.get(node.__class__) is None:
+            if self.cd_storage.class_codes.get(node.__class__) is None:
                 # source code not loaded yet
                 self.load_code_button.node = node
                 self.load_code_button.show()
@@ -152,17 +146,17 @@ class CodePreviewWidget(QWidget):
 
     def _process_node_src(self, node: Node):
         self._rebuild_class_selection(node)
-        code = class_codes[node.__class__].node_cls
-        if self.edits_enabled and node in modif_codes:
-            code = modif_codes[node]
+        code = self.cd_storage.class_codes[node.__class__].node_cls
+        if self.cd_storage.edit_src_codes and node in self.cd_storage.modif_codes:
+            code = self.cd_storage.modif_codes[node]
         self._update_code(NodeInspectable(node, code))
 
     def _update_code(self, insp: Inspectable):
-        if self.edits_enabled:
+        if self.cd_storage.edit_src_codes:
             self._disable_editing()
             self._update_radio_buttons_edit_status()
             self.edit_code_button.setEnabled(True)
-            self.reset_code_button.setEnabled(insp.obj in modif_codes)
+            self.reset_code_button.setEnabled(insp.obj in self.cd_storage.modif_codes)
 
         self.text_edit.disable_highlighting()
 
@@ -176,7 +170,7 @@ class CodePreviewWidget(QWidget):
         self.radio_buttons.clear()
 
         node_gui: NodeGUI = node.gui
-        codes: NodeTypeCodes = class_codes[node.__class__]
+        codes: NodeTypeCodes = self.cd_storage.class_codes[node.__class__]
 
         def register_rb(rb: QRadioButton):
            rb.toggled.connect(self._class_rb_toggled)
@@ -185,14 +179,14 @@ class CodePreviewWidget(QWidget):
 
         # node radio button
         code = codes.node_cls
-        code = modif_codes.get(node, code)
+        code = self.cd_storage.modif_codes.get(node, code)
         register_rb(LinkedRadioButton('node', NodeInspectable(node, code)))
 
         # main widget radio button
         if codes.main_widget_cls is not None:
             mw = node_gui.main_widget()
             code = codes.main_widget_cls
-            code = modif_codes.get(mw, code)
+            code = self.cd_storage.modif_codes.get(mw, code)
             register_rb(LinkedRadioButton(
                 'main widget',
                 MainWidgetInspectable(node, node_gui.main_widget(), code)
@@ -205,7 +199,7 @@ class CodePreviewWidget(QWidget):
                 name = node_gui.input_widgets[inp]['name']
                 widget = node_gui.item.inputs[i].widget
                 code = codes.custom_input_widget_clss[name]
-                code = modif_codes.get(widget, code)
+                code = self.cd_storage.modif_codes.get(widget, code)
                 register_rb(LinkedRadioButton(
                     f'input {i}', CustomInputWidgetInspectable(node, widget, code)
                 ))
@@ -222,7 +216,7 @@ class CodePreviewWidget(QWidget):
     
     def _load_code_button_clicked(self):
         node: Node = self.sender().node
-        load_src_code(node.__class__)
+        self.cd_storage.load_src_code(node.__class__)
         self.load_code_button.hide()
         self._process_node_src(node)
 
@@ -230,7 +224,7 @@ class CodePreviewWidget(QWidget):
         """Draws radio buttons referring to modified objects bold."""
 
         for br in self.radio_buttons:
-            if modif_codes.get(br.representing.obj) is not None:
+            if self.cd_storage.modif_codes.get(br.representing.obj) is not None:
                 # o.setStyleSheet('color: #3B9CD9;')
                 f = br.font()
                 f.setBold(True)
@@ -270,7 +264,7 @@ class CodePreviewWidget(QWidget):
         )
         if err is None:
             self.current_insp.code = new_code
-            modif_codes[self.current_insp.obj] = new_code
+            self.cd_storage.modif_codes[self.current_insp.obj] = new_code
             self._disable_editing()
             self.reset_code_button.setEnabled(True)
             self._update_radio_buttons_edit_status()
@@ -284,11 +278,11 @@ class CodePreviewWidget(QWidget):
         o = insp.obj
         orig_code = ''
         if isinstance(insp, NodeInspectable):
-            orig_code = class_codes[o.__class__].node_cls
+            orig_code = self.cd_storage.class_codes[o.__class__].node_cls
         elif isinstance(insp, MainWidgetInspectable):
-            orig_code = class_codes[o.__class__].main_widget_cls
+            orig_code = self.cd_storage.class_codes[o.__class__].main_widget_cls
         elif isinstance(insp, CustomInputWidgetInspectable):
-            orig_code = class_codes[o.__class__].custom_input_widget_clss[o.__class__]
+            orig_code = self.cd_storage.class_codes[o.__class__].custom_input_widget_clss[o.__class__]
 
         err = SrcCodeUpdater.override_code(
             obj=self.current_insp.obj,
@@ -297,7 +291,7 @@ class CodePreviewWidget(QWidget):
 
         if err is None:
             self.current_insp.code = orig_code
-            del modif_codes[self.current_insp.obj]
+            del self.cd_storage.modif_codes[self.current_insp.obj]
             self._update_code(self.current_insp)
         else:
             # TODO: show error message

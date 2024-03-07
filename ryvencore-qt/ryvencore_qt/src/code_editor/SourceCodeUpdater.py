@@ -1,5 +1,5 @@
 import types
-from typing import Union
+from typing import Union, List
 
 
 def get_method_funcs(cls_def_str: str, obj):
@@ -16,7 +16,7 @@ def get_method_funcs(cls_def_str: str, obj):
     import ast
 
     # extract functions
-    ast_funcs: [ast.FunctionDef] = [
+    ast_funcs: List[ast.FunctionDef] = [
         f
         for f in ast.parse(cls_def_str).body[0].body
         if type(f) == ast.FunctionDef

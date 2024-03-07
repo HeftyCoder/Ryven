@@ -5,13 +5,13 @@ from qtpy.QtCore import Qt
 from pygments import highlight
 from pygments.lexers import get_lexer_by_name
 from pygments.formatters import get_formatter_by_name
-# from resources.pygments.dracula import DraculaStyle
-from ryven.gui.code_editor.pygments.dracula import DraculaStyle
-from ryven.gui.code_editor.pygments.light import LightStyle
+
+from .pygments.dracula import DraculaStyle
+from .pygments.light import LightStyle
 
 
 class CodeEditorWidget(QTextEdit):
-    def __init__(self, theme, highlight=True, enabled=False):
+    def __init__(self, window_theme='dark', highlight=True, enabled=False):
         super(CodeEditorWidget, self).__init__()
 
         self.highlighting = highlight
@@ -31,7 +31,7 @@ class CodeEditorWidget(QTextEdit):
 
         self.lexer = get_lexer_by_name('python')
 
-        if theme.name == 'dark':
+        if window_theme == 'dark':
             self.formatter = get_formatter_by_name('html', noclasses=True, style=DraculaStyle)
         else:
             self.formatter = get_formatter_by_name('html', noclasses=True, style=LightStyle)

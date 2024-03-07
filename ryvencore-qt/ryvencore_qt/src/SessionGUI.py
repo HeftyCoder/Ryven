@@ -8,6 +8,8 @@ import ryvencore
 from .flows.FlowView import FlowView
 from .Design import Design
 from .GUIBase import GUIBase
+from .code_editor.codes_storage import SourceCodeStorage
+
 from cognix.graph_player import CognixPlayer
 
 class SessionGUI(GUIBase, QObject):
@@ -35,6 +37,8 @@ class SessionGUI(GUIBase, QObject):
 
         self.gui_parent = gui_parent
 
+        # code storage
+        self.cd_storage = SourceCodeStorage()
         # flow views
         self.flow_views = {}  # {Flow : FlowView}
 

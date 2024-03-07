@@ -18,11 +18,14 @@ import ryvencore_qt.src.widgets as GUI
 from ryvencore.RC import FlowAlg
 from ryvencore import Flow
 
-from ryven.gui.code_editor.CodePreviewWidget import CodePreviewWidget
-from ryven.gui.uic.ui_flow_window import Ui_FlowWindow
+from ryvencore_qt.src.code_editor.CodePreviewWidget import CodePreviewWidget
+from ..gui.uic.ui_flow_window import Ui_FlowWindow
 from ryvencore_qt.src.flows.FlowView import FlowView
 from ryvencore_qt.src.flows.nodes.NodeInspector import InspectorView
-from typing import List
+from typing import List, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .main_window import MainWindow
 
 
 class FlowUI(QMainWindow):
@@ -32,7 +35,7 @@ class FlowUI(QMainWindow):
         FlowAlg.EXEC: 'exec-flow',
     }
 
-    def __init__(self, main_window, flow: Flow, flow_view: FlowView):
+    def __init__(self, main_window: 'MainWindow', flow: Flow, flow_view: FlowView):
         super().__init__(main_window)
 
         self.setWindowFlag(Qt.Widget)
@@ -102,7 +105,8 @@ class FlowUI(QMainWindow):
         self.set_performance_mode(self.flow_view.design.performance_mode)
 
         # code preview
-        self.code_preview_widget = CodePreviewWidget(main_window, self.flow_view)
+        self.code_preview_widget = CodePreviewWidget(main_window.session_gui.cd_storage)
+        self.flow_view.nodes_selection_changed.connect(self.code_preview_widget.set_selected_nodes)
         self.ui.source_dock.setWidget(self.code_preview_widget)
         
         # inspector widget
