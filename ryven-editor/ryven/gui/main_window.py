@@ -41,6 +41,7 @@ from ryvencore import InfoMsgs, Flow
     
 class MainWindow(QMainWindow):
 
+    __built_in_packages = ['built_in', 'cognix_library']
     __session_gui_instance = None
     
     @classmethod
@@ -610,7 +611,7 @@ CONTROLS
             if (
                 node.__class__ not in self.node_packages.keys()
                 or self.node_packages[node.__class__] is None
-                or self.node_packages[node.__class__].name == 'built_in'
+                or self.node_packages[node.__class__].name in self.__built_in_packages
             ):
                 continue
             required_packages.add(self.node_packages[node.__class__])
