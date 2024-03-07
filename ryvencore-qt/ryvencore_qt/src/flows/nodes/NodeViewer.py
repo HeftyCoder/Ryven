@@ -55,6 +55,7 @@ class NodeViewerDefault(NodeViewerWidget, QDialog):
     def showEvent(self, show_event: QShowEvent):
         
         if self.code_preview_widget:
+            self.code_preview_widget.text_edit.update_formatter(self.node_gui.session_gui.wnd_light_type)
             self.code_preview_widget._set_node(self.node)
             
         self.on_before_shown()

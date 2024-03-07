@@ -38,6 +38,7 @@ class SessionGUI(GUIBase, QObject):
         self.gui_parent = gui_parent
 
         # code storage
+        self.wnd_light_type = 'dark'
         self.cd_storage = SourceCodeStorage()
         # flow views
         self.flow_views = {}  # {Flow : FlowView}

@@ -16,7 +16,7 @@ class CodeEditorWidget(QTextEdit):
 
         self.highlighting = highlight
         self.editing = enabled
-
+        
         f = QFont('Consolas', 12)
         self.setFont(f)
         self.update_tab_stop_width()
@@ -31,15 +31,18 @@ class CodeEditorWidget(QTextEdit):
 
         self.lexer = get_lexer_by_name('python')
 
-        if window_theme == 'dark':
-            self.formatter = get_formatter_by_name('html', noclasses=True, style=DraculaStyle)
-        else:
-            self.formatter = get_formatter_by_name('html', noclasses=True, style=LightStyle)
+        self.update_formatter(window_theme)
 
         if self.editing:
             self.enable_editing()
         else:
             self.disable_editing()
+
+    def update_formatter(self, window_theme):
+        if window_theme == 'dark':
+            self.formatter = get_formatter_by_name('html', noclasses=True, style=DraculaStyle)
+        else:
+            self.formatter = get_formatter_by_name('html', noclasses=True, style=LightStyle)
 
     def enable_editing(self):
         self.editing = True

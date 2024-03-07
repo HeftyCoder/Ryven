@@ -20,7 +20,7 @@ class WindowThemeType(Enum):
     QDARKSTYLE_LIGHT = 'qdarkstyle-light'
     QDARKTHEME_DARK = 'qdarktheme-dark'
     QDARKTHEME_LIGHT = 'qdarktheme-light'
-     
+        
      
 class RyvenPalette:
     """
@@ -169,17 +169,24 @@ def __apply_qdarktheme_light(app: 'QApplication'):
     return __apply_qdarktheme(app, 'light', RyvenLightPalette(), __flow_theme_light)
 
 
+# stores the various styles in a dictionary as tuple(style, string)
+# the string indicates whether the style is light or dark (for code inspection purposes)
 __style_application_dict: dict = {
-    WindowThemeType.PLAIN : __apply_plain,
-    WindowThemeType.RYVEN_DARK: __apply_ryven_dark,
-    WindowThemeType.RYVEN_LIGHT: __apply_ryven_light,
-    WindowThemeType.QDARKSTYLE_DARK: __apply_qdarkstyle_dark,
-    WindowThemeType.QDARKSTYLE_LIGHT: __apply_qdarkstyle_light,
-    WindowThemeType.QDARKTHEME_DARK: __apply_qdarktheme_dark,
-    WindowThemeType.QDARKTHEME_LIGHT: __apply_qdarktheme_light,
+    WindowThemeType.PLAIN : (__apply_plain, 'l'),
+    WindowThemeType.RYVEN_DARK: (__apply_ryven_dark, 'd'),
+    WindowThemeType.RYVEN_LIGHT: (__apply_ryven_light, 'l'),
+    WindowThemeType.QDARKSTYLE_DARK: (__apply_qdarkstyle_dark, 'd'),
+    WindowThemeType.QDARKSTYLE_LIGHT: (__apply_qdarkstyle_light, 'l'),
+    WindowThemeType.QDARKTHEME_DARK: (__apply_qdarktheme_dark, 'd'),
+    WindowThemeType.QDARKTHEME_LIGHT: (__apply_qdarktheme_light, 'l'),
 }  
 
-def apply_stylesheet(style: str) -> tuple[WindowThemeType, RyvenPalette, str]:
+def apply_stylesheet(style: str) -> tuple[WindowThemeType, RyvenPalette, str, str]:
+    """
+    Applies an existing stylesheet to the Window.
+    
+    Returns a tuple of (WindowThemeType, RyvenPalette, <name of flow style>, 'dark'| 'light')
+    """
     from qtpy.QtWidgets import QApplication
     
     # set to None if not used
@@ -195,5 +202,7 @@ def apply_stylesheet(style: str) -> tuple[WindowThemeType, RyvenPalette, str]:
         except:
             style = WindowThemeType.PLAIN
     
-    ryven_palette, flow_theme = __style_application_dict[style](QApplication.instance()) 
-    return (style, ryven_palette, flow_theme)
+    func, wnd_brightness = __style_application_dict[style]
+    ryven_palette, flow_theme = func(QApplication.instance())
+    wnd_brightness = 'dark' if wnd_brightness == 'd' else 'light' 
+    return (style, ryven_palette, flow_theme, wnd_brightness)

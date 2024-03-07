@@ -54,6 +54,7 @@ class MainWindow(QMainWindow):
         required_packages: set = None,  # only valid when project_content is provided
         project_content: dict = None,
         parent=None,
+        wnd_light_type = 'dark'
     ):
         super().__init__(parent)
 
@@ -64,13 +65,15 @@ class MainWindow(QMainWindow):
         self.flow_UIs = {}  # Should be dict[Flow, FlowUI] in 3.9+
         self.flow_ui_template = None # Should be dict[str, QByteArray | dict] in 3.9+
         self._project_content = None
-
+        self.wnd_light_type = wnd_light_type
+        
         # Init Session GUI
 
         self.session_gui = rc.SessionGUI(self)
         MainWindow.__session_gui_instance = self.session_gui
 
         self.session_gui.cd_storage.edit_src_codes = self.config.src_code_edits_enabled
+        self.session_gui.wnd_light_type = wnd_light_type
         
         self.core_session = self.session_gui.core_session
         if self.config.verbose:

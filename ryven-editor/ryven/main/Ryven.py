@@ -133,7 +133,7 @@ def run(*args_,
         # editor_config['requested packages'] = conf.nodes
 
     # Store WindowThemeType object
-    conf.window_theme, ryven_palette, flow_theme = apply_stylesheet(conf.window_theme)
+    conf.window_theme, ryven_palette, flow_theme, wnd_light_type = apply_stylesheet(conf.window_theme)
 
     # Adjust flow theme if not set
     if conf.flow_theme is None:
@@ -182,7 +182,8 @@ def run(*args_,
         requested_packages=requested_packages,
         required_packages=required_packages,
         project_content=project_content,
-        parent=gui_parent
+        parent=gui_parent,
+        wnd_light_type=wnd_light_type
     )
     editor.show()
 

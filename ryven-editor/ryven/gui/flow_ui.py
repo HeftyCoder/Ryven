@@ -105,7 +105,7 @@ class FlowUI(QMainWindow):
         self.set_performance_mode(self.flow_view.design.performance_mode)
 
         # code preview
-        self.code_preview_widget = CodePreviewWidget(main_window.session_gui.cd_storage)
+        self.code_preview_widget = CodePreviewWidget(main_window.session_gui.cd_storage, main_window.wnd_light_type)
         self.flow_view.nodes_selection_changed.connect(self.code_preview_widget.set_selected_nodes)
         self.ui.source_dock.setWidget(self.code_preview_widget)
         
