@@ -58,6 +58,18 @@ class CognixNode(Node, metaclass=ABCMeta):
     
     def on_application_end(self):
         pass
+
+
+class StartNode(CognixNode):
+    """A node that has no inputs. It processes data only once."""
+    
+    def __init__(self, params):
+        super().__init__(params)
+        
+    @abstractmethod
+    def update_event(self, inp=-1):
+        """This method is called only once when the graph is starting."""
+        return super().update_event(inp)
         
 
 class FrameNode(CognixNode):

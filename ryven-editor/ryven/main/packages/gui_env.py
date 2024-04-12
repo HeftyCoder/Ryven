@@ -31,7 +31,7 @@ class GuiClassesContainer:
     pass
 
 
-def export_guis(guis: [Type[NodeGUI]]):
+def export_guis(guis: list[type[NodeGUI]]):
     """
     Exports/exposes the specified node gui classes to the nodes file importing them via import_guis().
     Returns an object with all exported gui classes as attributes for direct access.

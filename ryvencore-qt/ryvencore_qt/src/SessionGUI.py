@@ -10,7 +10,7 @@ from .Design import Design
 from .GUIBase import GUIBase
 from .code_editor.codes_storage import SourceCodeStorage
 
-from cognix.graph_player import CognixPlayer
+from cognix.core.graph_player import CognixPlayer
 
 class SessionGUI(GUIBase, QObject):
     """
