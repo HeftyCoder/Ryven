@@ -1,7 +1,6 @@
 from ryvencore import Data
 
 from ryven.gui_env import *
-from .nodes import *
 from qtpy.QtGui import QKeySequence
 from qtpy.QtCore import Signal
 from qtpy.QtWidgets import (
@@ -13,6 +12,8 @@ from qtpy.QtWidgets import (
     QShortcut, 
     QVBoxLayout
 )
+
+from cognix.nodes.utility.util_nodes import *
 
 class Result_Node_MainWidget(NodeMainWidget, QLineEdit):
     

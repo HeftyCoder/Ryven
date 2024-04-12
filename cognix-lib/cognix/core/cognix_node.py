@@ -1,4 +1,3 @@
-from typing import Optional
 from ryvencore import Node, Flow
 from ryvencore.InfoMsgs import InfoMsgs
 from ryvencore.Base import Event
@@ -7,7 +6,6 @@ from abc import ABCMeta, abstractmethod
 
 from ryvencore import Data
 
-# the additions over normal ryven can probably be made into PRs
 class CognixNode(Node, metaclass=ABCMeta):
     """The basic building block of a Cognix Graph"""
     
@@ -60,18 +58,6 @@ class CognixNode(Node, metaclass=ABCMeta):
     
     def on_application_end(self):
         pass
-
-
-class StartNode(CognixNode):
-    """A node that has no inputs. It processes data only once."""
-    
-    def __init__(self, params):
-        super().__init__(params)
-        
-    @abstractmethod
-    def update_event(self, inp=-1):
-        """This method is called only once when the graph is starting."""
-        return super().update_event(inp)
         
 
 class FrameNode(CognixNode):
@@ -99,14 +85,3 @@ class FrameNode(CognixNode):
     def reset(self):
         self._is_finished = False
         return super().reset()
-
-
-class TransformNode(CognixNode):
-    """Almost a typical ryven node. Processes data and sets the outputs."""
-    
-    def __init__(self, params):
-        super().__init__(params)
-    
-    @abstractmethod
-    def update_event(self, inp=-1):
-        return super().update_event(inp)

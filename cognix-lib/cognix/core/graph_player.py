@@ -3,7 +3,7 @@ from typing import Any
 from ryvencore import Flow, Node
 from ryvencore.Base import Event
 from enum import Enum, auto
-from .base_nodes import CognixNode, StartNode, FrameNode
+from .cognix_node import CognixNode, StartNode, FrameNode
 from dataclasses import dataclass
 
 import time

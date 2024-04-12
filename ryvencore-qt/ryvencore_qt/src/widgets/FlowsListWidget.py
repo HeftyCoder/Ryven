@@ -2,12 +2,15 @@ from qtpy.QtCore import Qt
 from qtpy.QtWidgets import QWidget, QMessageBox, QVBoxLayout, QLineEdit, QHBoxLayout, QPushButton, QScrollArea
 
 from .FlowsList_FlowWidget import FlowsList_FlowWidget
+from typing import TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from ..SessionGUI import SessionGUI
 
 class FlowsListWidget(QWidget):
     """Convenience class for a QWidget to easily manage the flows of a session."""
 
-    def __init__(self, session_gui):
+    def __init__(self, session_gui: 'SessionGUI'):
         super().__init__()
 
         self.session_gui = session_gui
@@ -63,7 +66,7 @@ class FlowsListWidget(QWidget):
         self.list_widgets.clear()
 
         # re-create flow widgets
-        for s in self.session_gui.core_session.flows:
+        for s in self.session_gui.core_session.flows.values():
             new_widget = FlowsList_FlowWidget(self, self.session_gui, s)
             self.list_widgets.append(new_widget)
 
@@ -74,7 +77,7 @@ class FlowsListWidget(QWidget):
     def create_flow(self):
         title = self.new_flow_title_lineedit.text()
 
-        if self.session_gui.core_session.flow_title_valid(title):
+        if self.session_gui.core_session.new_flow_title_valid(title):
             self.session_gui.core_session.create_flow(title=title)
 
     def add_new_flow(self, flow, flow_view):

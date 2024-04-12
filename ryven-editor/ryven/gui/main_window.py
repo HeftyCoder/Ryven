@@ -20,7 +20,7 @@ from ryvencore_qt import NodeGUI
 from qtpy.QtCore import Qt, QByteArray
 
 from ..gui.main_console import MainConsole
-from ..gui.flow_ui import FlowUI
+from ..gui.flow_ui import FlowUI, FlowView
 from ..main.config import Config
 from ..main.packages.nodes_package import NodesPackage
 from ..gui.uic.ui_main_window import Ui_MainWindow
@@ -63,8 +63,8 @@ class MainWindow(QMainWindow):
         self.session_gui, self.core_session = None, None
         self.theme = config.window_theme
         self.node_packages = {}  # {Node: str}
-        self.flow_UIs = {}  # Should be dict[Flow, FlowUI] in 3.9+
-        self.flow_ui_template = None # Should be dict[str, QByteArray | dict] in 3.9+
+        self.flow_UIs: dict[Flow, FlowUI] = {}  # Should be dict[Flow, FlowUI] in 3.9+
+        self.flow_ui_template: dict[str, QByteArray | dict] = None # Should be dict[str, QByteArray | dict] in 3.9+
         self._project_content = None
         self.wnd_light_type = wnd_light_type
         
@@ -486,7 +486,7 @@ CONTROLS
 
     # session
 
-    def flow_created(self, flow: Flow, flow_view):
+    def flow_created(self, flow: Flow, flow_view: FlowView):
         flow_widget = FlowUI(self, flow, flow_view)
         self.flow_UIs[flow] = flow_widget
         self.ui.flows_tab_widget.addTab(flow_widget, flow.title)
@@ -496,12 +496,12 @@ CONTROLS
 
         self.focus_on_flow(flow)
 
-    def flow_renamed(self, flow):
+    def flow_renamed(self, flow: Flow):
         self.ui.flows_tab_widget.setTabText(
             self.session_gui.core_session.flows.index(flow), flow.title
         )
 
-    def flow_deleted(self, flow):
+    def flow_deleted(self, flow: Flow):
         self.ui.flows_tab_widget.removeTab(self.ui.flows_tab_widget.indexOf(self.flow_UIs[flow]))
         self.flow_UIs[flow].unload()
         del self.flow_UIs[flow]
@@ -509,7 +509,7 @@ CONTROLS
     def get_current_flow(self):
         return self.core_session.flows[self.ui.flows_tab_widget.currentIndex()]
 
-    def focus_on_flow(self, flow):
+    def focus_on_flow(self, flow: Flow):
         self.ui.flows_tab_widget.setCurrentWidget(self.flow_UIs[flow])
 
     def import_packages(self, packages_list: List[NodesPackage]):
