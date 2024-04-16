@@ -165,7 +165,11 @@ class NodeGUI(QObject):
         self.progress_updated.emit(progress)
     
     def _on_deleted(self):
+        if self.inspector_widget:
+            self.inspector_widget.on_node_deleted()
+            
         if self.viewer_widget:
+            self.viewer_widget.on_node_deleted()
             self.hide_viewer()
         
     """

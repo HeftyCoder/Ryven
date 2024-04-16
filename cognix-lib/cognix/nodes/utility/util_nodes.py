@@ -1,4 +1,4 @@
-from ...core.cognix_node import CognixNode
+from ... import CognixNode
 from ryvencore import NodeInputType, NodeOutputType, Data
 
 class UtilNode(CognixNode):

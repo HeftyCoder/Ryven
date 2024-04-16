@@ -10,14 +10,13 @@ class AnotherConfig(HasTraits):
 class RandNode(Node):
     """Generates scaled random float values"""
 
-        
     class RandNodeConfig(HasTraits):
         # auto_set, enter_set allow the any_trait_changed to be called only when pressing enter
         # to play nicely with undo / redo
         scale: float = Float(1, auto_set=False, enter_set=True)
         use_seed: bool = Bool
         seed: int = Int(0, auto_set=False, enter_set=True)
-        con: AnotherConfig = Instance(klass=AnotherConfig, args=(), style='custom')
+        con: AnotherConfig = Instance(klass=AnotherConfig, args=())
         generate = Event
         
         _node = Instance(klass=Node, visible=False)
@@ -28,6 +27,7 @@ class RandNode(Node):
 
         # @observe('*') the decorator doesn't allow removal of notifications
         def any_trait_changed(self, event):
+            
             node: RandNode = self._node
             # generates a new random when pressing the button
             if event.name == 'generate':
@@ -52,7 +52,6 @@ class RandNode(Node):
     init_outputs = [NodeOutputType(label='out')]
 
     def __init__(self, params):
-        print('XDsdsad')
         self.config = RandNode.RandNodeConfig()
         self.config._node = self
         self.config.allow_notifications()

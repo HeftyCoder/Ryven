@@ -91,7 +91,7 @@ from .drawings.DrawingObject import DrawingObject
 from ..Design import Design
 from enum import Enum
 
-from cognix.core.graph_player import GraphPlayer, GraphState
+from cognix.graph_player import GraphPlayer, GraphState
 from threading import Thread
 
 from itertools import chain

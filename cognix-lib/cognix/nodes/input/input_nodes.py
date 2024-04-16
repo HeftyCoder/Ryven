@@ -1,4 +1,4 @@
-from ...core.cognix_node import CognixNode, FrameNode
+from ... import CognixNode, FrameNode
 from pylsl import resolve_stream, resolve_bypred, StreamInlet, StreamInfo
 from threading import Thread
 from ryvencore import NodeOutputType, Data

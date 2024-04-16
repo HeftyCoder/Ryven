@@ -57,15 +57,25 @@ class NodeViewerDefault(NodeViewerWidget, QDialog):
         if self.code_preview_widget:
             self.code_preview_widget.text_edit.update_formatter(self.node_gui.session_gui.wnd_light_type)
             self.code_preview_widget._set_node(self.node)
-            
+        
         self.on_before_shown()
+        
+        if self.attach_inspect_widgets:
+            self.inspector_widget.load()
+            
         super().showEvent(show_event)
         self.on_after_shown()
     
     def hideEvent(self, hide_event: QHideEvent):
         self.on_before_hidden()
         super().hideEvent(hide_event)
+        if self.attach_inspect_widgets:
+            self.inspector_widget.unload()
         self.on_after_hidden()
+    
+    def on_node_deleted(self):
+        if self.attach_inspect_widgets:
+            self.inspector_widget.on_node_deleted()
     
     def closeEvent(self, close_event: QCloseEvent):
         self.on_before_closed()

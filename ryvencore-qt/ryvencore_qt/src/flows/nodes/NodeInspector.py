@@ -119,3 +119,8 @@ class NodeInspectorDefaultWidget(NodeInspectorWidget, QWidget):
         if self.child:
             self.child.unload()
         super().unload()
+    
+    def on_node_deleted(self):
+        if self.child:
+            self.child.on_node_deleted()
+        return super().on_node_deleted()

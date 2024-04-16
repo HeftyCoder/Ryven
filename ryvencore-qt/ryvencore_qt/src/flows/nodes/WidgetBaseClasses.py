@@ -72,6 +72,10 @@ class NodeInspectorWidget(SerializableItem):
     def unload(self):
         """Called when the inspector is removed from the inspector view in the editor."""
         pass
+    
+    def on_node_deleted(self):
+        """Called when the node is deleted"""
+        pass
 
     def push_undo(self, text: str, undo_fn, redo_fn):
         """Push an undo function to the undo stack of the flow."""
@@ -146,6 +150,14 @@ class NodeViewerWidget:
         
         Called when a node is updated (the updated event).
         The developer can pass any kind of data and update the view.
+        """
+        pass
+
+    def on_node_deleted(self):
+        """
+        VIRTUAL
+        
+        Called when a node is deleted
         """
         pass
         

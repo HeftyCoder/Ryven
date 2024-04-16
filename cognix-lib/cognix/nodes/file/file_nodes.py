@@ -1,6 +1,6 @@
 from Orange.data import Table, Domain
 from ryvencore import NodeOutputType, NodeInputType, Data
-from ...core.cognix_node import CognixNode, FrameNode, StartNode
+from ... import CognixNode, FrameNode, StartNode
 from threading import Thread
 from multiprocessing import Manager, Queue, Process
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor

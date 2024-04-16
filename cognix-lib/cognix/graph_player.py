@@ -1,9 +1,13 @@
 from abc import ABC, abstractmethod
-from typing import Any
-from ryvencore import Flow, Node
 from ryvencore.Base import Event
 from enum import Enum, auto
-from .cognix_node import CognixNode, StartNode, FrameNode
+
+from . import (
+    CognixNode, 
+    StartNode, 
+    FrameNode,
+    CognixFlow,
+)
 from dataclasses import dataclass
 
 import time
@@ -140,7 +144,7 @@ class GraphPlayer(ABC):
     In ryvencore's context, the executor should always be naive.
     """
     
-    def __init__(self, flow: Flow, frames: int = 30):
+    def __init__(self, flow: CognixFlow, frames: int = 30):
         super().__init__()
         # constructing
         self._flow = flow
@@ -205,7 +209,7 @@ class GraphPlayer(ABC):
 class CognixPlayer(GraphPlayer):
     """The default implementation of a Graph Player in CogniX"""
     
-    def __init__(self, flow: Flow, frames: int = 35):
+    def __init__(self, flow: CognixFlow, frames: int = 35):
         super().__init__(flow, frames)
         self._start_nodes: list[StartNode] = []
         self._frame_nodes: list[FrameNode] = []
