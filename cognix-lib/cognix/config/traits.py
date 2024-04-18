@@ -1,9 +1,13 @@
-from traits.api import HasTraits, Instance, Float, List
+from traits.api import HasTraits, Instance, List, Dict, Set, CTrait
+from traits.observation.expression import ObserverExpression, trait, anytrait
 from traits.trait_base import not_false, not_event
 from traits.observation._trait_change_event import TraitChangeEvent
 
-from .. import CognixNode, NodeConfig
+from typing import Callable, Any
 from json import loads, dumps
+
+from .. import CognixNode, NodeConfig
+
 
 
 class DefaultInstance(Instance):
@@ -17,6 +21,21 @@ class DefaultInstance(Instance):
 class NodeTraitsConfig(NodeConfig, HasTraits):
     """An implementation of a Node Configuration using the traits library"""
     
+    # CLASS
+    
+    obj_exprs = None
+    """Holds all the important observer expressions"""
+    
+    @classmethod
+    def find_trait_exprs(cls):
+        cls.obj_exprs = []
+        find_expressions(cls, None, cls.obj_exprs)
+    
+    def __init_subclass__(cls, **kwargs):
+        cls.find_trait_exprs()
+
+    # INSTANCE
+    
     _node = Instance(CognixNode, visible=False)
     on_trait_changed = List(visible=False)
     
@@ -28,7 +47,7 @@ class NodeTraitsConfig(NodeConfig, HasTraits):
     # Traits only
     
     # @observe('*') the decorator doesn't allow removal of notifications
-    def any_trait_changed(self, event: TraitChangeEvent):
+    def __any_trait_changed(self, event):
         """Invoked when any trait changes"""
         
         # the HasTraits object
@@ -36,10 +55,10 @@ class NodeTraitsConfig(NodeConfig, HasTraits):
             e(self, event)
     
     def allow_notifications(self):
-        pass
+        self.observe(self.__any_trait_changed, self.obj_exprs)
     
     def block_notifications(self):
-        pass
+        self.observe(self.__any_trait_changed, self.obj_exprs, remove=True)
    
     def load(self, data: dict | str):
         
@@ -73,3 +92,138 @@ class NodeTraitsConfig(NodeConfig, HasTraits):
     
     def __serializable_traits(self):
         return self.trait_get(type=not_event, visible=not_false, dont_save=not_false)
+    
+
+#   UTIL
+
+def __process_expression_str(c_trait: CTrait, trait_name: str, expr: str):
+    
+    if not c_trait:
+        return None, f'{expr}.*' if expr else '*'
+        
+    trait_type = c_trait.trait_type
+    
+    if isinstance(trait_type, Instance) and issubclass(trait_type.klass, HasTraits):
+        
+        # it's guaranteed that if a trait_name doesnt exist,
+        # an expr will and vice-versa
+        if expr:
+            return (
+                trait_type.klass,
+                f'{expr}.{trait_name}' if trait_name else expr
+            )
+        else:
+            return trait_type.klass, trait_name
+    
+    elif isinstance(trait_type, (List, Set, Dict)):
+        
+        return_type = (
+            trait_type.item_trait 
+            if isinstance(trait_type, (List, Set)) 
+            else trait_type.value_trait
+        )
+        
+        if expr:
+            return (
+                return_type,
+                f'{expr}.{trait_name}.items' if trait_name else f'{expr}.items'
+            )
+        else:
+            return return_type, f'{trait_name}.items'
+            
+    return (None, None)
+
+__item_methods: dict = {
+    List: lambda expr: expr.list_items(),
+    Set: lambda expr: expr.set_items(),
+    Dict: lambda expr: expr.dict_items(),
+}
+
+def __process_expression_obs(c_trait: CTrait, trait_name: str, expr: ObserverExpression):
+    
+    if not c_trait:
+        return None, expr.anytrait() if expr else anytrait()
+        
+    trait_type = c_trait.trait_type
+    
+    if isinstance(trait_type, Instance) and issubclass(trait_type.klass, HasTraits):
+        
+        # it's guaranteed that if a trait_name doesnt exist,
+        # an expr will and vice-versa
+        if expr:
+            return (
+                trait_type.klass,
+                expr.trait(trait_name) if trait_name else expr
+            )
+        else:
+            return trait_type.klass, trait(trait_name)
+        
+    elif isinstance(trait_type, (List, Set, Dict)):
+        
+        return_type = (
+            trait_type.item_trait 
+            if isinstance(trait_type, (List, Set)) 
+            else trait_type.value_trait
+        )
+        items_method = __item_methods[type(trait_type)]
+        
+        if expr:
+            return (
+                return_type,
+                items_method(expr.trait(trait_name)) if trait_name else items_method(expr)
+            )
+        else:
+            return return_type, items_method(trait(trait_name))
+        
+    elif isinstance(trait_type, Set):
+        
+        return (
+            trait_type.item_trait,
+            expr.set_items() if expr else trait(trait_name).set_items()
+        )
+          
+    elif isinstance(trait_type, Dict):
+        
+        return (
+            trait_type.value_trait,
+            expr.dict_items() if expr else trait(trait_name).dict_items()
+        )    
+            
+    return (None, None)
+
+
+__process_expression_methods: dict[type, Callable[[CTrait, str, Any], None]]= {
+    str : __process_expression_str,
+    ObserverExpression: __process_expression_obs,
+}         
+
+def find_expressions (
+    obj: type[HasTraits] | List | Dict, 
+    expr: ObserverExpression, 
+    obs_exprs: list[ObserverExpression | str],
+    exp_type: type[str | ObserverExpression] = ObserverExpression
+):
+    
+    if not obj:
+        return
+    
+    process_method = __process_expression_methods[exp_type]
+    
+    if isinstance(obj, type) and issubclass(obj, HasTraits):
+        
+        # main class filter
+        new_obj, new_expr = process_method(None, None, expr)
+        obs_exprs.append(new_expr)
+        
+        # search for additional traits in the class
+        
+        cls_traits = obj.class_traits(visible=not_false)
+        for trait_name, c_trait in cls_traits.items():
+            new_obj, new_expr = process_method(c_trait, trait_name, expr)
+            find_expressions(new_obj, new_expr, obs_exprs, exp_type)
+    
+    elif isinstance(obj, CTrait):
+        
+        obs_exprs.append(expr)
+        new_obj, new_expr = process_method(obj, None, expr)
+        find_expressions(new_obj, new_expr, obs_exprs, exp_type)
