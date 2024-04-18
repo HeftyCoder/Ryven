@@ -13,6 +13,7 @@ from qtpy.QtWidgets import (
     QVBoxLayout
 )
 
+from ryvencore_qt import NodeMainWidget
 from cognix.nodes.utility.util_nodes import *
 
 class Result_Node_MainWidget(NodeMainWidget, QLineEdit):
@@ -27,7 +28,6 @@ class Result_Node_MainWidget(NodeMainWidget, QLineEdit):
         self.setFixedWidth(120)
         self.node: Node = self.node
         self.update_value.connect(self.show_val) 
-        self.node.updated.sub(self.on_update)
 
     def on_update(self, inp):
         self.update_value.emit(self.node.val)

@@ -28,15 +28,22 @@ class NodeTraitsConfig(NodeConfig, HasTraits):
         'visible': not_false,
         'dont_save': not_false,
     }
+    
     obj_exprs = None
     """Holds all the important observer expressions"""
     
     @classmethod
     def serializable_traits(cls):
+        """Returns the serializable traits of this class"""
         return cls.class_traits(**cls.__s_metadata)
     
     @classmethod
-    def find_trait_exprs(cls):
+    def find_trait_exprs(cls, exp_type: type[str | ObserverExpression] = ObserverExpression):
+        """
+        Finds all the observer expressions available for this node, for
+        traits that are not an event, are visible and do nothave the 
+        dont_save metadata atrribute set to True.
+        """
         cls.obj_exprs = []
         find_expressions(cls, None, cls.obj_exprs)
     
@@ -57,16 +64,18 @@ class NodeTraitsConfig(NodeConfig, HasTraits):
     
     # @observe('*') the decorator doesn't allow removal of notifications
     def __any_trait_changed(self, event):
-        """Invoked when any trait changes"""
+        """Invoked when any trait that can be saved changes"""
         
         # the HasTraits object
         for e in self.on_trait_changed:
             e(self, event)
     
     def allow_notifications(self):
+        """Allows the invocation of events when a trait changes"""
         self.observe(self.__any_trait_changed, self.obj_exprs)
     
     def block_notifications(self):
+        """Blocks the invocation of events when a trait changes"""
         self.observe(self.__any_trait_changed, self.obj_exprs, remove=True)
    
     def load(self, data: dict | str):

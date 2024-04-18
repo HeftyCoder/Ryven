@@ -1,5 +1,3 @@
-from typing import List
-
 from qtpy.QtCore import QObject, Signal, Qt
 from qtpy.QtWidgets import QWidget, QApplication
 

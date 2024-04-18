@@ -1,72 +1,19 @@
 """
 This module automatically imports all requirements for custom nodes.
 """
-
+from __future__ import annotations
 import os
-from os.path import basename, normpath
-from typing import Type, Tuple, List
+from ...main.utils import in_gui_mode
+from ryvencore import Node, Data
+from typing import TYPE_CHECKING
 
-from ryven.main.utils import in_gui_mode, load_from_file
-
-from ryvencore import Node, NodeInputType, NodeOutputType, Data, serialize, deserialize
-
+if TYPE_CHECKING:
+    from ...main.packages.nodes_package import NodesPackage
 
 def init_node_env():
-    # Note 1:
-    #   Because the wrapper classes were removed from ryvencore-qt recently, we don't need to import from
-    #   difference ryvencore sources here anymore depending on the mode, ryvencore stuff comes from ryvencore
-    #   directly now.
-
-    # Note 2:
-    #   I removed the NodeWrp class, which just added the actions dict to the Node base class, because it
-    #   should be moved to ryvencore soon.
-
-    # Note 3:
-    #   I removed dtypes imports, they are currently not supported and are expected to become a new add-on
-    #   some time in the future.
-
-    # Note 4:
-    #   I removed the import of NodeBase, because it's messy to override the Node class in the first place.
-
     if os.environ['RYVEN_MODE'] == 'gui':
         import ryvencore_qt
-
-
-# LEAVING THIS HERE FOR LEGACY PURPOSES
-def import_guis(origin_file: str, gui_file_name='gui.py'):
-    """
-    Import all exported GUI classes from gui_file_name with respect to the origin_file location.
-    Returns an object with all exported gui classes as attributes for direct access.
-    """
-
-    caller_location = os.path.dirname(origin_file)
-
-    # alternative solution without __file__ argument; does not work with debugging, so it's not the best idea
-    #   caller_location = os.path.dirname(stack()[1].filename)  # getting caller file path from stack frame
-
-    abs_path = os.path.join(caller_location, gui_file_name)
-
-    if os.environ['RYVEN_MODE'] == 'gui':
-        # import the gui module
-        load_from_file(abs_path)
-
-        # in GUI mode, import the gui classes container from gui_env containing all the exported gui classes
-        from ryven import gui_env
-
-        gui_classes_container = gui_env.GuiClassesRegistry.exported_guis[-1]
-
-    else:
-        # in non-gui mode, return an object that just returns None for all accessed attributes
-        # so guis.MyGUI in the nodes file just returns None then
-        class PlaceholderGuisContainer:
-            def __getattr__(self, item):
-                return None
-
-        gui_classes_container = PlaceholderGuisContainer()
-
-    return gui_classes_container
-
-
+        
 class NodesEnvRegistry:
     """
     Statically stores custom `ryvencore.Node` and `ryvencore.Data` subclasses
@@ -76,24 +23,15 @@ class NodesEnvRegistry:
     this class.
     """
 
-    # stores, for each nodes package or subpackage a tuple of exported node types and data
-    # should be dict[str, tuple[list[type[Node]], list[type[Data]]]] in future versions
-    exported_package_metadata: dict = {}
-    # the last exported package to be consumed for loading
-    # should be list[tuple[list[type[Node]], list[type[Data]]]]
-    last_exported_package: list = []
-
-    # stores, for each nodes package separately, a list of exported node types
-    exported_nodes_legacy: [[Type[Node]]] = []
-
-    # stores, for each nodes package separately, a list of exported data types
-    exported_data_types_legacy: [[Type[Data]]] = []
-
-    # stores the package that is currently being imported; set by the nodes package
-    # loader ryven.main.packages.nodes_package.import_nodes_package;
-    # needed for extending the identifiers of node types to include the package name
-    current_package = None  # type NodesPackage (not imported to avoid circular imports)
-
+    exported_package_metadata: dict[str, tuple[list[type[Node]], list[type[Data]]]] = {}
+    """Stores, for each nodes package or subpackage a tuple of exported node types and data"""
+    
+    last_exported_package: list[tuple[list[type[Node]], list[type[Data]]]] = []
+    """The last exported package to be consumed for loading"""
+    
+    current_package: NodesPackage = None
+    """Stores the package that is currently being imported. Set by the nodes package"""
+    
     @classmethod
     def current_package_id(cls):
         if cls.current_package is None:
@@ -104,11 +42,9 @@ class NodesEnvRegistry:
         return cls.current_package.name
 
     @classmethod
-    # should be -> tuple[list[type[Node]], list[type[Data]] in 3.9+
-    # should be result: tuple[list[type[Node]], list[type[Data]]] in 3.9+
-    def consume_last_exported_package(cls) -> Tuple[List[Type[Node]], List[Type[Data]]]:
+    def consume_last_exported_package(cls) -> tuple[list[type[Node]], list[type[Data]]]:
         """Consumes the last exported package"""
-        result: Tuple[List[Type[Node]], List[Type[Data]]] = ([], [])
+        result: tuple[list[type[Node]], list[type[Data]]] = ([], [])
         node_types, data_types = result
         for nodes, data in cls.last_exported_package:
             node_types.extend(nodes)
@@ -118,8 +54,8 @@ class NodesEnvRegistry:
 
 
 def export_nodes(
-    node_types: [Type[Node]], 
-    data_types: [Type[Data]] = None,
+    node_types: list[type[Node]], 
+    data_types: list[type[Data]] = None,
     sub_pkg_name: str = None
 ):
     """
@@ -149,9 +85,6 @@ def export_nodes(
     # same for data types
     for d_cls in data_types:
         d_cls.identifier = f'{pkg_name}.{d_cls.identifier}'
-
-    NodesEnvRegistry.exported_nodes_legacy.append(node_types)
-    NodesEnvRegistry.exported_data_types_legacy.append(data_types)
 
     metadata = NodesEnvRegistry.exported_package_metadata
     nodes_datas = (node_types, data_types)

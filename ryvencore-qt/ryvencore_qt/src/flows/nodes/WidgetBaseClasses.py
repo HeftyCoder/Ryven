@@ -5,17 +5,16 @@ from ryvencore import Data, Node
 from ..FlowCommands import Delegate_Command
 from ...GUIBase import SerializableItem
 
-from typing import Tuple, TYPE_CHECKING
+from typing import Generic, TypeVar, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .NodeItem import NodeItem
     from .NodeGUI import NodeGUI
 
-
 class NodeMainWidget(SerializableItem):
     """Base class for the main widget of a node."""
 
-    def __init__(self, params: Tuple[Node, 'NodeItem', 'NodeGUI']):
+    def __init__(self, params: tuple[Node, 'NodeItem', 'NodeGUI']):
         self.node, self.node_item, self.node_gui = params
 
     def update_node(self):
@@ -59,19 +58,38 @@ class NodeInputWidget(SerializableItem):
         self.node_gui.update_shape()
 
 
-class NodeInspectorWidget(SerializableItem):
-    """Base class for the inspector widget of a node."""
+InspectType = TypeVar('InspectType')
+"""A type representing an inspectable object"""
 
-    def __init__(self, params: Tuple[Node, 'NodeGUI']):
-        self.node, self.node_gui = params
+class InspectorWidget(SerializableItem, Generic[InspectType]):
+    """Base class representing an inspector to view and alter the state of an object"""
+    
+    def __init__(self, inspected_obj: InspectType):
+        self.inspected = inspected_obj
+    
+    def set_inspected(self, inspected_obj: InspectType):
+        """
+        VIRTUAL
+        
+        This needs to be overriden, otherwise it will throw an exception.
+        Allows for dynamic reseting of an editor with a different inspectable
+        """
+        raise NotImplementedError(f"Inspector {self.__class__} does not allow reseting the inspectable")
 
     def load(self):
-        """Called when the inspector is loaded into the inspector view in the editor."""
-        pass
-
+        """Called when the inspector is loaded in any kind of gui"""
+    
     def unload(self):
-        """Called when the inspector is removed from the inspector view in the editor."""
-        pass
+        """Called when the inspector is removed from its parent gui"""
+        
+    
+    
+class NodeInspectorWidget(InspectorWidget[Node]):
+    """Base class for the inspector widget of a node."""
+
+    def __init__(self, params: tuple[Node, 'NodeGUI']):
+        self.node, self.node_gui = params
+        self.inspected = self.node
     
     def on_node_deleted(self):
         """Called when the node is deleted"""
@@ -96,7 +114,7 @@ class NodeViewerWidget:
     A view is a detached window for interacting with the node other than the inspector.
     """
 
-    def __init__(self, params: Tuple[Node, 'NodeGUI']):
+    def __init__(self, params: tuple[Node, 'NodeGUI']):
         self.node, self.node_gui = params
     
     def on_before_shown(self):

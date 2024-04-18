@@ -75,9 +75,7 @@ def run(*args_,
     os.environ['RYVEN_MODE'] = 'gui'
     os.environ['QT_API'] = conf.qt_api
     from ..node_env import init_node_env
-    from ..gui_env import init_node_guis_env  # Qt dependency
     init_node_env()
-    init_node_guis_env()
 
     # Import GUI sources (must come after setting `os.environ['QT_API']`)
     from ..gui.main_console import init_main_console

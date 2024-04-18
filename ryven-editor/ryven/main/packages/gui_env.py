@@ -2,63 +2,93 @@
 This module automatically imports all requirements for Gui definitions of a nodes package.
 """
 
-from typing import Type
-
-from ryvencore import Data, Node, serialize, deserialize
+from ryvencore import Node
 from ryvencore.InfoMsgs import InfoMsgs
+from ryvencore_qt import NodeGUI, NodeInspectorWidget
+from ryvencore_qt.src.flows.nodes.WidgetBaseClasses import InspectorWidget
+from cognix import NodeConfig
 
-from ryvencore_qt import NodeInputWidget, NodeMainWidget, NodeGUI, NodeInspectorWidget
+from typing import TypeVar, Generic
 
 import ryven.gui.std_input_widgets as inp_widgets
-from ryven.main.utils import in_gui_mode
+
+AssocType = TypeVar('AssocType')
+"""The type to be inserted into the parent as an attribute"""
+ParentType = TypeVar('ParentType')
+"""The parent type"""
 
 
-__explicit_nodes: set = set() # for protection against setting the gui twice on the same node
-
-def init_node_guis_env():
-    pass
-
-
-class GuiClassesRegistry:
+class Association(Generic[ParentType, AssocType]):
     """
-    Used for statically keeping the gui classes specified in export_guis to access them through node_env.import_guis().
+    A class for statically creating a connection between two types.
+    
+    The parent class type ends up with an attribute containing the associated type
     """
+    
+    __explicit: set[type[ParentType]] = None
+    parent_base_type: type[ParentType] = None
+    assoc_base_type: type[AssocType] = None
+    _attr_name = 'ASSOC'
+    
+    def __init_subclass__(cls):
+        cls.__explicit = set()
+        
+    @classmethod
+    def associate_decor(cls, parent_type: type[ParentType]):
+        """Returns a decorator for creating the association"""
+        
+        if not issubclass(parent_type, cls.parent_base_type):
+            raise ValueError(f"{parent_type} is not of type {cls.parent_base_type}")
 
-    exported_guis = []
+        def register(assoc_type: type[AssocType]):
+            if parent_type in cls.__explicit:
+                InfoMsgs.write(f'{parent_type.__name__} has defined an explicit association {getattr(assoc_type, cls._attr_name).__name__}')
+                return
+            
+            setattr(parent_type, cls._attr_name, assoc_type)
+            cls.__explicit.add(parent_type)
+            InfoMsgs.write(f"Registered association: {assoc_type} for {parent_type}")
+            return assoc_type
 
+        return register
 
-class GuiClassesContainer:
-    pass
+    @classmethod
+    def get_assoc(cls, parent_type: type[ParentType]) -> type[AssocType] | None:
+        return getattr(parent_type, cls._attr_name) if hasattr(parent_type, cls._attr_name) else None
 
+class __InspectorToNodeConfig(Association[NodeConfig, InspectorWidget]):
+    
+    parent_base_type = NodeConfig
+    assoc_base_type = NodeGUI
+    _attr_name = 'INSPECTOR'
 
-def export_guis(guis: list[type[NodeGUI]]):
+def node_config(node_config_cls: type[NodeConfig]):
     """
-    Exports/exposes the specified node gui classes to the nodes file importing them via import_guis().
-    Returns an object with all exported gui classes as attributes for direct access.
+    Registers an inspector for a node config. The inspector of a config is inherited to its sub-classes,
+    but can be overriden by specifying a new gui for the sub-class.
     """
+    
+    return __InspectorToNodeConfig.associate_decor(node_config_cls)
 
-    gcc = GuiClassesContainer()
-    for w in guis:
-        setattr(gcc, w.__name__, w)
-    GuiClassesRegistry.exported_guis.append(gcc)
+def get_config_inspector_cls(node_config_cls: type[NodeConfig]):
+    return __InspectorToNodeConfig.get_assoc(node_config_cls)
 
 
-def node_gui(node_cls: Type[Node]):
+class __GuiToNode(Association[Node, NodeGUI]):
+    
+    parent_base_type = Node
+    assoc_base_type = NodeGUI
+    _attr_name = 'GUI'
+    
+def node_gui(node_cls: type[Node]):
     """
     Registers a node gui for a node class. The gui of a node is inherited to its sub-classes,
     but can be overridden by specifying a new gui for the sub-class.
     """
-    if not issubclass(node_cls, Node):
-        raise Exception(f"{node_cls} is not of type {Node}")
+    
+    return __GuiToNode.associate_decor(node_cls)
 
-    def register_gui(gui_cls: Type[NodeGUI]):
-        if node_cls in __explicit_nodes:
-            InfoMsgs.write(f'{node_cls.__name__} has defined an explicit gui {node_cls.GUI.__name__}')
-            return
-        
-        node_cls.GUI = gui_cls
-        __explicit_nodes.add(node_cls)
-        InfoMsgs.write(f"Registered node gui: {gui_cls} for {node_cls}")
-        return gui_cls
-
-    return register_gui
+def get_node_gui_cls(node_cls: type[Node]):
+    """Returns the type of NodeGUI this Node has"""
+    return __GuiToNode.get_assoc(node_cls)
+    
