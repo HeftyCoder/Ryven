@@ -23,8 +23,17 @@ class NodeTraitsConfig(NodeConfig, HasTraits):
     
     # CLASS
     
+    __s_metadata = {
+        'type': not_event,
+        'visible': not_false,
+        'dont_save': not_false,
+    }
     obj_exprs = None
     """Holds all the important observer expressions"""
+    
+    @classmethod
+    def serializable_traits(cls):
+        return cls.class_traits(**cls.__s_metadata)
     
     @classmethod
     def find_trait_exprs(cls):
@@ -91,7 +100,7 @@ class NodeTraitsConfig(NodeConfig, HasTraits):
         return obj.__serializable_traits()
     
     def __serializable_traits(self):
-        return self.trait_get(type=not_event, visible=not_false, dont_save=not_false)
+        return self.trait_get(self.__s_metadata)
     
 
 #   UTIL

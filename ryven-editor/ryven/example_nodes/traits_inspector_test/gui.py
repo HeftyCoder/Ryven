@@ -16,7 +16,7 @@ class RandNodeInspector(NodeInspectorWidget, QWidget):
         self.node: RandNode = self.node  # help with auto-complete
         
         g1 = Group(
-                *tuple(Item(name, style='custom') for name in self.config.visible_traits()),
+                *tuple(Item(name) for name in self.config.visible_traits()),
                 Item("generate", show_label=False, editor=ButtonEditor(label="Generate!")),
                 label="Config",
                 scrollable=True
