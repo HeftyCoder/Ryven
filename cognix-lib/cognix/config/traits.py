@@ -19,7 +19,12 @@ class DefaultInstance(Instance):
 
         
 class NodeTraitsConfig(NodeConfig, HasTraits):
-    """An implementation of a Node Configuration using the traits library"""
+    """
+    An implementation of a Node Configuration using the traits library
+    
+    Based on the documentation, the traits inside this are treated as items, in
+    the context of GUI generation.
+    """
     
     # CLASS
     
@@ -39,9 +44,10 @@ class NodeTraitsConfig(NodeConfig, HasTraits):
     
     @classmethod
     def find_trait_exprs(cls, exp_type: type[str | ObserverExpression] = ObserverExpression):
+        
         """
         Finds all the observer expressions available for this node, for
-        traits that are not an event, are visible and do nothave the 
+        traits that are not an event, are visible and do not have the 
         dont_save metadata atrribute set to True.
         """
         cls.obj_exprs = []
@@ -53,7 +59,7 @@ class NodeTraitsConfig(NodeConfig, HasTraits):
     # INSTANCE
     
     _node = Instance(CognixNode, visible=False)
-    on_trait_changed = List(visible=False)
+    trait_changed_event: set = Set(visible=False)
     
     def __init__(self, node: CognixNode = None, *args, **kwargs):
         HasTraits.__init__(self, *args, **kwargs)
@@ -67,7 +73,7 @@ class NodeTraitsConfig(NodeConfig, HasTraits):
         """Invoked when any trait that can be saved changes"""
         
         # the HasTraits object
-        for e in self.on_trait_changed:
+        for e in self.trait_changed_event:
             e(self, event)
     
     def allow_notifications(self):
@@ -110,7 +116,13 @@ class NodeTraitsConfig(NodeConfig, HasTraits):
     
     def __serializable_traits(self):
         return self.trait_get(self.__s_metadata)
-    
+
+class NodeTraitsGroupConfig(NodeTraitsConfig):
+    """
+    A type meant to represent a group in traits ui.
+    """  
+    pass
+
 
 #   UTIL
 

@@ -22,9 +22,8 @@ class RandNodeInspector(NodeInspectorWidget, QWidget):
                 scrollable=True
             )
         self.view = View(
-            Group(g1, 
+            Group(g1, g1,
                   show_border=True, 
-                  layout='tabbed', 
                   scrollable=True,
                   label='Configuration'),
             resizable=True

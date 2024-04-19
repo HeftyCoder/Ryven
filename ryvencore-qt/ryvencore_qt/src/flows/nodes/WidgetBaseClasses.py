@@ -10,6 +10,7 @@ from typing import Generic, TypeVar, TYPE_CHECKING
 if TYPE_CHECKING:
     from .NodeItem import NodeItem
     from .NodeGUI import NodeGUI
+    from ..FlowView import FlowView
 
 class NodeMainWidget(SerializableItem):
     """Base class for the main widget of a node."""
@@ -64,8 +65,9 @@ InspectType = TypeVar('InspectType')
 class InspectorWidget(SerializableItem, Generic[InspectType]):
     """Base class representing an inspector to view and alter the state of an object"""
     
-    def __init__(self, inspected_obj: InspectType):
+    def __init__(self, inspected_obj: InspectType, flow_view: FlowView):
         self.inspected = inspected_obj
+        self.flow_view = flow_view
     
     def set_inspected(self, inspected_obj: InspectType):
         """
@@ -82,7 +84,16 @@ class InspectorWidget(SerializableItem, Generic[InspectType]):
     def unload(self):
         """Called when the inspector is removed from its parent gui"""
         
-    
+    def push_undo(self, text: str, undo_fn, redo_fn):
+        """Push an undo function to the undo stack of the flow."""
+        self.flow_view.push_undo(
+            Delegate_Command(
+                self.flow_view,
+                text=text,
+                on_undo=undo_fn,
+                on_redo=redo_fn,
+            )
+        )
     
 class NodeInspectorWidget(InspectorWidget[Node]):
     """Base class for the inspector widget of a node."""
@@ -90,21 +101,11 @@ class NodeInspectorWidget(InspectorWidget[Node]):
     def __init__(self, params: tuple[Node, 'NodeGUI']):
         self.node, self.node_gui = params
         self.inspected = self.node
+        self.flow_view = self.node_gui.flow_view()
     
     def on_node_deleted(self):
         """Called when the node is deleted"""
         pass
-
-    def push_undo(self, text: str, undo_fn, redo_fn):
-        """Push an undo function to the undo stack of the flow."""
-        self.node_gui.flow_view().push_undo(
-            Delegate_Command(
-                self.node_gui.flow_view(),
-                text=text,
-                on_undo=undo_fn,
-                on_redo=redo_fn,
-            )
-        )
 
 
 class NodeViewerWidget:

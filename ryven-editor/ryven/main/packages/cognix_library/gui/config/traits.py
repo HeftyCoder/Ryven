@@ -1,0 +1,162 @@
+"""
+Implementations for a node config based on the 
+built-in traits and traitsui implementation
+"""
+
+from cognix import NodeConfig
+from cognix.config.traits import NodeTraitsConfig, NodeTraitsGroupConfig
+from .abc import NodeConfigInspector
+from .env import node_config_gui
+
+from traitsui.api import View, Group, Item
+from traits.observation.events import (
+    TraitChangeEvent, 
+    ListChangeEvent, 
+    DictChangeEvent, 
+    SetChangeEvent
+)
+from qtpy.QtWidgets import QVBoxLayout, QWidget
+from ......gui_env import NodeGUI
+
+@node_config_gui(NodeTraitsConfig)
+class NodeTraitsConfigInspector(NodeConfigInspector, QWidget):
+    """Basic config inspector"""
+    
+    def __init__(self, params: tuple[NodeTraitsConfig, NodeGUI]):
+        QWidget.__init__(self)
+        
+        config, _ = params
+        NodeConfigInspector.__init__(self, params)
+        
+        self.view: View = None
+        self.ui = None
+        self.set_inspected(config)
+        
+        self.setLayout(QVBoxLayout())
+    
+    def set_inspected(self, inspected_obj: NodeTraitsConfig):
+        
+        self.delete_ui()
+        
+        if not inspected_obj:
+            return
+        
+        self.inspected = inspected_obj
+        
+        gr_label = (
+            getattr(inspected_obj, 'label') 
+            if hasattr(inspected_obj, 'label') 
+            else 'config'
+        )
+        
+        config_group = Group (
+            **inspected_obj.serializable_traits(),
+            label= gr_label,
+            scrollable=True
+        )
+        
+        self.view = View (
+            config_group,
+            show_border=True,
+            scrollable=True,
+            label=gr_label
+        )
+    
+    def load(self):
+        
+        if not self.ui:
+            print('created')
+            self.ui = self.inspected.edit_traits(parent=self, kind='subpanel', view=self.view).control
+            self.ui.setVisible(False)
+            self.layout().addWidget(self.ui)
+            self.ui.setVisible(True)
+        
+        self.inspected.trait_changed_event.add(self.on_trait_changed)
+            
+    
+    def unload(self):
+        self.inspected.trait_changed_event.remove(self.on_trait_changed)
+    
+    def delete_ui(self):
+        if self.ui:
+            self.ui.deleteLater()
+            self.ui.setParent(None)
+            self.ui.setVisible(False)
+            self.ui = None
+    
+    def on_trait_changed(self, event):
+            
+        self.flow_view.setFocus()
+        def undo_redo(event, func, value):
+            def _undo__redo():
+                self.inspected.block_notifications()
+                func(event, value)
+                self.inspected.allow_notifications()
+            return _undo__redo
+        
+        def undo_redo_pair(event, func, undo_val, redo_val):
+            return (
+                undo_redo(event, func, undo_val),
+                undo_redo(event, func, redo_val)
+            )
+            
+        node_id = self.inspected.node().global_id
+        message = f'Config Change Node: {node_id}: {event}'
+        
+        if isinstance(event, TraitChangeEvent):
+            u_pair = undo_redo_pair(event, __trait_change, event.old, event.new)
+        elif isinstance(event, ListChangeEvent):
+            u_pair = undo_redo_pair(
+                event, 
+                __list_change, 
+                (event.added, event.removed, event.index)
+                (event.removed, event.added, event.index)
+            )
+        elif isinstance(event, SetChangeEvent):
+            u_pair = undo_redo_pair(
+                event,
+                __set_change,
+                (event.added, event.removed),
+                (event.removed, event.added)
+            )
+        else:
+            u_pair = undo_redo_pair(
+                event,
+                __dict_change,
+                (event.added, event.removed),
+                (event.removed, event.added)
+            )
+             
+        undo, redo = u_pair
+        self.push_undo(message, undo, redo)
+                          
+        
+@node_config_gui(NodeTraitsGroupConfig)
+class NodeTraitsGroupConfigInspector(NodeTraitsConfigInspector):
+    pass
+
+#   ------UTIL-------
+
+def __trait_change(event: TraitChangeEvent, value):
+    setattr(event.object, event.name, value)
+            
+def __list_change(event: ListChangeEvent, value: tuple): # (added, removed, index)
+    l: list = event.object
+    index, added, removed = value
+    del l[index:index+len(added)]
+    l[index:index] = removed
+            
+def __set_change(event: SetChangeEvent, value: tuple): # (added, removed)
+    s: set = event.object
+    added, removed = value
+    for r in removed:
+        s.remove(r)
+    s.update(added)
+        
+def __dict_change(event: DictChangeEvent, value: tuple): #(added, removed)
+    d: dict = event.object
+    added, removed = value
+    for key in removed:
+        del d[key]
+    d.update(added)
+

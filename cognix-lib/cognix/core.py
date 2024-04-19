@@ -6,8 +6,8 @@ from ryvencore import (
     Flow,
     Session, 
 )
-from ryvencore.Base import Base
 
+from enum import Enum
 from abc import abstractmethod
 from typing import TYPE_CHECKING
 
@@ -17,12 +17,16 @@ if TYPE_CHECKING:
 
 # ----CONFIGURATION----
 
+# TODO Provide a standard for defining and setting metadata for configs.
+# Each config or property of the config should have some way of accesssing metadat
+# through a unified API (most likely an abstract method on NodeConfig)
+
 class NodeConfig:
     """An interface representing a node's configuration"""
     
     def __init__(self, node: CognixNode = None):
         self._node = node
-        
+    
     def node(self) -> CognixNode:
         """A property returning the node of this configuration"""
         return self._node
@@ -36,7 +40,6 @@ class NodeConfig:
     def load(self, data: dict | str):
         """Loads the configuration from a JSON-compliant dict or a JSON str"""
         pass
-
     
 # ----NODES----
 

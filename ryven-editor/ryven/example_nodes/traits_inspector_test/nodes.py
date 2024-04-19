@@ -16,7 +16,7 @@ class RandNode(Node):
         scale: float = Float(1, auto_set=False, enter_set=True)
         use_seed: bool = Bool
         seed: int = Int(0, auto_set=False, enter_set=True)
-        con: AnotherConfig = Instance(klass=AnotherConfig, args=())
+        con: AnotherConfig = Instance(klass=AnotherConfig, args=(), style='custom')
         generate = Event
         
         _node = Instance(klass=Node, visible=False)

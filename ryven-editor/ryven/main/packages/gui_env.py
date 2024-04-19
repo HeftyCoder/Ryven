@@ -6,11 +6,11 @@ from ryvencore import Node
 from ryvencore.InfoMsgs import InfoMsgs
 from ryvencore_qt import NodeGUI, NodeInspectorWidget
 from ryvencore_qt.src.flows.nodes.WidgetBaseClasses import InspectorWidget
-from cognix import NodeConfig
 
 from typing import TypeVar, Generic
 
 import ryven.gui.std_input_widgets as inp_widgets
+
 
 AssocType = TypeVar('AssocType')
 """The type to be inserted into the parent as an attribute"""
@@ -55,24 +55,6 @@ class Association(Generic[ParentType, AssocType]):
     @classmethod
     def get_assoc(cls, parent_type: type[ParentType]) -> type[AssocType] | None:
         return getattr(parent_type, cls._attr_name) if hasattr(parent_type, cls._attr_name) else None
-
-class __InspectorToNodeConfig(Association[NodeConfig, InspectorWidget]):
-    
-    parent_base_type = NodeConfig
-    assoc_base_type = NodeGUI
-    _attr_name = 'INSPECTOR'
-
-def node_config(node_config_cls: type[NodeConfig]):
-    """
-    Registers an inspector for a node config. The inspector of a config is inherited to its sub-classes,
-    but can be overriden by specifying a new gui for the sub-class.
-    """
-    
-    return __InspectorToNodeConfig.associate_decor(node_config_cls)
-
-def get_config_inspector_cls(node_config_cls: type[NodeConfig]):
-    return __InspectorToNodeConfig.get_assoc(node_config_cls)
-
 
 class __GuiToNode(Association[Node, NodeGUI]):
     
