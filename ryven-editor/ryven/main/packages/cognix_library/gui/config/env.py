@@ -1,6 +1,6 @@
 from ryvencore_qt.src.flows.nodes.WidgetBaseClasses import InspectorWidget
 from cognix import NodeConfig
-from ....gui_env import Association, get_node_gui_cls
+from ryven.gui_env import Association
 from .abc import NodeConfigInspector
         
 class __InspectorToNodeConfig(Association[NodeConfig, NodeConfigInspector]):

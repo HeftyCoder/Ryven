@@ -1,9 +1,9 @@
 from qtpy.QtWidgets import QVBoxLayout, QWidget
-from .....gui_env import (
+from ryven.gui_env import (
     node_gui, 
-    get_config_inspector_cls, 
-    NodeInspectorWidget, 
-    NodeGUI,
+    NodeGUI, 
+    NodeInspectorWidget,
+    get_config_inspector_cls,
 )
 
 from cognix import CognixNode
@@ -19,9 +19,10 @@ class CognixNodeInspectorWidget(NodeInspectorWidget, QWidget):
         self.setLayout(QVBoxLayout())
         
         config_gui_cls = get_config_inspector_cls(type(self.node.config))
-        self.config_gui = config_gui_cls(self.node.config) if config_gui_cls else None
-        self.layout().addWidget(self.config_gui)
-    
+        self.config_gui = config_gui_cls((self.node.config, self.node_gui)) if config_gui_cls else None
+        if self.config_gui:
+            self.layout().addWidget(self.config_gui)
+        
     def load(self):
         
         if self.config_gui:

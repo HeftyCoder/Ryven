@@ -1,5 +1,5 @@
+from __future__ import annotations
 from queue import Queue
-from typing import List, Dict, Tuple, Optional, Union, Type, TYPE_CHECKING
 
 from qtpy.QtCore import QObject, Signal
 from qtpy.QtWidgets import QWidget, QApplication
@@ -12,6 +12,7 @@ from .NodeViewer import NodeViewerDefault
 from ryvencore.RC import ProgressState
 from ryvencore import Node
 
+from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .NodeItem import NodeItem
     from ...SessionGUI import SessionGUI
@@ -25,12 +26,12 @@ class NodeGUI(QObject):
     # customizable gui attributes
     description_html: str = None
     
-    main_widget_class: Type[Union[NodeMainWidget, QWidget]] = None
+    main_widget_class: type[NodeMainWidget | QWidget] = None
     main_widget_pos: str = 'below ports'
-    input_widget_classes: Dict[str, Type[Union[NodeInputWidget, QWidget]]] = {}
-    inspector_widget_class: Type[Union[NodeInspectorWidget, QWidget]] = NodeInspectorDefaultWidget
+    input_widget_classes: dict[str, type[NodeInputWidget | QWidget]] = {}
+    inspector_widget_class: type[NodeInspectorWidget | QWidget] = NodeInspectorDefaultWidget
     wrap_inspector_in_default: bool = False
-    viewer_widget_class: Type[Union[NodeViewerWidget, QWidget]] = NodeViewerDefault
+    viewer_widget_class: type[NodeViewerWidget | QWidget] = NodeViewerDefault
     
     init_input_widgets: dict = {}
     style: str = 'normal'
@@ -50,10 +51,10 @@ class NodeGUI(QObject):
     show_unconnected_ports_triggered = Signal()
     progress_updated = Signal(ProgressState)
     
-    def __init__(self, params: Tuple[Node, 'SessionGUI']):
+    def __init__(self, params: tuple[Node, SessionGUI, FlowView]):
         QObject.__init__(self)
 
-        self.node, self.session_gui = params
+        self.node, self.session_gui, self._flow_view = params
         self.item: NodeItem = None   # set by the node item directly after this __init__ call
         setattr(self.node, 'gui', self)
 
@@ -80,7 +81,6 @@ class NodeGUI(QObject):
 
         # create the inspector widget
         self.inspector_widget = self.create_inspector()
-        
         # create viewer widget
         self.viewer_widget = self.create_viewer()
         
@@ -122,27 +122,13 @@ class NodeGUI(QObject):
     slots
     """
 
-    # TODO: displaying update errors is currently prevented by the
-    #   lack of an appropriate updated event in ryvencore.
-    #   Update: there is an updating event now.
-
-    # def on_updated(self, inp):
-    #     if self.error_during_update:
-    #         # an error should prevent an update event, so if we
-    #         # are here, the update was successful
-    #         self.self.error_during_update = False
-    #         self.item.remove_error_message()
-    #     self.updated.emit()
-    #
     def _on_update_error(self, e):
-    #     self.item.display_error(e)
-    #     self.error_during_update = True
         self.update_error.emit(e)
 
     def _on_updating(self, inp: int):
         # update input widget
         if inp != -1 and self.item.inputs[inp].widget is not None:
-            o = self.node.flow.connected_output(self.node.inputs[inp])
+            o = self.node.flow.connected_output(self.node._inputs[inp])
             if o is not None:
                 self.item.inputs[inp].widget.val_update_event(o.val)
         self.updating.emit()
@@ -294,15 +280,16 @@ class NodeGUI(QObject):
             self.viewer_widget.setWindowTitle(self.display_title)
         self.update_shape()
 
+    @property
     def flow_view(self):
-        return self.item.flow_view
+        return self._flow_view
 
     def main_widget(self):
         """Returns the main_widget object, or None if the item doesn't exist (yet)"""
 
         return self.item.main_widget
 
-    def attach_input_widgets(self, widget_names: List[str]):
+    def attach_input_widgets(self, widget_names: list[str]):
         """Attaches the input widget to the next created input."""
 
         for w in widget_names:

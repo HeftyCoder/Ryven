@@ -2,7 +2,7 @@ import code
 import re
 import os
 
-from ryven.gui.code_editor.CodeEditorWidget import CodeEditorWidget
+from ryvencore_qt.src.code_editor.CodeEditorWidget import CodeEditorWidget
 
 from qtpy.QtWidgets import QWidget, QLineEdit, QGridLayout, QPlainTextEdit, QLabel, QPushButton, QGroupBox, \
     QVBoxLayout, QHBoxLayout

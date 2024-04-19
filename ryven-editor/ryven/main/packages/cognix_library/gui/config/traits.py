@@ -16,7 +16,7 @@ from traits.observation.events import (
     SetChangeEvent
 )
 from qtpy.QtWidgets import QVBoxLayout, QWidget
-from ......gui_env import NodeGUI
+from ryven.gui_env import NodeGUI
 
 @node_config_gui(NodeTraitsConfig)
 class NodeTraitsConfigInspector(NodeConfigInspector, QWidget):
@@ -49,17 +49,18 @@ class NodeTraitsConfigInspector(NodeConfigInspector, QWidget):
             else 'config'
         )
         
+        insp_traits = inspected_obj.serializable_traits()
+        
         config_group = Group (
-            **inspected_obj.serializable_traits(),
+            *insp_traits.keys(),
             label= gr_label,
-            scrollable=True
+            scrollable=True,
+            show_border=True,
         )
         
         self.view = View (
             config_group,
-            show_border=True,
-            scrollable=True,
-            label=gr_label
+            resizable=True
         )
     
     def load(self):
@@ -104,25 +105,25 @@ class NodeTraitsConfigInspector(NodeConfigInspector, QWidget):
         message = f'Config Change Node: {node_id}: {event}'
         
         if isinstance(event, TraitChangeEvent):
-            u_pair = undo_redo_pair(event, __trait_change, event.old, event.new)
+            u_pair = undo_redo_pair(event, _trait_change, event.old, event.new)
         elif isinstance(event, ListChangeEvent):
             u_pair = undo_redo_pair(
                 event, 
-                __list_change, 
+                _list_change, 
                 (event.added, event.removed, event.index)
                 (event.removed, event.added, event.index)
             )
         elif isinstance(event, SetChangeEvent):
             u_pair = undo_redo_pair(
                 event,
-                __set_change,
+                _set_change,
                 (event.added, event.removed),
                 (event.removed, event.added)
             )
         else:
             u_pair = undo_redo_pair(
                 event,
-                __dict_change,
+                _dict_change,
                 (event.added, event.removed),
                 (event.removed, event.added)
             )
@@ -137,23 +138,23 @@ class NodeTraitsGroupConfigInspector(NodeTraitsConfigInspector):
 
 #   ------UTIL-------
 
-def __trait_change(event: TraitChangeEvent, value):
+def _trait_change(event: TraitChangeEvent, value):
     setattr(event.object, event.name, value)
             
-def __list_change(event: ListChangeEvent, value: tuple): # (added, removed, index)
+def _list_change(event: ListChangeEvent, value: tuple): # (added, removed, index)
     l: list = event.object
     index, added, removed = value
     del l[index:index+len(added)]
     l[index:index] = removed
             
-def __set_change(event: SetChangeEvent, value: tuple): # (added, removed)
+def _set_change(event: SetChangeEvent, value: tuple): # (added, removed)
     s: set = event.object
     added, removed = value
     for r in removed:
         s.remove(r)
     s.update(added)
         
-def __dict_change(event: DictChangeEvent, value: tuple): #(added, removed)
+def _dict_change(event: DictChangeEvent, value: tuple): #(added, removed)
     d: dict = event.object
     added, removed = value
     for key in removed:

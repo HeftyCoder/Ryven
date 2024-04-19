@@ -1,4 +1,4 @@
-from traits.api import HasTraits, Instance, List, Dict, Set, CTrait
+from traits.api import *
 from traits.observation.expression import ObserverExpression, trait, anytrait
 from traits.trait_base import not_false, not_event
 from traits.observation._trait_change_event import TraitChangeEvent
@@ -7,122 +7,6 @@ from typing import Callable, Any
 from json import loads, dumps
 
 from .. import CognixNode, NodeConfig
-
-
-
-class DefaultInstance(Instance):
-    """Trait instance that is created by default"""
-    
-    def __init__(self, klass=None, factory=None, args=(), kw=None, 
-                 allow_none=True, adapt=None, module=None, **metadata):
-        super().__init__(klass, factory, args, kw, allow_none, adapt, module, **metadata)
-
-        
-class NodeTraitsConfig(NodeConfig, HasTraits):
-    """
-    An implementation of a Node Configuration using the traits library
-    
-    Based on the documentation, the traits inside this are treated as items, in
-    the context of GUI generation.
-    """
-    
-    # CLASS
-    
-    __s_metadata = {
-        'type': not_event,
-        'visible': not_false,
-        'dont_save': not_false,
-    }
-    
-    obj_exprs = None
-    """Holds all the important observer expressions"""
-    
-    @classmethod
-    def serializable_traits(cls):
-        """Returns the serializable traits of this class"""
-        return cls.class_traits(**cls.__s_metadata)
-    
-    @classmethod
-    def find_trait_exprs(cls, exp_type: type[str | ObserverExpression] = ObserverExpression):
-        
-        """
-        Finds all the observer expressions available for this node, for
-        traits that are not an event, are visible and do not have the 
-        dont_save metadata atrribute set to True.
-        """
-        cls.obj_exprs = []
-        find_expressions(cls, None, cls.obj_exprs)
-    
-    def __init_subclass__(cls, **kwargs):
-        cls.find_trait_exprs()
-
-    # INSTANCE
-    
-    _node = Instance(CognixNode, visible=False)
-    trait_changed_event: set = Set(visible=False)
-    
-    def __init__(self, node: CognixNode = None, *args, **kwargs):
-        HasTraits.__init__(self, *args, **kwargs)
-        NodeConfig.__init__(self, node)
-        self.allow_notifications()
-    
-    # Traits only
-    
-    # @observe('*') the decorator doesn't allow removal of notifications
-    def __any_trait_changed(self, event):
-        """Invoked when any trait that can be saved changes"""
-        
-        # the HasTraits object
-        for e in self.trait_changed_event:
-            e(self, event)
-    
-    def allow_notifications(self):
-        """Allows the invocation of events when a trait changes"""
-        self.observe(self.__any_trait_changed, self.obj_exprs)
-    
-    def block_notifications(self):
-        """Blocks the invocation of events when a trait changes"""
-        self.observe(self.__any_trait_changed, self.obj_exprs, remove=True)
-   
-    def load(self, data: dict | str):
-        
-        if isinstance(data, str):
-            data = loads(data)
-            
-        self._trait_change_notify(False)
-        for name, value in data.items():
-            try:
-                trait_value = getattr(self, name)
-                if isinstance(trait_value, NodeTraitsConfig):
-                    trait_value.load(value)
-                else:
-                    setattr(self, name, value)
-            except:
-                continue
-        
-        self._trait_change_notify(True)
-    
-    def to_json(self, indent=1) -> str:
-        return dumps(
-            self.__serializable_traits(), 
-            indent=indent, skipkeys=True, 
-            default=self.__encode
-        )
-    
-    def __encode(self, obj):
-        if not isinstance(obj, NodeTraitsConfig):
-            return None
-        return obj.__serializable_traits()
-    
-    def __serializable_traits(self):
-        return self.trait_get(self.__s_metadata)
-
-class NodeTraitsGroupConfig(NodeTraitsConfig):
-    """
-    A type meant to represent a group in traits ui.
-    """  
-    pass
-
 
 #   UTIL
 
@@ -257,3 +141,117 @@ def find_expressions (
         obs_exprs.append(expr)
         new_obj, new_expr = process_method(obj, None, expr)
         find_expressions(new_obj, new_expr, obs_exprs, exp_type)
+        
+        
+class DefaultInstance(Instance):
+    """Trait instance that is created by default"""
+    
+    def __init__(self, klass=None, factory=None, args=(), kw=None, 
+                 allow_none=True, adapt=None, module=None, **metadata):
+        super().__init__(klass, factory, args, kw, allow_none, adapt, module, **metadata)
+
+        
+class NodeTraitsConfig(NodeConfig, HasTraits):
+    """
+    An implementation of a Node Configuration using the traits library
+    
+    Based on the documentation, the traits inside this are treated as items, in
+    the context of GUI generation.
+    """
+    
+    # CLASS
+    
+    __s_metadata = {
+        'type': not_event,
+        'visible': not_false,
+        'dont_save': not_false,
+    }
+    
+    obj_exprs = None
+    """Holds all the important observer expressions"""
+    
+    @classmethod
+    def serializable_traits(cls):
+        """Returns the serializable traits of this class"""
+        return cls.class_traits(**cls.__s_metadata)
+    
+    @classmethod
+    def find_trait_exprs(cls, exp_type: type[str | ObserverExpression] = ObserverExpression):
+        
+        """
+        Finds all the observer expressions available for this node, for
+        traits that are not an event, are visible and do not have the 
+        dont_save metadata atrribute set to True.
+        """
+        cls.obj_exprs = []
+        find_expressions(cls, None, cls.obj_exprs)
+    
+    def __init_subclass__(cls, **kwargs):
+        cls.find_trait_exprs()
+
+    # INSTANCE
+    
+    _node = Instance(CognixNode, visible=False)
+    trait_changed_event: set = Set(visible=False)
+    
+    def __init__(self, node: CognixNode = None, *args, **kwargs):
+        HasTraits.__init__(self, *args, **kwargs)
+        NodeConfig.__init__(self, node)
+        self.allow_notifications()
+    
+    # Traits only
+    
+    # @observe('*') the decorator doesn't allow removal of notifications
+    def __any_trait_changed(self, event):
+        """Invoked when any trait that can be saved changes"""
+        
+        # the HasTraits object
+        for e in self.trait_changed_event:
+            e(event)
+    
+    def allow_notifications(self):
+        """Allows the invocation of events when a trait changes"""
+        self.observe(self.__any_trait_changed, self.obj_exprs)
+    
+    def block_notifications(self):
+        """Blocks the invocation of events when a trait changes"""
+        self.observe(self.__any_trait_changed, self.obj_exprs, remove=True)
+   
+    def load(self, data: dict | str):
+        
+        if isinstance(data, str):
+            data = loads(data)
+            
+        self._trait_change_notify(False)
+        for name, value in data.items():
+            try:
+                trait_value = getattr(self, name)
+                if isinstance(trait_value, NodeTraitsConfig):
+                    trait_value.load(value)
+                else:
+                    setattr(self, name, value)
+            except:
+                continue
+        
+        self._trait_change_notify(True)
+    
+    def to_json(self, indent=1) -> str:
+        return dumps(
+            self.__serializable_traits(), 
+            indent=indent, skipkeys=True, 
+            default=self.__encode
+        )
+    
+    def __encode(self, obj):
+        if not isinstance(obj, NodeTraitsConfig):
+            return None
+        return obj.__serializable_traits()
+    
+    def __serializable_traits(self):
+        return self.trait_get(**self.__s_metadata)
+
+class NodeTraitsGroupConfig(NodeTraitsConfig):
+    """
+    A type meant to represent a group in traits ui.
+    """  
+    pass

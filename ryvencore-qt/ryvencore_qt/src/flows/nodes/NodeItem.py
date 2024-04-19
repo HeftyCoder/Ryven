@@ -1,4 +1,4 @@
-import traceback
+from __future__ import annotations
 from typing import Optional, Tuple, List, TYPE_CHECKING
 
 from qtpy.QtWidgets import (
@@ -37,7 +37,7 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
     """The GUI representative for nodes. Unlike the Node class, this class is not subclassed individually and works
     the same for every node."""
 
-    def __init__(self, node: Node, node_gui: NodeGUI, flow_view, design: Design):
+    def __init__(self, node: Node, node_gui: NodeGUI, flow_view: FlowView, design: Design):
         GUIBase.__init__(self, representing_component=node)
         QGraphicsObject.__init__(self)
 

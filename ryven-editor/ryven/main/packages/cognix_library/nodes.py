@@ -13,4 +13,7 @@ export_nodes(all_util_nodes, sub_pkg_name=util_pkg_name)
 
 @on_gui_load
 def load_gui():
+    
+    from .gui.config import traits # basic GUI implementation
+    from .gui import inspector
     from .gui import utility_guis

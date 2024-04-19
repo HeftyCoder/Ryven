@@ -1,5 +1,5 @@
 """The base classes for node custom widgets for nodes."""
-
+from __future__ import annotations
 from ryvencore import Data, Node
 
 from ..FlowCommands import Delegate_Command
@@ -101,7 +101,7 @@ class NodeInspectorWidget(InspectorWidget[Node]):
     def __init__(self, params: tuple[Node, 'NodeGUI']):
         self.node, self.node_gui = params
         self.inspected = self.node
-        self.flow_view = self.node_gui.flow_view()
+        self.flow_view = self.node_gui.flow_view
     
     def on_node_deleted(self):
         """Called when the node is deleted"""

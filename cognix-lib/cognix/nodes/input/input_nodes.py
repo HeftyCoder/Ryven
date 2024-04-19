@@ -2,10 +2,18 @@ from ... import CognixNode, FrameNode
 from pylsl import resolve_stream, resolve_bypred, StreamInlet, StreamInfo
 from threading import Thread
 from ryvencore import NodeOutputType, Data
+from ...config.traits import *
 
 class LSLInput(FrameNode):
     """Test class for receiving an lsl stream"""
     
+    class Config(NodeTraitsConfig):
+        
+        f = File('Some path')
+        stream_name = Str('stream_name', auto_set=False, enter_set=True)
+        #some_list = List(Int())    
+    
+    config_type = Config
     title = 'LSL Input'
     version = '0.0.1'
     init_outputs = [NodeOutputType(label='data')]

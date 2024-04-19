@@ -115,7 +115,7 @@ class PortItem(GUIBase, QGraphicsWidget):
 
 class InputPortItem(PortItem):
     def __init__(self, node_gui: 'NodeGUI', node_item: 'NodeItem', port: NodePort, input_widget: Tuple[type, str] = None):
-        super().__init__(node_gui, node_item, port, node_gui.flow_view())
+        super().__init__(node_gui, node_item, port, node_gui.flow_view)
 
         self.proxy = None  # widget proxy
         self.widget = None  # widget
@@ -212,7 +212,7 @@ class InputPortItem(PortItem):
 
 class OutputPortItem(PortItem):
     def __init__(self, node_gui: 'NodeGUI', node_item: 'NodeItem', port: NodePort):
-        super().__init__(node_gui, node_item, port, node_gui.flow_view())
+        super().__init__(node_gui, node_item, port, node_gui.flow_view)
         # super(OutputPortItem, self).__init__(parent_node_instance, PortObjPos.OUTPUT, type_, label_str)
 
         self.setup_ui()
