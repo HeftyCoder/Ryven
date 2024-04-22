@@ -10,8 +10,8 @@ class LSLInput(FrameNode):
     class Config(NodeTraitsConfig):
         
         f = File('Some path')
-        stream_name = Str('stream_name', auto_set=False, enter_set=True)
-        some_list = List(Int())    
+        stream_name = CX_Str('stream_name')
+        some_list = List(CX_Int(54))    
     
     config_type = Config
     title = 'LSL Input'

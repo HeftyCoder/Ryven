@@ -71,7 +71,6 @@ class CognixNodeGUI(NodeGUI):
             return None
         
         e = config_gui_cls.create_config_changed_event(cognix_n, self)
-        print(self, e)
         if e:
             cognix_n.config.add_changed_event(e)
         

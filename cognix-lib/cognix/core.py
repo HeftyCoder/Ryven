@@ -26,11 +26,11 @@ class NodeConfig:
     
     def __init__(self, node: CognixNode = None):
         self._node = node
-        self.__config_changed: set = set()
+        self._config_changed: set = set()
         # we're using a list to avoid any implications with
         # frameworks such as traits that might behave differently
         # when setting an instance's member
-        self.__allow_change = [True]
+        self._allow_change = [True]
     
     @property
     def node(self) -> CognixNode:
@@ -43,30 +43,30 @@ class NodeConfig:
         event must be a function with a single parameter.
         """
         
-        self.__config_changed.add(e)
+        self._config_changed.add(e)
     
     def remove_changed_event(self, e: Callable[[Any], None]):
         """Removes any change event"""
-        self.__config_changed.remove(e)
+        self._config_changed.remove(e)
     
-    def _on_config_changed(self, event):
+    def _on_config_changed(self, params):
         """
         Called when a configuration parameter changes. Depending on the
         implementation, this may need to be assigned to another event.
         """
-        
-        if self.__allow_change[0]:
-            for e in self.__config_changed:
-                event(e)
+                
+        if self._allow_change[0]:
+            for ev in self._config_changed:
+                ev(params)
     
     def allow_change_events(self):
         """Allows the invocation of change events."""
         # check init if this seems weird
-        self.__allow_change[0] = True
+        self._allow_change[0] = True
     
     def block_change_events(self):
         """Blocks the invocation of change events."""
-        self.__allow_change[0] = False
+        self._allow_change[0] = False
         
     @abstractmethod
     def to_json(self, indent=1) -> str:

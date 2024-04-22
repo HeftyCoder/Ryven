@@ -6,6 +6,8 @@ from traits.observation._trait_change_event import TraitChangeEvent
 from typing import Callable, Any
 from json import loads, dumps
 
+from traits.trait_type import NoDefaultSpecified
+
 from .. import CognixNode, NodeConfig
 
 #   UTIL
@@ -163,6 +165,73 @@ class DefaultInstance(Instance):
                  allow_none=True, adapt=None, module=None, **metadata):
         super().__init__(klass, factory, args, kw, allow_none, adapt, module, **metadata)
 
+_auto_enter = {
+    'enter_set': True,
+    'auto_set': False
+}
+
+#   These are all set so that not every keystroke creates a change event
+
+class CX_Int(Int):
+    
+    def __init__(self, default_value=..., **metadata):
+        metadata.update(_auto_enter)
+        super().__init__(default_value, **metadata)
+
+class CX_Dict(Dict):
+    
+    def __init__(self, default_value=..., **metadata):
+        metadata.update(_auto_enter)
+        super().__init__(default_value, **metadata)
+
+class CX_Float(Float):
+    
+    def __init__(self, default_value=..., **metadata):
+        metadata.update(_auto_enter)
+        super().__init__(default_value, **metadata)
+
+class CX_Str(Str):
+    
+    def __init__(self, default_value=..., **metadata):
+        metadata.update(_auto_enter)
+        super().__init__(default_value, **metadata)
+
+class CX_Complex(Complex):
+    
+    def __init__(self, default_value=..., **metadata):
+        metadata.update(_auto_enter)
+        super().__init__(default_value, **metadata)
+
+class CX_Unicode(Unicode):
+    
+    def __init__(self, default_value=..., **metadata):
+        metadata.update(_auto_enter)
+        super().__init__(default_value, **metadata)
+
+class CX_String(String):
+    
+    def __init__(self, default_value=..., **metadata):
+        metadata.update(_auto_enter)
+        super().__init__(default_value, **metadata)
+
+class CX_CStr(CStr):
+    
+    def __init__(self, default_value=..., **metadata):
+        metadata.update(_auto_enter)
+        super().__init__(default_value, **metadata)
+
+class CX_CUnicode(CUnicode):
+    
+    def __init__(self, default_value=..., **metadata):
+        metadata.update(_auto_enter)
+        super().__init__(default_value, **metadata)
+
+class CX_Password(Password):
+    
+    def __init__(self, default_value=..., **metadata):
+        metadata.update(_auto_enter)
+        super().__init__(default_value, **metadata)
+
         
 class NodeTraitsConfig(NodeConfig, HasTraits):
     """
@@ -206,12 +275,14 @@ class NodeTraitsConfig(NodeConfig, HasTraits):
         cls.find_trait_exprs(str)
 
     # INSTANCE
-    
+    # redefine them as non serializable traits
     _node = Instance(CognixNode, visible=False)
-    trait_changed_event: set = Set(visible=False)
+    _config_changed = Set(visible=False)
+    _allow_change = List([True], visible=False)
+    traits_view = None
     
     def __init__(self, node: CognixNode = None, *args, **kwargs):
-        NodeConfig.__init__(self, node)
+        NodeConfig.__init__(self, node)        
         HasTraits.__init__(self, *args, **kwargs)
         self.allow_notifications()
     

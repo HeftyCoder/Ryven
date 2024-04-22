@@ -3,7 +3,7 @@ from ryvencore_qt.src.flows.nodes.WidgetBaseClasses import InspectorWidget
 from cognix import NodeConfig, CognixNode
 from ryven.gui_env import NodeGUI
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, Any
 if TYPE_CHECKING:
     from ..inspector import CognixNodeGUI
 
@@ -11,7 +11,7 @@ class NodeConfigInspector(InspectorWidget[NodeConfig]):
     """Base class for inspecting a node config"""
     
     @classmethod
-    def create_config_changed_event(cls, node: CognixNode, gui: CognixNodeGUI):
+    def create_config_changed_event(cls, node: CognixNode, gui: CognixNodeGUI) -> Callable[[Any], None]:
         """
         VIRTUAL
         

@@ -18,6 +18,7 @@ from traits.observation.events import (
 )
 from qtpy.QtWidgets import QVBoxLayout, QWidget
 from ryven.gui_env import NodeGUI
+from ryvencore_qt.src.flows.FlowCommands import Delegate_Command
 
 @node_config_gui(NodeTraitsConfig)
 class NodeTraitsConfigInspector(NodeConfigInspector, QWidget):
@@ -27,21 +28,21 @@ class NodeTraitsConfigInspector(NodeConfigInspector, QWidget):
     @classmethod
     def create_config_changed_event(cls, node: CognixNode, gui: NodeGUI):
         
-        def on_trait_changed(self, event):
+        def on_trait_changed(event):
             
             gui.flow_view.setFocus()
-            def undo_redo(event, func, value, message=''):
+            def undo_redo(event, func, value):
                 def _undo__redo():
-                    node.config.allow_change_events()
-                    func(event, value)
                     node.config.block_change_events()
+                    func(event, value)
+                    node.config.allow_change_events()
                         
                 return _undo__redo
             
             def undo_redo_pair(event, func, undo_val, redo_val):
                 return (
-                    undo_redo(event, func, undo_val, f'undo {event}'),
-                    undo_redo(event, func, redo_val, f'redo {event}')
+                    undo_redo(event, func, undo_val),
+                    undo_redo(event, func, redo_val)
                 )
                 
             node_id = node.global_id
@@ -53,8 +54,8 @@ class NodeTraitsConfigInspector(NodeConfigInspector, QWidget):
                 u_pair = undo_redo_pair(
                     event, 
                     _list_change, 
-                    (event.added, event.removed, event.index),
-                    (event.removed, event.added, event.index)
+                    (event.index, event.added, event.removed),
+                    (event.index, event.removed, event.added)
                 )
             elif isinstance(event, SetChangeEvent):
                 u_pair = undo_redo_pair(
@@ -72,7 +73,14 @@ class NodeTraitsConfigInspector(NodeConfigInspector, QWidget):
                 )
                 
             undo, redo = u_pair
-            gui.flow_view.push_undo(message, undo, redo, True)
+            gui.flow_view.push_undo(
+                Delegate_Command(
+                    gui.flow_view,
+                    message,
+                    undo,
+                    redo,
+                ), True
+            )
         
         return on_trait_changed
     
@@ -90,6 +98,13 @@ class NodeTraitsConfigInspector(NodeConfigInspector, QWidget):
         
         self.setLayout(QVBoxLayout())
     
+    def inspected_label(self):
+        return (
+            getattr(self.inspected, 'label') 
+            if hasattr(self.inspected, 'label') 
+            else 'Configuration'
+        )
+        
     def set_inspected(self, inspected_obj: NodeTraitsConfig):
         
         self.delete_ui()
@@ -99,24 +114,23 @@ class NodeTraitsConfigInspector(NodeConfigInspector, QWidget):
         
         self.inspected = inspected_obj
         
-        gr_label = (
-            getattr(inspected_obj, 'label') 
-            if hasattr(inspected_obj, 'label') 
-            else 'config'
-        )
+        gr_label = self.inspected_label()
         
         insp_traits = inspected_obj.serializable_traits()
         
+        items: list[Item] = []
+        for tr in insp_traits:
+            items.append(Item(tr))
+            
         config_group = Group (
-            *insp_traits.keys(),
-            label= gr_label,
+            *items,
+            label=gr_label,
             scrollable=True,
-            show_border=True,
+            springy=True,
         )
         
         self.view = View (
-            config_group,
-            resizable=True
+            config_group
         )
     
     def load(self):
@@ -137,7 +151,41 @@ class NodeTraitsConfigInspector(NodeConfigInspector, QWidget):
         
 @node_config_gui(NodeTraitsGroupConfig)
 class NodeTraitsGroupConfigInspector(NodeTraitsConfigInspector):
-    pass
+    
+    traits_view = None
+    
+    def set_inspected(self, inspected_obj: NodeTraitsGroupConfig):
+        
+        self.delete_ui()
+        
+        if not inspected_obj:
+            return
+        
+        self.inspected = inspected_obj
+        
+        gr_label = self.inspected_label()
+        gr_layout = (
+            getattr(self.inspected, 'layout') 
+            if hasattr(self.inspected, 'layout') 
+            else 'tabbed'
+        )
+        
+        insp_traits = inspected_obj.serializable_traits()
+        
+        items: list[Item] = []
+        for tr in insp_traits:
+            items.append(Item(tr, style='custom', show_label=False))
+        
+        self.view = View(
+            Group(
+                *items,
+                label=gr_label,
+                layout=gr_layout,
+                show_border=True,
+                scrollable=True,
+                springy=True
+            )
+        )
 
 #   ------UTIL-------
 
@@ -147,6 +195,7 @@ def _trait_change(event: TraitChangeEvent, value):
 def _list_change(event: ListChangeEvent, value: tuple): # (added, removed, index)
     l: list = event.object
     index, added, removed = value
+    
     del l[index:index+len(added)]
     l[index:index] = removed
             

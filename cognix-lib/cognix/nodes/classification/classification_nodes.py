@@ -4,10 +4,22 @@ from ... import CognixNode, FrameNode, StartNode
 from Orange.data import Table
 from Orange.classification import SVMLearner, LogisticRegressionLearner
 from Orange.evaluation import CrossValidation, CA, AUC
+from cognix.config.traits import NodeTraitsConfig, NodeTraitsGroupConfig, Int, List, Instance
 
 import traceback
 
 class SVM_Node(CognixNode):
+    
+    class Config(NodeTraitsGroupConfig):
+        
+        class SubConfig(NodeTraitsConfig):
+            s = List()
+            d = Int(15)
+        
+        george = Instance(SubConfig, args=())
+        john = Instance(SubConfig, args=())
+    
+    config_type = Config
     
     title = 'SVM Classifier'
     version = '0.1'
