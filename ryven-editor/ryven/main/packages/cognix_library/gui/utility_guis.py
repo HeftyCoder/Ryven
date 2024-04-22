@@ -27,7 +27,8 @@ class Result_Node_MainWidget(NodeMainWidget, QLineEdit):
         self.setReadOnly(True)
         self.setFixedWidth(120)
         self.node: Node = self.node
-        self.update_value.connect(self.show_val) 
+        self.update_value.connect(self.show_val)
+        self.node.updated.sub(self.on_update)
 
     def on_update(self, inp):
         self.update_value.emit(self.node.val)
@@ -60,7 +61,7 @@ class ValNode_MainWidget(NodeMainWidget, QLineEdit):
 
     def editing_finished(self):
         self.value_changed.emit(self.get_val())
-
+        
     def get_val(self):
         val = None
         try:

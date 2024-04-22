@@ -4,8 +4,10 @@ from ryvencore import (
     Data, 
     Node,
     Flow,
-    Session, 
+    Session,
 )
+
+from ryvencore.Base import Event
 
 from enum import Enum
 from abc import abstractmethod
@@ -89,6 +91,7 @@ class CognixNode(Node):
     def __init__(self, flow: CognixFlow):
         super().__init__(flow)
         
+        self.updated = Event(int)
         self.flow = flow
         self._config = self.config_type(self) if self.config_type else None
     
