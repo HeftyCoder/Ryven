@@ -2,7 +2,7 @@
 This file contains the implementations of undoable actions for FlowView.
 """
 
-from typing import Tuple, List, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from qtpy.QtCore import QObject, QPointF
 from qtpy.QtWidgets import QUndoCommand
@@ -47,9 +47,10 @@ class FlowUndoCommand(QObject, QUndoCommand):
         QObject.__init__(self)
         QUndoCommand.__init__(self)
 
-    def activate(self):
+    def activate(self, silent=False):
         self._activated = True
-        self.redo()
+        if not silent:
+            self.redo()
 
     def redo(self) -> None:
         if not self._activated:
@@ -85,23 +86,6 @@ class FlowUndoCommand(QObject, QUndoCommand):
     def undo_(self):
         """subclassed"""
         pass
-
-
-# (not currently used)
-# class Nested_Command(FlowUndoCommand):
-#     """Simple undo command nesting."""
-#     def __init__(self, flow_view, *args):
-#         super().__init__(flow_view)
-#         self.commands = [arg for arg in args]
-#         self.setText('Nested Command')
-# 
-#     def undo_(self):
-#         for command in self.commands:
-#             command.undo_()
-#   
-#     def redo_(self):
-#         for command in self.commands:
-#             command.redo_()
 
 
 class Delegate_Command(FlowUndoCommand):
@@ -228,15 +212,15 @@ class RemoveComponents_Command(FlowUndoCommand):
             set()
         )  # the connections that go beyond the removed nodes and need to be restored in undo
         self.internal_connections = set()
-
-        self.node_items = []
-        self.nodes: List[Node] = []
-        self.drawings = []
         
         from .nodes.NodeItem import NodeItem
         from .connections.ConnectionItem import ConnectionItem
         from .drawings.DrawingObject import DrawingObject
     
+        self.node_items: list[NodeItem] = []
+        self.nodes: list[Node] = []
+        self.drawings: list[DrawingObject] = []
+        
         for i in self.items:
             if isinstance(i, NodeItem):
                 self.node_items.append(i)
@@ -284,6 +268,8 @@ class RemoveComponents_Command(FlowUndoCommand):
         self.restore_broken_connections()
         self.restore_internal_connections()
         
+        for n_i in self.node_items:
+            n_i.node_gui._on_restored()
         # removing the items means something was probably selected
         # restore the selection
         self.flow_view.select_items(self.selection)

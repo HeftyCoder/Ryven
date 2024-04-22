@@ -11,6 +11,10 @@ from .. import CognixNode, NodeConfig
 #   UTIL
 
 def __process_expression_str(c_trait: CTrait, trait_name: str, expr: str):
+    """
+    Processes an ongoing string expression given a trait and its name. Extends the
+    expression based on whether the trait is an Instance, a List, a Dict or a Set.
+    """
     
     if not c_trait:
         return None, f'{expr}.*' if expr else '*'
@@ -54,6 +58,10 @@ __item_methods: dict = {
 }
 
 def __process_expression_obs(c_trait: CTrait, trait_name: str, expr: ObserverExpression):
+    """
+    Processes an ongoing object expression given a trait and its name. Extends the
+    expression based on whether the trait is an Instance, a List, a Dict or a Set.
+    """
     
     if not c_trait:
         return None, expr.anytrait() if expr else anytrait()
@@ -117,6 +125,11 @@ def find_expressions (
     obs_exprs: list[ObserverExpression | str],
     exp_type: type[str | ObserverExpression] = ObserverExpression
 ):
+    """
+    Recursively searches an object to find all the possible observer
+    expressions. Starting expression should be None and starting object
+    should be a HasTraits.
+    """
     
     if not obj:
         return
@@ -164,11 +177,14 @@ class NodeTraitsConfig(NodeConfig, HasTraits):
     __s_metadata = {
         'type': not_event,
         'visible': not_false,
-        'dont_save': not_false,
     }
     
-    obj_exprs = None
+    __obs_exprs = None
     """Holds all the important observer expressions"""
+    
+    @classmethod
+    def obs_exprs(cls):
+        return cls.__obs_exprs
     
     @classmethod
     def serializable_traits(cls):
@@ -183,11 +199,11 @@ class NodeTraitsConfig(NodeConfig, HasTraits):
         traits that are not an event, are visible and do not have the 
         dont_save metadata atrribute set to True.
         """
-        cls.obj_exprs = []
-        find_expressions(cls, None, cls.obj_exprs)
+        cls.__obs_exprs = []
+        find_expressions(cls, None, cls.__obs_exprs, exp_type)
     
     def __init_subclass__(cls, **kwargs):
-        cls.find_trait_exprs()
+        cls.find_trait_exprs(str)
 
     # INSTANCE
     
@@ -195,27 +211,19 @@ class NodeTraitsConfig(NodeConfig, HasTraits):
     trait_changed_event: set = Set(visible=False)
     
     def __init__(self, node: CognixNode = None, *args, **kwargs):
-        HasTraits.__init__(self, *args, **kwargs)
         NodeConfig.__init__(self, node)
+        HasTraits.__init__(self, *args, **kwargs)
         self.allow_notifications()
     
     # Traits only
     
-    # @observe('*') the decorator doesn't allow removal of notifications
-    def __any_trait_changed(self, event):
-        """Invoked when any trait that can be saved changes"""
-        
-        # the HasTraits object
-        for e in self.trait_changed_event:
-            e(event)
-    
     def allow_notifications(self):
         """Allows the invocation of events when a trait changes"""
-        self.observe(self.__any_trait_changed, self.obj_exprs)
-    
+        self.observe(self._on_config_changed, self.__obs_exprs)
+
     def block_notifications(self):
         """Blocks the invocation of events when a trait changes"""
-        self.observe(self.__any_trait_changed, self.obj_exprs, remove=True)
+        self.observe(self._on_config_changed, self.__obs_exprs, remove=True)
    
     def load(self, data: dict | str):
         
@@ -237,18 +245,19 @@ class NodeTraitsConfig(NodeConfig, HasTraits):
     
     def to_json(self, indent=1) -> str:
         return dumps(
-            self.__serializable_traits(), 
+            self.serializable_traits(), 
             indent=indent, skipkeys=True, 
             default=self.__encode
         )
     
+    def serializable_traits(self):
+        return self.trait_get(**self.__s_metadata)
+    
     def __encode(self, obj):
         if not isinstance(obj, NodeTraitsConfig):
             return None
-        return obj.__serializable_traits()
+        return obj.serializable_traits()
     
-    def __serializable_traits(self):
-        return self.trait_get(**self.__s_metadata)
 
 class NodeTraitsGroupConfig(NodeTraitsConfig):
     """

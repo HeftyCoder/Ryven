@@ -84,15 +84,20 @@ class InspectorWidget(SerializableItem, Generic[InspectType]):
     def unload(self):
         """Called when the inspector is removed from its parent gui"""
         
-    def push_undo(self, text: str, undo_fn, redo_fn):
-        """Push an undo function to the undo stack of the flow."""
+    def push_undo(self, text: str, undo_fn, redo_fn, silent=False):
+        """
+        Push an undo function to the undo stack of the flow.
+        
+        If silent, the redo is not invoked upon pushing.
+        """
         self.flow_view.push_undo(
             Delegate_Command(
                 self.flow_view,
                 text=text,
                 on_undo=undo_fn,
                 on_redo=redo_fn,
-            )
+            ),
+            silent
         )
     
 class NodeInspectorWidget(InspectorWidget[Node]):

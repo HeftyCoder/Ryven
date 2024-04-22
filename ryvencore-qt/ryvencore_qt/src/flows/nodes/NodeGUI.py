@@ -150,7 +150,12 @@ class NodeGUI(QObject):
     def _on_progress_updated(self, progress: ProgressState):
         self.progress_updated.emit(progress)
     
+    def _on_restored(self):
+        """Called when a node is restored from being deleted"""
+        pass
+    
     def _on_deleted(self):
+        """Called when a node is deleted"""
         if self.inspector_widget:
             self.inspector_widget.on_node_deleted()
             
@@ -251,14 +256,14 @@ class NodeGUI(QObject):
     
     def show_viewer(self):
         self.viewer_widget.setWindowTitle(self.title())
-        self.viewer_widget.setParent(self.flow_view())
+        self.viewer_widget.setParent(self.flow_view)
         self.viewer_widget.setWindowFlags(
             self.viewer_widget.windowFlags() |
             Qt.WindowType.WindowMinimizeButtonHint |
             Qt.WindowType.Dialog
         )
         self.viewer_widget.move(
-            self.flow_view().mapToGlobal(
+            self.flow_view.mapToGlobal(
                 self.item.pos()
             ).toPoint()
         )

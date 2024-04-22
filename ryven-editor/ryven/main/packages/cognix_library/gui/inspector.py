@@ -44,4 +44,39 @@ class CognixNodeGUI(NodeGUI):
     """The base CogniX Node GUI parameters"""
     inspector_widget_class = CognixNodeInspectorWidget
     wrap_inspector_in_default = True
+    
+    def initialized(self):
+        
+        self.config_changed_func = self.apply_config_changed_event()
 
+    def _on_deleted(self):
+        if self.config_changed_func:
+            self.node.config.remove_changed_event(self.config_changed_func)
+            self.config_changed_func = None
+        super()._on_deleted()
+    
+    def _on_restored(self):
+        self.config_changed_func = self.apply_config_changed_event()
+        
+    def apply_config_changed_event(self):
+        """Creates the config changed GUI event based on config GUI class"""
+        
+        cognix_n: CognixNode = self.node
+        config = cognix_n.config
+        if not config:
+            return None
+        
+        config_gui_cls = get_config_inspector_cls(type(config))
+        if not config_gui_cls:
+            return None
+        
+        e = config_gui_cls.create_config_changed_event(cognix_n, self)
+        print(self, e)
+        if e:
+            cognix_n.config.add_changed_event(e)
+        
+        return e
+    
+        
+        
+        

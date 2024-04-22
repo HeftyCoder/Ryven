@@ -470,9 +470,10 @@ class FlowView(GUIBase, QGraphicsView):
             self._undo_stack.command(i).setObsolete(True)
         self._undo_stack.setIndex(self._saved_undo_index)
             
-    def push_undo(self, cmd: FlowUndoCommand):
+    def push_undo(self, cmd: FlowUndoCommand, silent = False):
+        """Pushes an undo function and invokes its redo, if not silent"""
         self._undo_stack.push(cmd)
-        cmd.activate()
+        cmd.activate(silent)
 
     def _undo_activated(self):
         """Triggered by ctrl+z"""

@@ -11,7 +11,7 @@ class LSLInput(FrameNode):
         
         f = File('Some path')
         stream_name = Str('stream_name', auto_set=False, enter_set=True)
-        #some_list = List(Int())    
+        some_list = List(Int())    
     
     config_type = Config
     title = 'LSL Input'

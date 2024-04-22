@@ -9,7 +9,7 @@ from ryvencore import (
 
 from enum import Enum
 from abc import abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, Any
 
 if TYPE_CHECKING:
     from .graph_player import GraphPlayer
@@ -26,14 +26,51 @@ class NodeConfig:
     
     def __init__(self, node: CognixNode = None):
         self._node = node
+        self.__config_changed: set = set()
+        # we're using a list to avoid any implications with
+        # frameworks such as traits that might behave differently
+        # when setting an instance's member
+        self.__allow_change = [True]
     
+    @property
     def node(self) -> CognixNode:
         """A property returning the node of this configuration"""
         return self._node
     
+    def add_changed_event(self, e: Callable[[Any], None]):
+        """
+        Adds an event to be called when a parameter of the config changes. The
+        event must be a function with a single parameter.
+        """
+        
+        self.__config_changed.add(e)
+    
+    def remove_changed_event(self, e: Callable[[Any], None]):
+        """Removes any change event"""
+        self.__config_changed.remove(e)
+    
+    def _on_config_changed(self, event):
+        """
+        Called when a configuration parameter changes. Depending on the
+        implementation, this may need to be assigned to another event.
+        """
+        
+        if self.__allow_change[0]:
+            for e in self.__config_changed:
+                event(e)
+    
+    def allow_change_events(self):
+        """Allows the invocation of change events."""
+        # check init if this seems weird
+        self.__allow_change[0] = True
+    
+    def block_change_events(self):
+        """Blocks the invocation of change events."""
+        self.__allow_change[0] = False
+        
     @abstractmethod
     def to_json(self, indent=1) -> str:
-        """Returns JSON representation of the object"""
+        """Returns JSON representation of the object as a string"""
         pass
     
     @abstractmethod
