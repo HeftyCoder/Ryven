@@ -12,6 +12,7 @@ from ryvencore.Base import Event
 from enum import Enum
 from abc import abstractmethod
 from typing import TYPE_CHECKING, Callable, Any
+from inspect import isclass
 
 if TYPE_CHECKING:
     from .graph_player import GraphPlayer
@@ -87,13 +88,19 @@ class CognixNode(Node):
     
     config_type: type[NodeConfig] | None = None
     """A JSON serializable configuration"""
-    
+    _config_as_cls_type: type[NodeConfig] | None = None
+    def __init_subclass__(cls):
+        attr = getattr(cls, 'Config', None)
+        if (attr and isclass(attr)):
+            cls._config_as_cls_type = attr
+        
     def __init__(self, flow: CognixFlow):
         super().__init__(flow)
         
         self.updated = Event(int)
         self.flow = flow
-        self._config = self.config_type(self) if self.config_type else None
+        config_type = self.config_type if self.config_type else self._config_as_cls_type
+        self._config = config_type(self) if config_type else None
     
     @property
     def config(self) -> NodeConfig | None:

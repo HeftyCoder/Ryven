@@ -13,7 +13,6 @@ class LSLInput(FrameNode):
         stream_name = CX_Str('stream_name')
         some_list = List(CX_Int(54))    
     
-    config_type = Config
     title = 'LSL Input'
     version = '0.0.1'
     init_outputs = [NodeOutputType(label='data')]
