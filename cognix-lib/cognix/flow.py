@@ -16,6 +16,20 @@ class CognixFlow(Flow):
     
     _node_base_type = CognixNode
     
-    def __init__(self, session: CognixSession, title: str, player: GraphPlayer = None):
+    def __init__(self, session: CognixSession, title: str):
         super().__init__(session, title)
         self.session = session
+        self._player = None
+    
+    @property
+    def player(self):
+        return self._player
+    
+    @player.setter
+    def player(self, value: GraphPlayer):
+        
+        if self._player:
+            self._player.stop()
+        
+        self._player = value
+        self._player._flow = self

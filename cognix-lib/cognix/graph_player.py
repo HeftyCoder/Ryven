@@ -144,10 +144,10 @@ class GraphPlayer(ABC):
     In ryvencore's context, the executor should always be naive.
     """
     
-    def __init__(self, flow: CognixFlow, frames: int = 30):
+    def __init__(self, frames: int = 30):
         super().__init__()
         # constructing
-        self._flow = flow
+        self._flow = None
         self._state = GraphState.STOPPED
         
         # internal
@@ -158,6 +158,12 @@ class GraphPlayer(ABC):
     def flow(self):
         """The flow for this player."""
         return self._flow
+    
+    @flow.setter
+    def flow(self, value: CognixFlow):
+        if self._flow:
+            self.stop()
+        self._flow = value
     
     @property
     def graph_time(self):
@@ -209,8 +215,8 @@ class GraphPlayer(ABC):
 class CognixPlayer(GraphPlayer):
     """The default implementation of a Graph Player in CogniX"""
     
-    def __init__(self, flow: CognixFlow, frames: int = 35):
-        super().__init__(flow, frames)
+    def __init__(self, frames: int = 35):
+        super().__init__(frames)
         self._start_nodes: list[StartNode] = []
         self._frame_nodes: list[FrameNode] = []
         self._nodes: list[CognixNode] = []
