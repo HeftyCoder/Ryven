@@ -110,7 +110,3 @@ class SomeInput(CognixNode):
         my_config: MyConfig = config.one_config
         
         self.progress = None
-        
-    
-all_input_nodes = [LSLInput, SomeInput]
-input_nodes_pkg = 'input'

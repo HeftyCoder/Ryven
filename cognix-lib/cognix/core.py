@@ -10,7 +10,7 @@ from ryvencore import (
 from ryvencore.Base import Event
 
 from enum import Enum
-from abc import abstractmethod
+from abc import abstractmethod, ABCMeta
 from typing import TYPE_CHECKING, Callable, Any
 from inspect import isclass
 
@@ -83,9 +83,10 @@ class NodeConfig:
     
 # ----NODES----
 
-class CognixNode(Node):
+class CognixNode(Node, metaclass=ABCMeta):
     """The basic building block of CogniX"""
     
+    """Indicates whether this node should be exported to a package"""
     config_type: type[NodeConfig] | None = None
     """A JSON serializable configuration"""
     _config_as_cls_type: type[NodeConfig] | None = None
@@ -119,7 +120,11 @@ class CognixNode(Node):
         if self._config and config_data:
             self._config.load(config_data)
         
-    # VIRTUAL GOGNIX METHODS   
+    # VIRTUAL GOGNIX METHODS
+    @abstractmethod
+    def update_event(self, inp=-1):
+        pass
+    
     def reset(self):
         """
         VIRTUAL
@@ -162,6 +167,10 @@ class FrameNode(CognixNode):
     def is_finished(self):
         return self._is_finished
     
+    def update_event(self, inp=-1):
+        pass
+    
+    # Frame Updates
     def frame_update(self):
         """Wraps the frame_update_event with internal calls."""
         if self.frame_update_event():

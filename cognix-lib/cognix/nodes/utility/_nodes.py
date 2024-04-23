@@ -2,6 +2,9 @@ from ... import CognixNode
 from ryvencore import NodeInputType, NodeOutputType, Data
 
 class UtilNode(CognixNode):
+    
+    export = False
+    
     def have_gui(self):
         return hasattr(self, 'gui')
 
@@ -220,13 +223,3 @@ class SetVarsPassive_Node(UtilNode):
 
     def set_state(self, data, version):
         self.num_vars = data['num vars']
-        
-all_util_nodes = [
-    SetVar_Node,
-    GetVar_Node,
-    Val_Node,
-    Result_Node,
-    SetVarsPassive_Node,
-]
-
-util_pkg_name = 'utility'
