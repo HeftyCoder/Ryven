@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 # ----CONFIGURATION----
 
 # TODO Provide a standard for defining and setting metadata for configs.
-# Each config or property of the config should have some way of accesssing metadat
+# Each config or property of the config should have some way of accesssing metadata
 # through a unified API (most likely an abstract method on NodeConfig)
 
 class NodeConfig:

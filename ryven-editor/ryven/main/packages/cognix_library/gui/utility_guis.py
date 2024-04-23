@@ -14,7 +14,7 @@ from qtpy.QtWidgets import (
 )
 
 from ryvencore_qt import NodeMainWidget
-from cognix.nodes.utility.util_nodes import *
+from cognix.nodes.utility import *
 
 class Result_Node_MainWidget(NodeMainWidget, QLineEdit):
     

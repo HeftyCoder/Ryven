@@ -80,5 +80,3 @@ class CrossValidationNode(CognixNode):
         self.set_output_val(0, Data(cv_results))
         self.set_output_val(1, Data(accuracy))
         self.set_output_val(2, Data(auc))
-
-all_classification_nodes = [SVM_Node, LogisticRegressionNode, CrossValidationNode]
