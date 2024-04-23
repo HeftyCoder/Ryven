@@ -1320,7 +1320,7 @@ class FlowView(GUIBase, QGraphicsView):
                     self.connect_node_ports__cmd(p, inp)
                     return
         elif p.io_pos == PortObjPos.INPUT:
-            for out in n.outputs:
+            for out in n._outputs:
                 if p.type_ == out.type_:
                     # connect exactly once
                     self.connect_node_ports__cmd(p, out)
