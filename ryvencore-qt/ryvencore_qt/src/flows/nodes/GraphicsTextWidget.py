@@ -10,13 +10,13 @@ from qtpy.QtWidgets import (
 )
 
 from qtpy.QtGui import QColor
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
 class TextStyle:
-    color: QColor = QColor('#FFFFFF')
-    font: QFont = QFont()
+    color: QColor = field(default_factory=lambda: QColor('#FFFFFF'))
+    font: QFont = field(default_factory=QFont)
 
 
 class GraphicsTextWidget(QGraphicsWidget):

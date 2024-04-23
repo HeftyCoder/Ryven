@@ -12,18 +12,22 @@ from .nodes.GraphicsTextWidget import GraphicsTextWidget, TextStyle
 from ..utils import pythagoras
 
 from typing import Dict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-      
+def _get_color(color: str, alpha=255):
+    def __get_color():
+        result = QColor(color)
+        result.setAlpha(alpha)
+        return result
+    return __get_color
+    
 @dataclass
 class PinStyle:
     pen_width: int = 2
     
-    valid_color: QColor = QColor('#0dff05')
-    valid_color.setAlpha(125)
-    invalid_color: QColor = QColor('#ff2605')
-    invalid_color.setAlpha(125)
-    connected_color: QColor = QColor('#c69a15')
+    valid_color: QColor = field(default_factory=_get_color('#0dff05', 125))
+    invalid_color: QColor = field(default_factory=_get_color('#ff2605', 125))
+    connected_color: QColor = field(default_factory=lambda: QColor('#c69a15'))
     disconnected_color: QColor = None
     
     margin_cut: int = 0
@@ -51,7 +55,7 @@ class DataPinStyle(PinStyle):
 @dataclass
 class ExecPinStyle(PinStyle):
     """Default values for Exec"""
-    connected_color: QColor = QColor("#FFFFFF")
+    connected_color: QColor = field(default_factory=lambda: QColor("#FFFFFF"))
     pen_width: int = 0
     margin_cut: int = 0
     
