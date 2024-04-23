@@ -1,5 +1,5 @@
 from ryvencore import NodeOutputType, NodeInputType, Data
-from ... import CognixNode, FrameNode, StartNode
+from cognix.api import CognixNode
 
 # from Orange.data import Table
 # from Orange.classification import SVMLearner, LogisticRegressionLearner

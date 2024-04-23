@@ -1,95 +1,27 @@
+"""Defines the abstract classes for nodes in CogniX"""
 from __future__ import annotations
-
-from ryvencore import (
-    Data, 
-    Node,
-    Flow,
-    Session,
-)
-
+from ryvencore import Node
 from ryvencore.Base import Event
-
-from enum import Enum
-from abc import abstractmethod, ABCMeta
-from typing import TYPE_CHECKING, Callable, Any
+from abc import ABCMeta, abstractmethod
 from inspect import isclass
 
+from ..config.abc import NodeConfig
+from ..utils import get_mod_classes
+
+from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from .graph_player import GraphPlayer
-
-
-# ----CONFIGURATION----
-
-# TODO Provide a standard for defining and setting metadata for configs.
-# Each config or property of the config should have some way of accesssing metadata
-# through a unified API (most likely an abstract method on NodeConfig)
-
-class NodeConfig:
-    """An interface representing a node's configuration"""
+    from ..flow import CognixFlow
     
-    def __init__(self, node: CognixNode = None):
-        self._node = node
-        self._config_changed: set = set()
-        # we're using a list to avoid any implications with
-        # frameworks such as traits that might behave differently
-        # when setting an instance's member
-        self._allow_change = [True]
-    
-    @property
-    def node(self) -> CognixNode:
-        """A property returning the node of this configuration"""
-        return self._node
-    
-    def add_changed_event(self, e: Callable[[Any], None]):
-        """
-        Adds an event to be called when a parameter of the config changes. The
-        event must be a function with a single parameter.
-        """
-        
-        self._config_changed.add(e)
-    
-    def remove_changed_event(self, e: Callable[[Any], None]):
-        """Removes any change event"""
-        self._config_changed.remove(e)
-    
-    def _on_config_changed(self, params):
-        """
-        Called when a configuration parameter changes. Depending on the
-        implementation, this may need to be assigned to another event.
-        """
-                
-        if self._allow_change[0]:
-            for ev in self._config_changed:
-                ev(params)
-    
-    def allow_change_events(self):
-        """Allows the invocation of change events."""
-        # check init if this seems weird
-        self._allow_change[0] = True
-    
-    def block_change_events(self):
-        """Blocks the invocation of change events."""
-        self._allow_change[0] = False
-        
-    @abstractmethod
-    def to_json(self, indent=1) -> str:
-        """Returns JSON representation of the object as a string"""
-        pass
-    
-    @abstractmethod
-    def load(self, data: dict | str):
-        """Loads the configuration from a JSON-compliant dict or a JSON str"""
-        pass
-    
-# ----NODES----
-
 class CognixNode(Node, metaclass=ABCMeta):
     """The basic building block of CogniX"""
     
-    """Indicates whether this node should be exported to a package"""
     config_type: type[NodeConfig] | None = None
-    """A JSON serializable configuration"""
+    """A configuration type that will be instantiated with the node, if given"""
     _config_as_cls_type: type[NodeConfig] | None = None
+    """
+    A nested class named Config can be defined to avoid setting the config_type.
+    It will be used if the config_type is not defined.
+    """
     def __init_subclass__(cls):
         attr = getattr(cls, 'Config', None)
         if (attr and isclass(attr)):
@@ -200,30 +132,12 @@ class FrameNode(CognixNode):
     def reset(self):
         self._is_finished = False
         return super().reset()
-    
 
-# ----FLOW----
-
-class CognixFlow(Flow):
-    """
-    An extension to a ryvencore Flow for CogniX.
+def get_cognix_node_classes(modname: str, to_fill: list | None = None, base_type: type = None):
+    """Returns a list of node types defined in the current mode"""
     
-    Specifically, it adds a CognixFlowPlayer for interpreting the graph.
-    """
-    
-    _node_base_type = CognixNode
-    
-    def __init__(self, session: CognixSession, title: str):
-        super().__init__(session, title)
-        self.session = session
-
-
-# ----SESSION----
-
-class CognixSession(Session):
-    """
-    An extension to a ryvencore Session for CogniX.
-    """
-    
-    _flow_base_type = CognixFlow
+    def filter_nodes(obj):
+        return issubclass(obj, CognixNode) and not obj.__abstractmethods__
+        
+    return get_mod_classes(modname, to_fill, filter_nodes)
 

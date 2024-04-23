@@ -6,7 +6,7 @@ from ryven.gui_env import (
     get_config_inspector_cls,
 )
 
-from cognix import CognixNode
+from cognix.api import CognixNode
 
 class CognixNodeInspectorWidget(NodeInspectorWidget, QWidget):
     """The basic CogniX Node Inspector. Handles GUI config as well"""

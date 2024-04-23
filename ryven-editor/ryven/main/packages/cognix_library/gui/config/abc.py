@@ -1,6 +1,6 @@
 from __future__ import annotations
 from ryvencore_qt.src.flows.nodes.WidgetBaseClasses import InspectorWidget
-from cognix import NodeConfig, CognixNode
+from cognix.api import NodeConfig, CognixNode
 from ryven.gui_env import NodeGUI
 
 from typing import TYPE_CHECKING, Callable, Any

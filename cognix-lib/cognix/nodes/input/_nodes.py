@@ -1,12 +1,13 @@
-from ... import CognixNode, FrameNode
 from pylsl import resolve_stream, resolve_bypred, StreamInlet, StreamInfo
 from threading import Thread
 from ryvencore import NodeOutputType, Data
-from ...config.traits import *
 from ryvencore import NodeInputType, NodeOutputType
 from ryvencore.data.built_in import *
 from ryvencore.data.built_in.collections.abc import MutableSetData
 from ryvencore import ProgressState
+
+from cognix.api import CognixNode, FrameNode
+from cognix.config.traits import *
 
 class LSLInput(FrameNode):
     """Test class for receiving an lsl stream"""

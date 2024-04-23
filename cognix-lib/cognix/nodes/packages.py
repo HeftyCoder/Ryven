@@ -1,6 +1,5 @@
 """Contains utilities and structures for loading all the nodes as a package hierarchy"""
-
-from ..core import CognixNode
+from .abc import CognixNode
 
 cognix_package: dict[str, list[CognixNode]]
 """

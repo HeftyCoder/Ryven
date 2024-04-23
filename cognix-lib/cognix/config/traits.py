@@ -8,7 +8,8 @@ from json import loads, dumps
 
 from traits.trait_type import NoDefaultSpecified
 
-from .. import CognixNode, NodeConfig
+from ..nodes.abc import CognixNode
+from .abc import NodeConfig
 
 #   UTIL
 

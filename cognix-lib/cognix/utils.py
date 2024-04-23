@@ -3,7 +3,6 @@
 import inspect
 import sys
 
-from .core import CognixNode
 from typing import Callable, Any
 
 def get_mod_classes(modname: str, to_fill: list | None = None, filter: Callable[[Any], bool] = None):
@@ -24,11 +23,3 @@ def get_mod_classes(modname: str, to_fill: list | None = None, filter: Callable[
         classes.append(obj)
 
     return classes
-
-def get_cognix_node_classes(modname: str, to_fill: list | None = None, base_type: type = None):
-    """Returns a list of node types defined in the current mode"""
-    
-    def filter_nodes(obj):
-        return issubclass(obj, CognixNode) and not obj.__abstractmethods__
-        
-    return get_mod_classes(modname, to_fill, filter_nodes)

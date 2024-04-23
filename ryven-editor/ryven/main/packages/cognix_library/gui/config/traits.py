@@ -3,7 +3,7 @@ Implementations for a node config based on the
 built-in traits and traitsui implementation
 """
 from __future__ import annotations
-from cognix import NodeConfig, CognixNode
+from cognix.api import NodeConfig, CognixNode
 from cognix.config.traits import NodeTraitsConfig, NodeTraitsGroupConfig
 
 from .abc import NodeConfigInspector
