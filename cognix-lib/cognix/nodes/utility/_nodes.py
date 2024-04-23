@@ -3,8 +3,6 @@ from ryvencore import NodeInputType, NodeOutputType, Data
 
 class UtilNode(CognixNode):
     
-    export = False
-    
     def have_gui(self):
         return hasattr(self, 'gui')
 

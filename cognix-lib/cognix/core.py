@@ -135,12 +135,28 @@ class CognixNode(Node, metaclass=ABCMeta):
         pass
     
     def on_start(self):
+        """
+        VIRTUAL
+        
+        Happens at the start of the graph player
+        """
         pass
     
     def on_stop(self):
+        """
+        VIRTUAL
+        
+        Happens at the stop of the graph player
+        """
         pass
     
+    
     def on_application_end(self):
+        """
+        Runs when the application exits
+        
+        Maybe not useful right now
+        """
         pass
 
 
