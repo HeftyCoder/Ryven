@@ -3,6 +3,10 @@ from pylsl import resolve_stream, resolve_bypred, StreamInlet, StreamInfo
 from threading import Thread
 from ryvencore import NodeOutputType, Data
 from ...config.traits import *
+from ryvencore import NodeInputType, NodeOutputType
+from ryvencore.data.built_in import *
+from ryvencore.data.built_in.collections.abc import MutableSetData
+from ryvencore import ProgressState
 
 class LSLInput(FrameNode):
     """Test class for receiving an lsl stream"""
@@ -65,6 +69,48 @@ class LSLInput(FrameNode):
             return
         self.set_output_val(0, Data(data))
     
+class MyConfig(NodeTraitsConfig):
+    
+    s = CX_Int()
+    parameter: int = CX_Int(245)
+    li: list[int] = List(CX_Int(0))
 
-all_input_nodes = [LSLInput,]
+class AnotherConfig(NodeTraitsConfig):
+    
+    myname: float = CX_Float()
+    some_file:str = File()
+    
+class SomeInput(CognixNode):
+    
+    title = 'George'
+    
+    init_inputs = [
+        NodeInputType(label='george', allowed_data=RealData),
+        NodeInputType(label='we', allowed_data=MutableSetData)
+    ]
+    
+    init_outputs = [
+        NodeOutputType("mm", allowed_data=IntegerData),
+        NodeOutputType("zz", allowed_data=ListData)
+    ]
+    
+    class Config(NodeTraitsGroupConfig):
+        
+        one_config: MyConfig = CX_Instance(MyConfig)
+        second_config: AnotherConfig = CX_Instance(AnotherConfig)
+    
+    def update(self, inp=-1):
+        
+        self.progress = ProgressState(1, 0.2, "Started loading")
+        
+        self.set_progress_value(0.3, "wersd")
+        
+        val = self.input_payload(inp)
+        config: SomeInput.Config = self.config
+        my_config: MyConfig = config.one_config
+        
+        self.progress = None
+        
+    
+all_input_nodes = [LSLInput, SomeInput]
 input_nodes_pkg = 'input'

@@ -158,8 +158,8 @@ def find_expressions (
         find_expressions(new_obj, new_expr, obs_exprs, exp_type)
         
         
-class DefaultInstance(Instance):
-    """Trait instance that is created by default"""
+class CX_Instance(Instance):
+    """Trait instance whose class parameter is instantiated by default"""
     
     def __init__(self, klass=None, factory=None, args=(), kw=None, 
                  allow_none=True, adapt=None, module=None, **metadata):
@@ -172,65 +172,45 @@ _auto_enter = {
 
 #   These are all set so that not every keystroke creates a change event
 
-class CX_Int(Int):
+class __CX_Interface:
+    """
+    This is a class helper to define Cognix trait parameters
     
-    def __init__(self, default_value=..., **metadata):
+    It is the first class in the inheritance chain.
+    The trait class is the second class.
+    """
+    
+    def __init__(self, default_value=NoDefaultSpecified, **metadata):
         metadata.update(_auto_enter)
-        super().__init__(default_value, **metadata)
+        # second class is the Trait class
+        self.__class__.__bases__[1].__init__(self, default_value, **metadata)
+        
+class CX_Int(__CX_Interface, Int):
+    pass
 
-class CX_Dict(Dict):
-    
-    def __init__(self, default_value=..., **metadata):
-        metadata.update(_auto_enter)
-        super().__init__(default_value, **metadata)
+class CX_Float(__CX_Interface, Float):
+    pass
 
-class CX_Float(Float):
-    
-    def __init__(self, default_value=..., **metadata):
-        metadata.update(_auto_enter)
-        super().__init__(default_value, **metadata)
+class CX_Str(__CX_Interface, Str):
+    pass
 
-class CX_Str(Str):
-    
-    def __init__(self, default_value=..., **metadata):
-        metadata.update(_auto_enter)
-        super().__init__(default_value, **metadata)
+class CX_Complex(__CX_Interface, Complex):
+    pass
 
-class CX_Complex(Complex):
-    
-    def __init__(self, default_value=..., **metadata):
-        metadata.update(_auto_enter)
-        super().__init__(default_value, **metadata)
+class CX_Unicode(__CX_Interface, Unicode):
+    pass
 
-class CX_Unicode(Unicode):
-    
-    def __init__(self, default_value=..., **metadata):
-        metadata.update(_auto_enter)
-        super().__init__(default_value, **metadata)
+class CX_String(__CX_Interface, String):
+    pass
 
-class CX_String(String):
-    
-    def __init__(self, default_value=..., **metadata):
-        metadata.update(_auto_enter)
-        super().__init__(default_value, **metadata)
+class CX_CStr(__CX_Interface, CStr):
+    pass
 
-class CX_CStr(CStr):
-    
-    def __init__(self, default_value=..., **metadata):
-        metadata.update(_auto_enter)
-        super().__init__(default_value, **metadata)
+class CX_CUnicode(__CX_Interface, CUnicode):
+    pass
 
-class CX_CUnicode(CUnicode):
-    
-    def __init__(self, default_value=..., **metadata):
-        metadata.update(_auto_enter)
-        super().__init__(default_value, **metadata)
-
-class CX_Password(Password):
-    
-    def __init__(self, default_value=..., **metadata):
-        metadata.update(_auto_enter)
-        super().__init__(default_value, **metadata)
+class CX_Password(__CX_Interface, Password):
+    pass
 
         
 class NodeTraitsConfig(NodeConfig, HasTraits):
