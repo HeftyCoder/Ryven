@@ -145,7 +145,7 @@ class FlowUI(QMainWindow):
         """
         self.flow_view.design.performance_mode_changed.disconnect(self.set_performance_mode)
         self.flow_view._undo_stack.clear()
-        self.flow_view._graph_player.stop()
+        self.flow_view.session_gui.core_session.stop_flow(self.flow_view.flow.title)
 
     def set_performance_mode(self, mode: str):
         if mode == 'fast':

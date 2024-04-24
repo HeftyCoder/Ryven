@@ -412,6 +412,20 @@ class StartupDialog(QDialog):
         defer_code_cb.toggled.connect(self.on_defer_toggled)
         fbox.addRow(defer_code_label, defer_code_cb)
         
+        # Rest API
+        
+        rest_api_label = QLabel('RESTful API:')
+        rest_api_cb = QCheckBox('Enabled')
+        rest_api_cb.setToolTip(
+            f'''Choose whether you want to start a RESTful service to connect
+            to the CogniX Session
+            '''
+        )
+        rest_api_cb.toggled.connect(self.on_rest_api_toggled)
+        rest_api_cb.setChecked(self.conf.rest_api)
+        fbox.addRow(rest_api_label, rest_api_cb)
+        
+        
         layout.addLayout(fbox)
 
         # Buttons
@@ -608,6 +622,9 @@ class StartupDialog(QDialog):
         """Call-back method, whenever the defer source code loading checkbox was toggled"""
         self.conf.defer_code_loading = check
     #
+    
+    def on_rest_api_toggled(self, check):
+        self.conf.rest_api = check
     # Helper/Working methods
     #
 

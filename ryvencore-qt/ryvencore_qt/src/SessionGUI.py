@@ -7,8 +7,7 @@ from .flows.FlowView import FlowView
 from .Design import Design
 from .GUIBase import GUIBase
 from .code_editor.codes_storage import SourceCodeStorage
-
-from cognix.graph_player import CognixPlayer
+from cognix.api import CognixSession
 
 class SessionGUI(GUIBase, QObject):
     """
@@ -30,7 +29,7 @@ class SessionGUI(GUIBase, QObject):
         GUIBase.__init__(self)
         QObject.__init__(self)
 
-        self.core_session = ryvencore.Session(gui=True, load_addons=True)
+        self.core_session = CognixSession(gui=True, load_addons=True)
         setattr(self.core_session, 'gui', self)
 
         self.gui_parent = gui_parent
@@ -64,7 +63,7 @@ class SessionGUI(GUIBase, QObject):
 
         self.flow_views[flow] = FlowView(
             session_gui=self,
-            graph_player=CognixPlayer(flow),
+            flow=flow,
             parent=self.gui_parent,
         )
         self.flow_view_created.emit(flow, self.flow_views[flow])

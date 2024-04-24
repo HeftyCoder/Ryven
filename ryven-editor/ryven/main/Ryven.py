@@ -184,6 +184,12 @@ def run(*args_,
         wnd_light_type=wnd_light_type
     )
     editor.show()
+    if conf.rest_api:
+        session = editor.session_gui.core_session
+        session.rest_api.run(
+            port=conf.rest_api_port, 
+            on_other_thread=True, 
+        )
 
     # Start application
     if qt_app is None:

@@ -40,6 +40,8 @@ class Config:
     qt_api: str = 'pyside6'
     src_code_edits_enabled: bool = False
     defer_code_loading: bool = True
+    rest_api: bool = False
+    rest_api_port: int = 7555
 
     @staticmethod
     def get_available_window_themes() -> List[WindowThemeType]:

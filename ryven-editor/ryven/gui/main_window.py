@@ -63,8 +63,8 @@ class MainWindow(QMainWindow):
         self.session_gui, self.core_session = None, None
         self.theme = config.window_theme
         self.node_packages = {}  # {Node: str}
-        self.flow_UIs: dict[Flow, FlowUI] = {}  # Should be dict[Flow, FlowUI] in 3.9+
-        self.flow_ui_template: dict[str, QByteArray | dict] = None # Should be dict[str, QByteArray | dict] in 3.9+
+        self.flow_UIs: dict[Flow, FlowUI] = {}
+        self.flow_ui_template: dict[str, QByteArray | dict] = None
         self._project_content = None
         self.wnd_light_type = wnd_light_type
         
@@ -497,12 +497,12 @@ CONTROLS
         self.focus_on_flow(flow)
 
     def flow_renamed(self, flow: Flow):
-        self.ui.flows_tab_widget.setTabText(
-            self.session_gui.core_session.flows.index(flow), flow.title
-        )
+        i = self.ui.flows_tab_widget.indexOf(self.flow_UIs[flow])
+        self.ui.flows_tab_widget.setTabText(i, flow.title)
 
     def flow_deleted(self, flow: Flow):
-        self.ui.flows_tab_widget.removeTab(self.ui.flows_tab_widget.indexOf(self.flow_UIs[flow]))
+        i = self.ui.flows_tab_widget.indexOf(self.flow_UIs[flow])
+        self.ui.flows_tab_widget.removeTab(i)
         self.flow_UIs[flow].unload()
         del self.flow_UIs[flow]
 

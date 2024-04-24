@@ -3,9 +3,9 @@ from ryvencore.Flow import Flow
 
 from .flow import CognixFlow
 from .graph_player import CognixPlayer, GraphPlayer, GraphState, GraphActionResponse
-from enum import IntEnum, auto
 from concurrent.futures import ThreadPoolExecutor, Future
 from typing import Callable
+from .networking.rest_api import CognixRestAPI
 
         
 class CognixSession(Session):
@@ -20,6 +20,11 @@ class CognixSession(Session):
         self._graphs_playing: set[GraphPlayer] = set()
         self._flow_executor = ThreadPoolExecutor(thread_name_prefix="flow_execution_")
         self._flow_to_future: dict[str, Future] = {}
+        self._rest_api = CognixRestAPI(self)
+    
+    @property
+    def rest_api(self):
+        return self._rest_api
     
     def graph_player(self, title: str):
         """A proxy to the graph players dictionary contained in the session"""
@@ -34,8 +39,9 @@ class CognixSession(Session):
         """
         
         flow: CognixFlow = self._flow_base_type(session=self, title=title)
-        player = player_type(flow, frames) if player_type else CognixPlayer(flow, frames)
+        player = player_type(flow, frames) if player_type else CognixPlayer(frames)
         flow.player = player
+        player.flow = flow
         
         if data:
             flow.load(data)

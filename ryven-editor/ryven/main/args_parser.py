@@ -218,6 +218,14 @@ def parse_sys_args(just_defaults=False) -> Config:
             • Deferred code loading decreases package loading time.\\
             ''')
 
+    parser.add_argument(
+        '--rest-api',
+        action='store_true',
+        dest='rest_api',
+        help=f'''
+            When using rest api, a RESTful service will start that allows\\
+            for remote interaction with the Editor.
+            ''')
     # Project configuration
 
     group = parser.add_argument_group('project configuration')

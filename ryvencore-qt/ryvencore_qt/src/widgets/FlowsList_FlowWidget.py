@@ -109,7 +109,7 @@ class FlowsList_FlowWidget(QWidget):
 
         self.ignore_title_line_edit_signal = True
 
-        if self.session_gui.core_session.flow_title_valid(title):
+        if self.session_gui.core_session.new_flow_title_valid(title):
             self.session_gui.core_session.rename_flow(flow=self.flow, title=title)
         else:
             self.title_line_edit.setText(self.previous_flow_title)

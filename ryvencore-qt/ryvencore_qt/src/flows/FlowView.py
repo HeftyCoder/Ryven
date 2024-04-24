@@ -1,6 +1,5 @@
+from __future__ import annotations
 import json
-
-from typing import Tuple, Union
 
 from qtpy.QtCore import (
     Qt,
@@ -10,10 +9,7 @@ from qtpy.QtCore import (
     QSizeF,
     Signal,
     QTimer,
-    QTimeLine,
     QEvent,
-    QRunnable,
-    QThreadPool,
 )
 from qtpy.QtGui import (
     QPainter,
@@ -46,14 +42,14 @@ try:
 except ImportError:
     from qtpy.QtWidgets import QUndoStack
 
-from ryvencore.Flow import Flow
-from ryvencore.Node import Node
-from ryvencore.NodePort import NodePort, NodeInput, NodeOutput
 
+from ryvencore.NodePort import NodePort, NodeInput, NodeOutput
 # from ryvencore.Connection import Connection, DataConnection
 from ryvencore.InfoMsgs import InfoMsgs
 from ryvencore.RC import PortObjPos, ConnValidType
 from ryvencore.Node import node_from_identifier
+
+from cognix.api import CognixNode, CognixFlow
 
 from ..GUIBase import GUIBase
 from ..utils import *
@@ -92,21 +88,10 @@ from ..Design import Design
 from enum import Enum
 
 from cognix.graph_player import GraphPlayer, GraphState
-from threading import Thread
 
-from itertools import chain
-
-class GraphRunnable(QRunnable):
-    """
-    A class for running a graph in a separate thread via Qt's thread mechanism.
-    """
-    
-    def __init__(self, graph_player: GraphPlayer):
-        super().__init__()
-        self.graph_player = graph_player
-    
-    def run(self):
-        self.graph_player.play()
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from ..SessionGUI import SessionGUI
     
 class _SelectionMode(Enum):
     """
@@ -126,10 +111,10 @@ class FlowView(GUIBase, QGraphicsView):
     graph_state_changed = Signal(GraphState, GraphState)
     
     nodes_selection_changed = Signal(list)
-    node_placed = Signal(Node)
+    node_placed = Signal(CognixNode)
 
     create_node_request = Signal(object, dict)
-    remove_node_request = Signal(Node)
+    remove_node_request = Signal(CognixNode)
 
     connect_request = Signal(NodePort, NodePort)
 
@@ -139,13 +124,13 @@ class FlowView(GUIBase, QGraphicsView):
 
     viewport_update_mode_changed = Signal(str)
 
-    def __init__(self, session_gui, graph_player: GraphPlayer, parent=None):
-        self._graph_player = graph_player
-        flow = graph_player.flow
+    def __init__(self, session_gui: SessionGUI, flow: CognixFlow, parent=None):
         
         GUIBase.__init__(self, representing_component=flow)
         QGraphicsView.__init__(self, parent=parent)
 
+        self.flow = flow
+        self.__session = self.flow.session
         # UNDO STACK
         self._undo_stack = QUndoStack(self)
         self._undo_action = self._undo_stack.createUndoAction(self, 'undo')
@@ -160,10 +145,8 @@ class FlowView(GUIBase, QGraphicsView):
 
         # GENERAL ATTRIBUTES
         self.session_gui = session_gui
-        self.design: Design = session_gui.design  # type hinting and quicker access
-
-        self.flow: Flow = flow
-        self.node_items: dict = {}  # {Node: NodeItem}
+        self.design = session_gui.design
+        self.node_items: dict[CognixNode, NodeItem] = {}
         self.node_items__cache: dict = {}
         self.connection_items: dict = {}  # {Connection: ConnectionItem}
         self.connection_items__cache: dict = {}
@@ -172,10 +155,10 @@ class FlowView(GUIBase, QGraphicsView):
         # DRAGGING - CONNECTION
         self._selected_pin: PortItemPin = None
         self._potential_conn_pin: PortItemPin = None # the pin we're trying to connect to
-        self._conn_item_over: Union[PortItem, NodeItem, None] = None
+        self._conn_item_over: PortItem | NodeItem | None = None
         self._dragging_connection = False
         self._valid_check: ConnValidType = None
-        self._drag_conn_port_items: Tuple[OutputPortItem, InputPortItem] = None
+        self._drag_conn_port_items: tuple[OutputPortItem, InputPortItem] = None
         self._waiting_for_connection_request: bool = False
         
         # PRIVATE FIELDS
@@ -308,11 +291,11 @@ class FlowView(GUIBase, QGraphicsView):
         menu_layout_widget.layout().addWidget(play_button)
         
         def play_button_clicked():
-            if self._graph_player.state == GraphState.STOPPED:
-                graph_runnable = GraphRunnable(self._graph_player)
-                QThreadPool.globalInstance().start(graph_runnable)
+            player = self.flow.player
+            if player.state == GraphState.STOPPED:
+                self.flow.session.play_flow(self.flow.title, True)
             else:
-                self._graph_player.stop()
+                self.flow.session.stop_flow(self.flow.title)
                 
         play_button.clicked.connect(play_button_clicked)
         
@@ -323,10 +306,11 @@ class FlowView(GUIBase, QGraphicsView):
         menu_layout_widget.layout().addWidget(pause_button)
         
         def pause_button_clicked():
-            if self._graph_player.state == GraphState.PLAYING:
-                self._graph_player.pause()
-            elif self._graph_player.state == GraphState.PAUSED:
-                self._graph_player.resume()
+            player = self.flow.player
+            if player.state == GraphState.PLAYING:
+                self.__session.pause_flow(self.flow.title)
+            elif player.state == GraphState.PAUSED:
+                self.__session.resume_flow(self.flow.title)
         pause_button.clicked.connect(pause_button_clicked)
         
         # FPS label 
@@ -337,7 +321,7 @@ class FlowView(GUIBase, QGraphicsView):
         fps_label.setFont(copy_font)
         fps_timer = QTimer(self)
         def refresh_fps():
-            gt = self._graph_player.graph_time
+            gt = self.flow.player.graph_time
             fps_label.setText(f'FPS: avg: {int(gt.avg_fps())}, current: {int(gt.current_fps())}, count: {gt.frame_count}')
             
         fps_timer.timeout.connect(refresh_fps)
@@ -346,7 +330,7 @@ class FlowView(GUIBase, QGraphicsView):
         
         # Graph Change events    
         self.graph_state_changed.connect(self.on_graph_state_changed)        
-        self._graph_player.graph_events.sub_state_changed(self.graph_state_changed.emit)
+        self.flow.player.graph_events.sub_state_changed(self.graph_state_changed.emit)
         
         # # TOUCH GESTURES
         self.viewport().setAttribute(Qt.WA_AcceptTouchEvents)
@@ -1220,7 +1204,7 @@ class FlowView(GUIBase, QGraphicsView):
         self._potential_conn_pin = pin
         self._potential_conn_pin.state = state
         
-    def _get_conn_pair(self, conn_port_items: Tuple[OutputPortItem, InputPortItem]) -> Tuple[NodeOutput, NodeInput]:
+    def _get_conn_pair(self, conn_port_items: tuple[OutputPortItem, InputPortItem]) -> tuple[NodeOutput, NodeInput]:
         """Returns a connected given port items"""
         out_port_item, inp_port_item = conn_port_items
         return (out_port_item.port, inp_port_item.port)
@@ -1264,7 +1248,7 @@ class FlowView(GUIBase, QGraphicsView):
         # otherwise this would delete the connection if it existed
         self.push_undo(ConnectPorts_Command(self, out=out, inp=inp, silent=self.silent_on_connecting()))
 
-    def add_connection(self, c: Tuple[NodeOutput, NodeInput]):
+    def add_connection(self, c: tuple[NodeOutput, NodeInput]):
         out, inp = c
 
         # TODO: need to verify that connection_items_cache still works fine with new connection object
@@ -1296,7 +1280,7 @@ class FlowView(GUIBase, QGraphicsView):
         item.setZValue(-1)
         # self.viewport().repaint()
 
-    def remove_connection(self, c: Tuple[NodeOutput, NodeInput]):
+    def remove_connection(self, c: tuple[NodeOutput, NodeInput]):
         item = self.connection_items[c]
         self._remove_connection_item(item)
 
@@ -1312,7 +1296,7 @@ class FlowView(GUIBase, QGraphicsView):
         self.connection_items__cache[item.connection] = item
         self.scene().removeItem(item)
 
-    def auto_connect(self, p: NodePort, n: Node):
+    def auto_connect(self, p: NodePort, n: CognixNode):
         if p.io_pos == PortObjPos.OUTPUT:
             for inp in n.inputs:
                 if p.type_ == inp.type_:
@@ -1326,7 +1310,7 @@ class FlowView(GUIBase, QGraphicsView):
                     self.connect_node_ports__cmd(p, out)
                     return
 
-    def update_conn_item(self, c: Tuple[NodeOutput, NodeInput]):
+    def update_conn_item(self, c: tuple[NodeOutput, NodeInput]):
         if c in self.connection_items:
             self.connection_items[c].changed = True
             self.connection_items[c].update()
@@ -1489,7 +1473,7 @@ class FlowView(GUIBase, QGraphicsView):
         search_list = item_list if item_list else self.scene().selectedItems()
         return [node_item for node_item in search_list if isinstance(node_item, NodeItem)]
 
-    def selected_nodes(self, item_list: list = None) -> List[Node]:
+    def selected_nodes(self, item_list: list = None) -> List[CognixNode]:
         """Returns a list of the currently selected nodes."""
         
         return [node_item.node for node_item in self.selected_node_items(item_list)]
