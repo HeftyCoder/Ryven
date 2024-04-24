@@ -83,7 +83,7 @@ class CognixSession(Session):
         if not on_other_thread:
             self.__play_flow(flow_name, graph_player)
         else:
-            play_task = self._flow_executor.submit(self.__play_flow, (flow_name, graph_player))
+            play_task = self._flow_executor.submit(self.__play_flow, flow_name, graph_player)
             self._flow_to_future[flow_name] = play_task
             
     
@@ -166,6 +166,18 @@ class CognixSession(Session):
             )
             
         graph.stop()
+    
+    def shutdown(self):
+        
+        # shut down any players
+        for flow_title in self.flows.keys():
+            self.stop_flow(flow_title)
+        
+        self._flow_executor.shutdown()
+        
+        # shut down the rest api
+        self.rest_api.shutdown()
+        
         
         
         

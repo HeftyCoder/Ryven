@@ -4,8 +4,16 @@ import os
 
 from ryvencore_qt.src.code_editor.CodeEditorWidget import CodeEditorWidget
 
-from qtpy.QtWidgets import QWidget, QLineEdit, QGridLayout, QPlainTextEdit, QLabel, QPushButton, QGroupBox, \
-    QVBoxLayout, QHBoxLayout
+from qtpy.QtWidgets import (
+    QWidget, 
+    QLineEdit, 
+    QGridLayout, 
+    QPlainTextEdit, QLabel, 
+    QPushButton, 
+    QGroupBox, 
+    QVBoxLayout, 
+    QHBoxLayout,
+)
 from qtpy.QtCore import Signal, QEvent, Qt
 from qtpy.QtGui import QTextCharFormat, QBrush, QColor, QFont, QFontMetrics
 

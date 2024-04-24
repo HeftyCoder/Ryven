@@ -165,6 +165,9 @@ The editor console can still be used for commands.
     def closeEvent(self, event):
         for flow_ui in self.flow_UIs.values():
             flow_ui.unload()
+        self.session_gui.core_session.shutdown()
+        
+        # at this point
         
     def print_info(self):
         print('''

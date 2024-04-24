@@ -5,6 +5,8 @@ from json import dumps, loads
 from enum import IntEnum
 from concurrent.futures import Future, ThreadPoolExecutor
 from ..graph_player import GraphState, GraphActionResponse
+from threading import Thread
+from waitress import create_server
 
 from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
@@ -63,35 +65,43 @@ class FlowResource(Resource):
             if p_action not in _available_player_actions:
                 abort(HttpStatus.BAD_REQUEST.value, message=f"No action {p_action} found. Actions: {_available_player_actions}")
             
-            response, message, finished = None, None, False
+            # pass by reference
+            result = {
+                'response': None,
+                'message': None,
+                'finished': False
+            }
+            
             def callback(resp: GraphActionResponse, mess: str):
-                response = resp
-                message = mess
-                finished = True
+                result['response'] = resp
+                result['message'] = mess
+                result['finished'] = True
             
             try:    
                 if p_action == 'play':    
                     s.play_flow(name, True, callback)
                 elif p_action == 'stop':
-                    s.stop_flow(name, True, callback)
+                    s.stop_flow(name, callback)
                 elif p_action == 'pause':
-                    s.pause_flow(name, True, callback)
-                else:
-                    s.resume_flow(name, True, callback)
-                
-                # Request cannot be completed
-                while not finished:
-                    continue
-                
-                if response != GraphActionResponse.SUCCESS:
-                    abort(
-                        HttpStatus.BAD_REQUEST.value,
-                        message=f"ERROR!!\nResponse: {response}\nError Message: {message}"
-                    )
-                
-                return f"OK!! {message}", HttpStatus.OK.value
+                    s.pause_flow(name, callback)
+                elif p_action=='resume':
+                    s.resume_flow(name, callback)
             except Exception as e:
-                abort(HttpStatus.INTERNAL_SERVER_ERROR.value, f"An exception was called {e} when trying to {p_action} the flow")    
+                abort(HttpStatus.INTERNAL_SERVER_ERROR.value, message=f"An exception was called {e} when trying to {p_action} the flow")    
+                # Request cannot be completed
+            while not result['finished']:
+                continue
+            
+            response: GraphActionResponse = result['response']
+            message: str = result['message']
+            
+            if response != GraphActionResponse.SUCCESS:
+                abort(
+                    HttpStatus.BAD_REQUEST.value,
+                    message=f"ERROR!! Response: {response} Error Message: {message}"
+                )
+            
+            return f"OK!! {message}", HttpStatus.OK.value
     
     def put(self, name: str):
         args = _flow_put_args.parse_args()
@@ -137,7 +147,7 @@ class FlowResource(Resource):
     
     def delete(self, name: str):
         if name not in self.session.flows:
-            abort(HttpStatus.BAD_REQUEST.value, f"Flow named {name} does not exist")
+            abort(HttpStatus.BAD_REQUEST.value, message=f"Flow named {name} does not exist")
         
         self.session.delete_flow(self.session.flows[name])
         return f"Flow {name} deleted!", HttpStatus.OK.value
@@ -158,6 +168,8 @@ class CognixRestAPI:
             'node_session': session
         })
         self.run_task = None
+        self._run_thread: Thread = None
+        self._server = None
         """Populated only if the REST service starts in another thread"""
 
     def run(self, 
@@ -168,9 +180,18 @@ class CognixRestAPI:
             on_other_thread: bool = False,
             **options: Any
     ):
+        if not host:
+            host = '127.0.0.1'
+        self._server = create_server(self.app, host=host, port = port)
+        def _run():
+            self._server.run()
+            
         if not on_other_thread:
-            self.app.run(host, port, debug, load_dotenv, **options)
+            _run()
         else:
-            def _run():
-                self.app.run(host, port, debug, load_dotenv, **options)
-            self.run_task = self.session._flow_executor.submit(_run)
+            self._run_thread = Thread(target=_run)
+            self._run_thread.setDaemon(True)
+            self._run_thread.start()
+    
+    def shutdown(self):
+        self._server.close()
