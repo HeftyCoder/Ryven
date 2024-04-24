@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from ryvencore.Base import Event
 from enum import Enum, auto
 from dataclasses import dataclass
+from enum import IntEnum
 
 from .nodes import (
     CognixNode, 
@@ -12,6 +13,19 @@ from .nodes import (
 from .flow import CognixFlow
 import time
 
+class GraphActionResponse(IntEnum):
+    """
+    An enum indicating a response to an action for a graph requested on the Session
+    """
+    
+    NO_GRAPH = auto()
+    """No graph found to play"""
+    NOT_ALLOWED = auto()
+    """The action requested (play, pause, stop) is being invoked already"""
+    SUCCESS = auto()
+    """The action was succesful"""
+    
+    
 class GraphState(Enum):
     """Enum that represents a graph player's state."""
     
@@ -25,17 +39,31 @@ class GraphEvents:
         
     def __init__(self):
         self.reset()
-    
-    def sub_state_changed(self, func, nice: int = 0):
-        self._state_changed.sub(func, nice)
+            
+    def sub_state_changed(self, func, nice=0, one_off=False):
+        if not one_off:
+            self._state_changed.sub(func, nice)
+        else:
+            def _one_off(old_state, new_state):
+                func(old_state, new_state)
+                self.unsub_state_changed(_one_off)
+            self._state_changed.sub(_one_off, nice)
         
     def unsub_state_changed(self, func):
         self._state_changed.unsub(func)
-    
-    def sub_event(self, e_type: GraphState | str, func, nice: int = 0):
+        
+    def sub_event(self, e_type: GraphState | str, func, nice=0, one_off=False):
         e = self._get_event(e_type)
-        if e:
+        if not e:
+            return
+            
+        if not one_off:
             e.sub(func, nice)
+        else:
+            def _one_off():
+                func()
+                e.unsub(_one_off)
+            e.sub(_one_off)    
     
     def unsub_event(self, e_type: GraphState | str, func):
         e = self._get_event(e_type)
