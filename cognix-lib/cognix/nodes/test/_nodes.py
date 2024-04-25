@@ -11,4 +11,4 @@ class TestStreamNode(FrameNode):
     ]
     
     def frame_update_event(self) -> bool:
-        self.set_output_val(Data(randint(23, 1452)))    
+        self.set_output_val(0, Data(randint(23, 1452)))    

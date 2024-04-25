@@ -72,7 +72,7 @@ class Result_Node(UtilNode):
         self.update()
 
     def update_event(self, input_called=-1):
-        self.val = self.input(0).payload
+        self.val = self.input_payload(0)
         self.updated.emit(0)
 
 

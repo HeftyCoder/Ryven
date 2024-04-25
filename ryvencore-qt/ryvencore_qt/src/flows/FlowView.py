@@ -87,7 +87,7 @@ from .drawings.DrawingObject import DrawingObject
 from ..Design import Design
 from enum import Enum
 
-from cognix.graph_player import GraphPlayer, GraphState
+from cognix.graph_player import GraphStateEvent, GraphState
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -108,7 +108,7 @@ class _SelectionMode(Enum):
 class FlowView(GUIBase, QGraphicsView):
     """Manages the GUI of flows"""
 
-    graph_state_changed = Signal(GraphState, GraphState)
+    graph_state_changed = Signal(GraphStateEvent)
     
     nodes_selection_changed = Signal(list)
     node_placed = Signal(CognixNode)
@@ -410,8 +410,9 @@ class FlowView(GUIBase, QGraphicsView):
         redo_shortcut.activated.connect(self._redo_activated)
 
     # Saves the graph state to be restored later. Probably won't be used
-    def on_graph_state_changed(self, old_state: GraphState, new_state: GraphState):
+    def on_graph_state_changed(self, state_event: GraphStateEvent):
         self._play_button.setEnabled(True)
+        new_state, old_state = state_event.new_state, state_event.old_state
         if new_state == GraphState.PLAYING:
             # save the state only if the graph has just started
             # if old_state == GraphState.STOPPED:

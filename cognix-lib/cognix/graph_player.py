@@ -3,6 +3,7 @@ from ryvencore.Base import Event
 from enum import Enum, auto
 from dataclasses import dataclass
 from enum import IntEnum
+from typing import Callable
 
 from .nodes import (
     CognixNode, 
@@ -33,21 +34,26 @@ class GraphState(Enum):
     PAUSED = auto()
     STOPPED = auto()
 
-
+class GraphStateEvent:
+    """Represents a change event"""
+    
+    def __init__(self, old_state: GraphState, new_state: GraphState):
+        self.old_state = old_state
+        self.new_state = new_state
+    
+    def __str__(self):
+        return f"Old State: {self.old_state}, New State: {self.new_state}"
+        
 class GraphEvents:
     """All the events that a player may have. Hides invocation"""
         
     def __init__(self):
         self.reset()
             
-    def sub_state_changed(self, func, nice=0, one_off=False):
-        if not one_off:
-            self._state_changed.sub(func, nice)
-        else:
-            def _one_off(old_state, new_state):
-                func(old_state, new_state)
-                self.unsub_state_changed(_one_off)
-            self._state_changed.sub(_one_off, nice)
+    def sub_state_changed(self, func: Callable[[GraphStateEvent], None], 
+                          nice=0, one_off=False):
+        
+        self._state_changed.sub(func, nice, one_off)
         
     def unsub_state_changed(self, func):
         self._state_changed.unsub(func)
@@ -56,14 +62,8 @@ class GraphEvents:
         e = self._get_event(e_type)
         if not e:
             return
-            
-        if not one_off:
-            e.sub(func, nice)
-        else:
-            def _one_off():
-                func()
-                e.unsub(_one_off)
-            e.sub(_one_off)    
+
+        e.sub(func, nice, one_off)
     
     def unsub_event(self, e_type: GraphState | str, func):
         e = self._get_event(e_type)
@@ -71,7 +71,7 @@ class GraphEvents:
             e.unsub(func)
             
     def reset(self):
-        self._state_changed: Event = Event(GraphState, GraphState)
+        self._state_changed = Event(GraphState, GraphState)
         
         self._on_play = Event()
         self._on_pause = Event()
@@ -89,11 +89,14 @@ class GraphEvents:
             'stop': self._on_stop
         }
     
-    def _invoke(self, old_state: GraphState, new_state: GraphState):
-        e = self._get_event(new_state)
+    def _invoke_params(self, old_state: GraphState, new_state: GraphState):
+        self._invoke(GraphStateEvent(old_state, new_state))
+        
+    def _invoke(self, state_event: GraphStateEvent):
+        e = self._get_event(state_event.new_state)
         if e:
             e.emit()
-        self._state_changed.emit(old_state, new_state)
+        self._state_changed.emit(state_event)
         
     def _get_event(self, e_type: GraphState | str) -> Event:
         if e_type in self._type_events:
@@ -266,7 +269,7 @@ class CognixPlayer(GraphPlayer):
         self._stop_flag = False
         self._state = GraphState.PLAYING
         self.__gather_nodes()
-        self._events._invoke(GraphState.STOPPED, GraphState.PLAYING)
+        self._events._invoke_params(GraphState.STOPPED, GraphState.PLAYING)
         
         for node in self._nodes:
             node.reset()
@@ -308,13 +311,13 @@ class CognixPlayer(GraphPlayer):
         if self._state == GraphState.PLAYING:
             old_state = self._state
             self._state = GraphState.PAUSED
-            self._events._invoke(old_state, GraphState.PAUSED)
+            self._events._invoke_params(old_state, GraphState.PAUSED)
     
     def resume(self):
         if self._state == GraphState.PAUSED:
             old_state = self._state
             self._state = GraphState.PLAYING
-            self._events._invoke(old_state, GraphState.PLAYING)
+            self._events._invoke_params(old_state, GraphState.PLAYING)
     
     def stop(self):
         if self._state != GraphState.STOPPED:
@@ -331,7 +334,6 @@ class CognixPlayer(GraphPlayer):
         for node in self._flow.nodes:
             if not isinstance(node, CognixNode):
                 continue
-            node._player = self
             self._nodes.append(node)
             if isinstance(node, StartNode):
                 self._start_nodes.append(node)
@@ -349,5 +351,5 @@ class CognixPlayer(GraphPlayer):
         self._state = GraphState.STOPPED
         for node in self._nodes:
             node.on_stop()
-        self._events._invoke(old_state, GraphState.STOPPED)
+        self._events._invoke_params(old_state, GraphState.STOPPED)
         self._graph_time.reset()

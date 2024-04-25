@@ -40,11 +40,12 @@ class CognixSession(Session):
         
         flow: CognixFlow = self._flow_base_type(session=self, title=title)
         player = player_type(flow, frames) if player_type else CognixPlayer(frames)
-        flow.player = player
-        player.flow = flow
         
         if data:
             flow.load(data)
+        
+        flow.player = player
+        player.flow = flow
         
         # Titles should be unique
         if not self.new_flow_title_valid(flow.title):
