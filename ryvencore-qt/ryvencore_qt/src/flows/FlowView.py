@@ -43,11 +43,12 @@ except ImportError:
     from qtpy.QtWidgets import QUndoStack
 
 
-from ryvencore.NodePort import NodePort, NodeInput, NodeOutput
+from ryvencore import NodeInput, NodeOutput
+from ryvencore.port import NodePort
 # from ryvencore.Connection import Connection, DataConnection
-from ryvencore.InfoMsgs import InfoMsgs
-from ryvencore.RC import PortObjPos, ConnValidType
-from ryvencore.Node import node_from_identifier
+from ryvencore.info_msgs import InfoMsgs
+from ryvencore.rc import PortObjPos, ConnValidType
+from ryvencore.node import node_from_identifier
 
 from cognix.api import CognixNode, CognixFlow
 

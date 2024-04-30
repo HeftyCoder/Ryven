@@ -3,12 +3,9 @@ This module, together with the node_env and gui_env defines Ryven's nodes
 package system. It can be used outside of Ryven as well.
 """
 
-import importlib.util
-import os, sys
+import os
 import pathlib
-from os.path import basename, dirname, splitext, normpath, join
-from typing import Tuple, List, Type, Union, Set, Optional
-import pkgutil
+from os.path import basename, normpath, join
 
 from ryvencore import Node, Data
 
@@ -57,7 +54,7 @@ class NodesPackage:
 # should be Tuple[list[Type[Node]], list[Type[Data]] in 3.9+
 def import_nodes_package(
     package: NodesPackage = None, directory: str = None
-) -> Tuple[List[Type[Node]], List[Type[Data]]]:
+) -> tuple[list[type[Node]], list[type[Data]]]:
     """Loads node and data classes from a Ryven nodes package and returns both in separate lists.
 
     Can be used without a running Ryven instance, but you need to specify in which mode nodes should be loaded
@@ -84,9 +81,6 @@ def import_nodes_package(
     NodesEnvRegistry.current_package = package
     load_from_file(package.file_path)
 
-    # obsolete node_types = node_env.NodesEnvRegistry.exported_nodes[-1]
-    # obsolote data_types = node_env.NodesEnvRegistry.exported_data_types[-1]
-
     node_types, data_types = NodesEnvRegistry.consume_last_exported_package()
     
     # load guis
@@ -104,12 +98,9 @@ def import_nodes_package(
     return node_types, data_types
 
 def process_nodes_packages(
-    project_or_nodes: Union[
-        Union[str, pathlib.Path],  # path to Ryven project
-        List[Union[str, pathlib.Path, NodesPackage]],  # list of node packages
-    ],
-    requested_packages: List[NodesPackage] = None,
-) -> Tuple[Set[NodesPackage], List[pathlib.Path], Optional[dict]]:
+    project_or_nodes: str | pathlib.Path | list[str | pathlib.Path | NodesPackage],
+    requested_packages: list[NodesPackage] = None,
+) -> tuple[set[NodesPackage], list[pathlib.Path], dict | None]:
     """Takes a project or list of node packages and additionally requested node
     packages and checks whether the node packages are valid.
 

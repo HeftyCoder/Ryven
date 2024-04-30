@@ -1,12 +1,14 @@
 """Defines the abstract classes for nodes in CogniX"""
 from __future__ import annotations
 from ryvencore import Node
-from ryvencore.Base import Event
+from ryvencore import Event
+from ryvencore.addons.builtin import VarsAddon
+from ryvencore.utils import get_mod_classes
 from abc import ABCMeta, abstractmethod
 from inspect import isclass
 
 from ..config.abc import NodeConfig
-from ..utils import get_mod_classes
+
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -32,6 +34,7 @@ class CognixNode(Node, metaclass=ABCMeta):
         
         self.updated = Event(int)
         self.flow = flow
+        self.__vars_addon = self.flow.session.addons[VarsAddon.addon_name()]
         config_type = self.config_type if self.config_type else self._config_as_cls_type
         self._config = config_type(self) if config_type else None
     
@@ -40,6 +43,20 @@ class CognixNode(Node, metaclass=ABCMeta):
         """Returns this node's configuration, if it exists"""
         return self._config
     
+    @property
+    def vars_addon(self) -> VarsAddon:
+        """Returns the session's variable addon. Session local"""
+        return self.__vars_addon
+    
+    def set_var_val(self, var_name: str, value):
+        """Sets a variables' value"""
+        self.vars_addon.var(self.flow, var_name).set(value)
+    
+    def get_var_val(self, var_name: str):
+        """Gets a variables' value. If it doesn't exist, returns None"""
+        var = self.vars_addon.var(self.flow, var_name)
+        return var.get() if var else None
+        
     def data(self) -> dict:
         return {
             **super().data(),

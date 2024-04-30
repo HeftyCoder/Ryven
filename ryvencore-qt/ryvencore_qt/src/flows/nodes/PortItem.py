@@ -7,7 +7,8 @@ from qtpy.QtCore import Qt, QRectF, QPointF, QSizeF
 from qtpy.QtGui import QFontMetricsF, QFont
 
 from ryvencore import serialize, Data
-from ryvencore.NodePort import NodeOutput, NodeInput, NodePort
+from ryvencore import NodeOutput, NodeInput
+from ryvencore.port import NodePort
 from ryvencore.utils import deserialize
 
 from ...GUIBase import GUIBase

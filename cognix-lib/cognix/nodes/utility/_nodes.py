@@ -6,15 +6,6 @@ class UtilNode(CognixNode):
     def have_gui(self):
         return hasattr(self, 'gui')
 
-    def vars_addon(self):
-        return self.get_addon('Variables')
-
-    def get_var_val(self, var_name):
-        return self.vars_addon().var(self.flow, var_name).get()
-
-    def set_var_val(self, var_name, val):
-        return self.vars_addon().var(self.flow, var_name).set(val)
-
 
 class GetVar_Node(UtilNode):
     """Gets the value of a script variable"""
@@ -41,12 +32,13 @@ class GetVar_Node(UtilNode):
     def update_event(self, input_called=-1):
         if self.input(0).payload != self.var_name:
             if self.var_name != '':  # disconnect old var val update connection
-                self.vars_addon().unsubscribe(self, self.var_name, self.var_val_changed)
+                self.vars_addon.unsubscribe(self, self.var_name, self.var_val_changed)
 
-            self.var_name = self.input(0).payload
+            self.var_name = self.input_payload(0)
 
             # create new var update connection
-            self.vars_addon().subscribe(self, self.var_name, self.var_val_changed)
+            if self.var_name:
+                self.vars_addon.subscribe(self, self.var_name, self.var_val_changed)
 
         self.set_output_val(0, Data(self.get_var_val(self.var_name)))
 

@@ -15,7 +15,7 @@ from qtpy.QtWidgets import (
 from qtpy.QtCore import Qt, QByteArray
 
 import ryvencore_qt.src.widgets as GUI
-from ryvencore.RC import FlowAlg
+from ryvencore.rc import FlowAlg
 from ryvencore import Flow
 
 from ryvencore_qt.src.code_editor.CodePreviewWidget import CodePreviewWidget

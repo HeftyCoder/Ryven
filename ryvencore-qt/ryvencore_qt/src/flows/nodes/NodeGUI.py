@@ -9,7 +9,7 @@ from .WidgetBaseClasses import NodeMainWidget, NodeInputWidget, NodeInspectorWid
 from .NodeInspector import NodeInspectorDefaultWidget
 from .NodeViewer import NodeViewerDefault
 
-from ryvencore.RC import ProgressState
+from ryvencore.rc import ProgressState
 from ryvencore import Node
 
 from typing import TYPE_CHECKING

@@ -1,4 +1,4 @@
-from ryvencore.Base import Base
+from ryvencore.base import Base
 from qtpy.QtWidgets import QGraphicsObject, QGraphicsItem
 from qtpy.QtCore import QTimer
 

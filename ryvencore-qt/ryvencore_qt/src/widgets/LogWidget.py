@@ -1,7 +1,7 @@
 from qtpy.QtGui import QFont
 from qtpy.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QPlainTextEdit
 
-from ryvencore.addons.Logging import Logger
+from ryvencore.addons.logging import Logger
 import logging
 
 

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from ryvencore.Base import Event
+from ryvencore import Event
 from enum import Enum, auto
 from dataclasses import dataclass
 from enum import IntEnum

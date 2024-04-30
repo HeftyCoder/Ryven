@@ -1,5 +1,4 @@
-from ryvencore import Session
-from ryvencore.Flow import Flow
+from ryvencore import Session, Flow
 
 from .flow import CognixFlow
 from .graph_player import CognixPlayer, GraphPlayer, GraphState, GraphActionResponse

@@ -13,7 +13,7 @@ from ...utils import pythagoras
 from ...flows.nodes.PortItem import PortItem
 from .ConnectionAnimation import ConnPathItemsAnimation, ConnPathItemsAnimationScaled
 from ryvencore_qt.src.Design import Design
-from ryvencore.Node import NodeOutput, NodeInput, Data, Node
+from ryvencore import NodeOutput, NodeInput, Data, Node
 
 class ConnectionItem(GUIBase, QGraphicsPathItem, QObject):
     """The GUI representative for a connection. The classes ExecConnectionItem and DataConnectionItem will be ready

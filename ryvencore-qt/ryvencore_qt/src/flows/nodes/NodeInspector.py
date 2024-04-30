@@ -8,6 +8,7 @@ from qtpy.QtWidgets import (
 
 from qtpy.QtCore import Qt
 from ryvencore import Node
+from ryvencore.port import NodePort
 
 from .WidgetBaseClasses import NodeInspectorWidget
 
@@ -36,7 +37,7 @@ class InspectorView(QWidget):
             self.set_node(nodes[-1])
 
     def set_node(self, node: Node):
-        """Sets a node for inspection, if it exists. Otherwise clears the inspector"""
+        """Sets a node for inspection, if it exists. Otherwise clears the inspector view"""
 
         if self.node == node:
             return
@@ -89,26 +90,14 @@ class NodeInspectorDefaultWidget(NodeInspectorWidget, QWidget):
         
         if child:
             self.content_splitter.addWidget(child)
-
-        desc = self.node.__doc__ if self.node.__doc__ and self.node.__doc__ != "" else "No description given"
-        bbt = NodeInspectorDefaultWidget._big_bold_text
         
         self.description_area: QTextEdit = QTextEdit()
         self.description_area.setReadOnly(True)
-        self.description_area.setText(f"""
-<html>
-    <body>
-        {bbt('Title:')} {self.node.title}<br>
-        {bbt('Version:')} {self.node.version}<br><br>
-        {bbt('Description:')}<br><br>
-        {desc}
-    </body>
-</html>
-        """)
     
         self.content_splitter.addWidget(self.description_area)
     
     def load(self):
+        self.process_description()
         super().load()
         if self.child:
             self.child.load()
@@ -122,3 +111,33 @@ class NodeInspectorDefaultWidget(NodeInspectorWidget, QWidget):
         if self.child:
             self.child.on_node_deleted()
         return super().on_node_deleted()
+    
+    def process_description(self):
+        desc = self.node.__doc__ if self.node.__doc__ and self.node.__doc__ != "" else "No description given"
+        bbt = NodeInspectorDefaultWidget._big_bold_text
+        
+        def create_port_desc(ports: list[NodePort]):
+            desc = ""
+            for i in range(len(ports)):
+                port = ports[i]
+                label = port.label_str if port.label_str else 'No label'
+                data_constr = port.allowed_data.__name__ if port.allowed_data else None
+                desc += f"{i+1}) [ Label: {label}, Constraint: {data_constr} ]<br>" 
+            
+            if not desc:
+                desc = "No ports!"
+            return desc
+        
+        self.description_area.setText(f"""
+<html>
+    <body>
+        {bbt('Title:')} {self.node.title}<br>
+        {bbt('Version:')} {self.node.version}<br><br>
+        {bbt('Description:')}<br><br>{desc}<br><br></p>
+        {bbt('Inputs:')}<br><br>{create_port_desc(self.node._inputs)}<br><br>
+        {bbt('Outputs:')}<br><br>{create_port_desc(self.node._outputs)}<br><br>
+        
+    </body>
+</html>
+        """)       
+        

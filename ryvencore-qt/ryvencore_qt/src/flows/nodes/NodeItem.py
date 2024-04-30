@@ -16,8 +16,8 @@ from qtpy.QtGui import QColor
 from .NodeErrorIndicator import NodeErrorIndicator
 from .NodeGUI import NodeGUI
 from ...GUIBase import GUIBase
-from ryvencore.NodePort import NodeInput, NodeOutput
-from ryvencore.RC import ProgressState
+from ryvencore import NodeInput, NodeOutput
+from ryvencore.rc import ProgressState
 from ryvencore import Node
 
 from .NodeItemAction import NodeItemAction

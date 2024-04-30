@@ -22,7 +22,7 @@ def in_gui_mode() -> bool:
     return environ['RYVEN_MODE'] == 'gui'
 
 
-def load_from_file(file: str = None, components_list: [str] = None) -> Tuple:
+def load_from_file(file: str = None, components_list: list[str] = None) -> Tuple:
     """
     Imports specified components from a python module with given file path.
     The directory of the file is added to sys.path if not already present.
