@@ -1,5 +1,5 @@
 from cognix.nodes import CognixNode
-from ryvencore import NodeInputType, NodeOutputType, Data
+from ryvencore import PortConfig, Data
 
 class UtilNode(CognixNode):
     
@@ -23,9 +23,9 @@ class GetVar_Node(UtilNode):
 
     title = 'get var'
     init_inputs = [
-        NodeInputType(),
+        PortConfig(),
     ]
-    init_outputs = [NodeOutputType(label='val')]
+    init_outputs = [PortConfig(label='val')]
 
     def __init__(self, params):
         super().__init__(params)
@@ -61,7 +61,7 @@ class Result_Node(UtilNode):
 
     title = 'result'
     init_inputs = [
-        NodeInputType(type_='data'),
+        PortConfig(type_='data'),
     ]
 
     def __init__(self, params):
@@ -86,7 +86,7 @@ class Val_Node(UtilNode):
         # NodeInputType(default=Data()),
     ]
     init_outputs = [
-        NodeInputType(type_='data'),
+        PortConfig(type_='data'),
     ]
 
     def __init__(self, params):
@@ -118,13 +118,13 @@ class SetVar_Node(UtilNode):
 
     title = 'set var'
     init_inputs = [
-        NodeInputType(type_='exec'),
-        NodeInputType(label='var'),
-        NodeInputType(label='val'),
+        PortConfig(type_='exec'),
+        PortConfig(label='var'),
+        PortConfig(label='val'),
     ]
     init_outputs = [
-        NodeOutputType(type_='exec'),
-        NodeOutputType(type_='data', label='val'),
+        PortConfig(type_='exec'),
+        PortConfig(type_='data', label='val'),
     ]
 
     def __init__(self, params):

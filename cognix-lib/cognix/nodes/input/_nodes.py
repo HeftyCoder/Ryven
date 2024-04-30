@@ -1,7 +1,6 @@
 from pylsl import resolve_stream, resolve_bypred, StreamInlet, StreamInfo
 from threading import Thread
-from ryvencore import NodeOutputType, Data
-from ryvencore import NodeInputType, NodeOutputType
+from ryvencore import PortConfig, Data
 from ryvencore.data.built_in import *
 from ryvencore.data.built_in.collections.abc import MutableSetData
 from ryvencore import ProgressState
@@ -20,7 +19,7 @@ class LSLInput(FrameNode):
     
     title = 'LSL Input'
     version = '0.0.1'
-    init_outputs = [NodeOutputType(label='data')]
+    init_outputs = [PortConfig(label='data')]
     
     def __init__(self, params):
         super().__init__(params)
@@ -86,13 +85,13 @@ class SomeInput(CognixNode):
     title = 'George'
     
     init_inputs = [
-        NodeInputType(label='george', allowed_data=RealData),
-        NodeInputType(label='we', allowed_data=MutableSetData)
+        PortConfig(label='george', allowed_data=RealData),
+        PortConfig(label='we', allowed_data=MutableSetData)
     ]
     
     init_outputs = [
-        NodeOutputType("mm", allowed_data=IntegerData),
-        NodeOutputType("zz", allowed_data=ListData)
+        PortConfig("mm", allowed_data=IntegerData),
+        PortConfig("zz", allowed_data=ListData)
     ]
     
     class Config(NodeTraitsGroupConfig):

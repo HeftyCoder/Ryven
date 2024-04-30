@@ -1,4 +1,4 @@
-from ryvencore import NodeOutputType, NodeInputType, Data
+from ryvencore import PortConfig
 from cognix.api import CognixNode
 
 # from Orange.data import Table
@@ -24,8 +24,8 @@ import traceback
 #     title = 'SVM Classifier'
 #     version = '0.1'
     
-#     init_inputs = [NodeInputType()]
-#     init_outputs = [NodeOutputType()]
+#     init_inputs = [PortConfig()]
+#     init_outputs = [PortConfig()]
     
 #     def update_event(self, inp=-1):
 #         packet = self.input(0)
@@ -39,8 +39,8 @@ import traceback
 #     title = 'Logistic Regression'
 #     version = '0.1'
     
-#     init_inputs = [NodeInputType()]
-#     init_outputs = [NodeOutputType()]
+#     init_inputs = [PortConfig()]
+#     init_outputs = [PortConfig()]
     
 #     def update_event(self, inp=-1):
 #         packet = self.input(0)
@@ -54,8 +54,8 @@ import traceback
 #     title = 'Cross Validation'
 #     version = '0.1'
     
-#     init_inputs = [NodeInputType(label='data'), NodeInputType(label='classifier')]
-#     init_outputs = [NodeOutputType(label='model'), NodeOutputType(label = 'ACC'), NodeOutputType(label='AUC')]
+#     init_inputs = [PortConfig(label='data'), PortConfig(label='classifier')]
+#     init_outputs = [PortConfig(label='model'), PortConfig(label = 'ACC'), PortConfig(label='AUC')]
     
 #     def update_event(self, inp=-1):
 #         data_packet = self.input(0)

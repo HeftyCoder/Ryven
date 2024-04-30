@@ -1,5 +1,5 @@
 # from Orange.data import Table, Domain
-from ryvencore import NodeOutputType, NodeInputType, Data
+from ryvencore import PortConfig, Data
 from threading import Thread
 from multiprocessing import Manager, Queue, Process
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
@@ -14,7 +14,7 @@ from cognix.api import CognixNode, FrameNode, StartNode
 #     title = 'Import Feature Data'
 #     version = '0.1'
     
-#     init_outputs = [NodeOutputType(label='')]
+#     init_outputs = [PortConfig(label='')]
     
 #     def __init__(self, params):
 #         super().__init__(params)
@@ -43,8 +43,8 @@ from cognix.api import CognixNode, FrameNode, StartNode
 #     title = 'Data Selection'
 #     version = '0.1'
     
-#     init_inputs = [NodeInputType()]
-#     init_outputs = [NodeOutputType()]
+#     init_inputs = [PortConfig()]
+#     init_outputs = [PortConfig()]
     
 #     def __init__(self, params):
 #         super().__init__(params)

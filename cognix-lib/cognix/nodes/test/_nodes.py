@@ -1,5 +1,5 @@
 from cognix.nodes import CognixNode, FrameNode
-from ryvencore import NodeOutputType, Data
+from ryvencore import PortConfig, Data
 from random import randint
 
 class TestStreamNode(FrameNode):
@@ -7,7 +7,7 @@ class TestStreamNode(FrameNode):
     title = "Random Int Generator"
     
     init_outputs=[
-        NodeOutputType('value')
+        PortConfig('value')
     ]
     
     def frame_update_event(self) -> bool:
