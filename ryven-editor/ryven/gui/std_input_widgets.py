@@ -2,8 +2,6 @@
 This module provides some frequently useful convenience input widgets for nodes.
 It replaces what was previously the dtypes system.
 """
-from typing import Tuple
-
 from ryvencore import Data
 
 from ryvencore_qt import NodeInputWidget
@@ -217,7 +215,7 @@ class Builder:
         return StdInpWidget_StrLineEdit
 
     @staticmethod
-    def int_spinbox(init: int = 0, range: Tuple[int, int] = (0, 99), descr: str = '', data_type: type[Data] = Data):
+    def int_spinbox(init: int = 0, range: tuple[int, int] = (0, 99), descr: str = '', data_type: type[Data] = Data):
         """
         Creates a spinbox input widget for integers.
         :param init: the initial value shown in the widget
@@ -268,7 +266,7 @@ class Builder:
         return StdInpWidget_IntSpinBox
 
     @staticmethod
-    def int_slider(init: int = 0, range: Tuple[int, int] = (0, 10), descr: str = '', data_type: type[Data] = Data):
+    def int_slider(init: int = 0, range: tuple[int, int] = (0, 10), descr: str = '', data_type: type[Data] = Data):
         """
         Creates a slider input widget for ints.
         :param init: the initial value shown in the widget

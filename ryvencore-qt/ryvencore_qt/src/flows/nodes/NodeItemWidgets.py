@@ -3,21 +3,16 @@ from qtpy.QtCore import (
     QRectF, 
     Qt, 
     QSizeF, 
-    Property,
-    QSize
+    QSize,
 )
 from qtpy.QtWidgets import (
     QGraphicsWidget, 
     QGraphicsLinearLayout, 
     QSizePolicy, 
     QGraphicsLayoutItem, 
-    QGraphicsItem,
-    QGraphicsPixmapItem,
 )
 from qtpy.QtGui import (
     QFont, 
-    QFontMetricsF, 
-    QColor,
     QPixmap,
     QImage,
 )

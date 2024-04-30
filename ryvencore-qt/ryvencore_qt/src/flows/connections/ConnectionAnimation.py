@@ -1,4 +1,3 @@
-from typing import List
 from enum import Enum
 
 from qtpy.QtCore import (
@@ -28,7 +27,7 @@ class ConnPathItemsAnimation(QGraphicsObject):
 
     def __init__(
         self,
-        items: List[QGraphicsItem],
+        items: list[QGraphicsItem],
         connection,
         frames=100,
         between=125,
@@ -36,7 +35,7 @@ class ConnPathItemsAnimation(QGraphicsObject):
     ):
         super().__init__()
         
-        self.items: List[QGraphicsItemAnimated] = [
+        self.items: list[QGraphicsItemAnimated] = [
             QGraphicsItemAnimated(item, self) 
             for item in items
         ]

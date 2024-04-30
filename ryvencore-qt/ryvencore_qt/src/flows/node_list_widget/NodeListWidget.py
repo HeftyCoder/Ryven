@@ -7,7 +7,6 @@ from qtpy.QtWidgets import (
     QSplitter,
     QAbstractItemView,
     QLabel,
-    QApplication,
     QStyle
 )
 

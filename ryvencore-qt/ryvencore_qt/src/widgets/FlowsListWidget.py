@@ -1,5 +1,5 @@
 from qtpy.QtCore import Qt
-from qtpy.QtWidgets import QWidget, QMessageBox, QVBoxLayout, QLineEdit, QHBoxLayout, QPushButton, QScrollArea
+from qtpy.QtWidgets import QWidget, QMessageBox, QVBoxLayout, QLineEdit, QScrollArea
 
 from .FlowsList_FlowWidget import FlowsList_FlowWidget
 from typing import TYPE_CHECKING

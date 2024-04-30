@@ -1,7 +1,14 @@
 import json
 
-from qtpy.QtWidgets import QLineEdit, QWidget, QLabel, QGridLayout, QHBoxLayout, QSpacerItem, QSizePolicy, QStyleOption, QStyle
-from qtpy.QtGui import QFont, QPainter, QColor, QDrag
+from qtpy.QtWidgets import (
+    QLineEdit, 
+    QWidget, 
+    QGridLayout, 
+    QHBoxLayout, 
+    QStyleOption, 
+    QStyle
+)
+from qtpy.QtGui import QPainter, QColor, QDrag
 from qtpy.QtCore import Signal, Qt, QMimeData
 from .utils import text_font
 

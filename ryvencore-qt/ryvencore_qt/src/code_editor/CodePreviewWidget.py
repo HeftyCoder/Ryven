@@ -1,5 +1,4 @@
-from dataclasses import dataclass
-from typing import Type, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import (
@@ -7,9 +6,6 @@ from qtpy.QtWidgets import (
     QHBoxLayout, 
     QVBoxLayout, 
     QRadioButton, 
-    QLabel, 
-    QCheckBox, 
-    QGridLayout,
     QPushButton
 )
 
@@ -57,7 +53,7 @@ class CodePreviewWidget(QWidget):
     def __init__(self, src_code_storage: SourceCodeStorage, window_theme='dark'):
         super().__init__()
 
-        self.current_insp: Optional[Inspectable] = None
+        self.current_insp: Inspectable | None = None
         self.cd_storage = src_code_storage
 
         # widgets
@@ -123,7 +119,7 @@ class CodePreviewWidget(QWidget):
         else:
             self._set_node(nodes[-1])
 
-    def _set_node(self, node: Optional[Node]):
+    def _set_node(self, node: Node | None):
         self.node = node
 
         if node is None:

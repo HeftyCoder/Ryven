@@ -1,6 +1,5 @@
 import os
 import pathlib
-from typing import Optional
 
 from qtpy.QtWidgets import (
     QDialog,
@@ -630,8 +629,9 @@ class StartupDialog(QDialog):
 
     def get_project(
         self, base_dir: str, title='Select project file'
-    ) -> Optional[pathlib.Path]:
-        """Get a project file from the user.
+    ) -> pathlib.Path | None:
+        """
+        Get a project file from the user.
 
         Parameters
         ----------
@@ -659,8 +659,9 @@ class StartupDialog(QDialog):
 
         return None
 
-    def load_project(self, project_path: Optional[pathlib.Path]):
-        """Load a project file.
+    def load_project(self, project_path: pathlib.Path | None):
+        """
+        Load a project file.
 
         It opens the project file and scans for all required node packages.
         These are displayed in the imported packages list. All packages which

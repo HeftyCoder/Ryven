@@ -1,9 +1,6 @@
-import bisect
 import enum
-import json
 import pathlib
 from math import sqrt
-from typing import List, Dict
 
 from qtpy.QtCore import QPointF, QByteArray
 

@@ -1,4 +1,4 @@
-from typing import Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING
 from qtpy.QtGui import QCloseEvent, QHideEvent, QShowEvent
 from qtpy.QtWidgets import QTabWidget, QVBoxLayout, QDialog, QSplitter
 from qtpy.QtCore import Qt
@@ -24,7 +24,7 @@ class NodeViewerDefault(NodeViewerWidget, QDialog):
     
     attach_inspect_widgets = True
     
-    def __init__(self, params: Tuple[Node, 'NodeGUI'], parent=None):
+    def __init__(self, params: tuple[Node, 'NodeGUI'], parent=None):
         NodeViewerWidget.__init__(self, params)
         QDialog.__init__(self, parent)
         

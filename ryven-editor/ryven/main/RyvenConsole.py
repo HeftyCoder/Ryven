@@ -7,7 +7,6 @@ projects without GUI programmatically, the ryvencore lib should be used directly
 import argparse
 import os
 from os.path import join, dirname
-import json
 import sys
 import code
 

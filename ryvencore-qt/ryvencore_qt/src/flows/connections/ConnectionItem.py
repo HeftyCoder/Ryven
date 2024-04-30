@@ -1,6 +1,4 @@
-# import math
-from typing import List, Tuple
-from qtpy.QtCore import QPointF, Qt, Signal, QObject, QTimer
+from qtpy.QtCore import QPointF, Qt, Signal, QObject
 from qtpy.QtGui import QPainter, QColor, QRadialGradient, QPainterPath, QPen
 from qtpy.QtWidgets import (
     QGraphicsPathItem,
@@ -24,7 +22,7 @@ class ConnectionItem(GUIBase, QGraphicsPathItem, QObject):
     
     data_signal = Signal(Data) # tuple[NodeOutput, NodeInput]
 
-    def __init__(self, connection: Tuple[NodeOutput, NodeInput], session_design: Design):
+    def __init__(self, connection: tuple[NodeOutput, NodeInput], session_design: Design):
         QGraphicsPathItem.__init__(self)
         QObject.__init__(self)
 

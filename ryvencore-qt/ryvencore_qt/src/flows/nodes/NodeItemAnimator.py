@@ -1,4 +1,4 @@
-from qtpy.QtCore import QObject, QPropertyAnimation, Property, QParallelAnimationGroup, QTimeLine
+from qtpy.QtCore import QObject, QPropertyAnimation, Property, QParallelAnimationGroup
 from qtpy.QtGui import QColor
 from qtpy.QtWidgets import QGraphicsItem
 

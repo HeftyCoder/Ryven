@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional, Tuple, List, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from qtpy.QtWidgets import (
     QGraphicsItem, 
@@ -49,8 +49,8 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
         self.movement_state = None
         self.movement_pos_from = None
         self.painted_once = False
-        self.inputs: List[InputPortItem] = []
-        self.outputs: List[OutputPortItem] = []
+        self.inputs: list[InputPortItem] = []
+        self.outputs: list[OutputPortItem] = []
         self.color = QColor(self.node_gui.color)  # manipulated by self.animator
         self.progress_state: ProgressState = None
 

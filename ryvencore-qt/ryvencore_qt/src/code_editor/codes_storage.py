@@ -1,5 +1,6 @@
+from __future__ import annotations
 from dataclasses import dataclass
-from typing import Type, Optional, Dict, TYPE_CHECKING
+from typing import TYPE_CHECKING
 from inspect import getsource, getmodule
 
 from ryvencore import Node
@@ -16,16 +17,16 @@ class SourceCodeStorage:
     
     def __init__(self, edit_src_codes = False):
         self.edit_src_codes = edit_src_codes
-        self.__class_codes: Dict[Type[Node], NodeTypeCodes] = {}
+        self.__class_codes: dict[type[Node], NodeTypeCodes] = {}
         self.__class_codes_proxy = MappingProxyType(self.__class_codes)
         
         # below fields are only used when src code edits are enabled
         
         # maps node- or widget classes to their full module source code
-        self.__mod_codes: Dict[Type, str] = {}
+        self.__mod_codes: dict[type, str] = {}
         self.__mode_codes_proxy = MappingProxyType(self.__mod_codes)
         # maps node- or widget objects to their modified source code
-        self.__modif_codes: Dict[object, str] = {} 
+        self.__modif_codes: dict[object, str] = {} 
         self.__modif_codes_proxy = MappingProxyType(self.__modif_codes)
     
     @property
@@ -40,7 +41,7 @@ class SourceCodeStorage:
     def modif_codes(self):
         return self.__modif_codes_proxy
     
-    def register_node_type(self, n: Type[Node], defer_code_loading=True):
+    def register_node_type(self, n: type[Node], defer_code_loading=True):
         """
         Registers a node type and loads its source code directly if deferred 
         source code loading is disabled.
@@ -51,7 +52,7 @@ class SourceCodeStorage:
         else:
             self.__class_codes[n] = None
             
-    def load_src_code(self, n: Type[Node], custom_gui: 'Type[NodeGUI]' = None):
+    def load_src_code(self, n: type[Node], custom_gui: type[NodeGUI] = None):
         """
         Loads a node's source code and optionally its custom gui.
         
@@ -62,7 +63,7 @@ class SourceCodeStorage:
         if custom_gui:
             gui = custom_gui
         else:
-            gui: Type[NodeGUI] = n.GUI if hasattr(n, 'GUI') else None 
+            gui: type[NodeGUI] = n.GUI if hasattr(n, 'GUI') else None 
         
         has_gui = gui is not None
         has_mw = has_gui and gui.main_widget_class is not None
@@ -92,8 +93,8 @@ class SourceCodeStorage:
 @dataclass
 class NodeTypeCodes:
     node_cls: str
-    main_widget_cls: Optional[str]
-    custom_input_widget_clss: Dict[str, str]
+    main_widget_cls: str | None
+    custom_input_widget_clss: dict[str, str]
 
 
 class Inspectable:

@@ -1,4 +1,11 @@
-from qtpy.QtWidgets import QDialog, QDialogButtonBox, QVBoxLayout, QPlainTextEdit, QShortcut, QMessageBox
+from qtpy.QtWidgets import (
+    QDialog, 
+    QDialogButtonBox,
+    QVBoxLayout,
+    QPlainTextEdit, 
+    QShortcut,
+    QMessageBox
+)
 from qtpy.QtGui import QKeySequence
 
 

@@ -1,6 +1,6 @@
 from qtpy.QtWidgets import QWidget, QHBoxLayout, QLabel, QMenu, QAction
 from qtpy.QtGui import QIcon, QImage
-from qtpy.QtCore import Qt, QEvent, QBuffer, QByteArray
+from qtpy.QtCore import Qt, QEvent, QBuffer
 
 from ..GlobalAttributes import Location
 from .ListWidget_NameLineEdit import ListWidget_NameLineEdit

@@ -3,9 +3,24 @@
 #   in case of changes affecting it
 #
 
-from qtpy.QtCore import Qt, QPointF, QPoint, QRectF, QMargins, QMarginsF
-from qtpy.QtGui import QColor, QPainter, QBrush, QRadialGradient, QLinearGradient, QPen, QPainterPath, QFont, QPolygon
-from qtpy.QtWidgets import QStyle, QStyleOption
+from qtpy.QtCore import (
+    Qt, 
+    QPointF, 
+    QPoint, 
+    QRectF, 
+    QMarginsF
+)
+from qtpy.QtGui import (
+    QColor, 
+    QPainter, 
+    QBrush, 
+    QRadialGradient, 
+    QLinearGradient, 
+    QPen, QPainterPath, 
+    QFont, 
+    QPolygon
+)
+from qtpy.QtWidgets import QStyleOption
 
 from ..flows.nodes.PortItem import PinState
 from .nodes.GraphicsTextWidget import GraphicsTextWidget, TextStyle

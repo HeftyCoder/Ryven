@@ -51,8 +51,7 @@ class FlowUI(QMainWindow):
         self.setLayout(central_layout)
 
         # add widget actions to menu
-        # should be list[QDockWidget] in 3.9+
-        all_dock_widgets: List[QDockWidget] = [d for d in self.findChildren(QDockWidget)]
+        all_dock_widgets: list[QDockWidget] = [d for d in self.findChildren(QDockWidget)]
         windows_menu = flow_view.menu().addMenu("Windows")
         open_all_action = QAction('Open All', self)
         open_all_action.triggered.connect(self.open_docks)

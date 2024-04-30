@@ -1,5 +1,3 @@
-from typing import Union, Type, List, Optional, Tuple
-
 from qtpy.QtWidgets import (
     QWidget, 
     QVBoxLayout, 
@@ -31,7 +29,7 @@ class InspectorView(QWidget):
     def setup_ui(self):
         self.setLayout(QVBoxLayout())
 
-    def set_selected_nodes(self, nodes: List[Node]):
+    def set_selected_nodes(self, nodes: list[Node]):
         if len(nodes) == 0:
             self.set_node(None)
         else:
@@ -69,7 +67,7 @@ class NodeInspectorDefaultWidget(NodeInspectorWidget, QWidget):
     def _big_bold_text(txt: str):
         return f'<b><bold>{txt}</bold></b>'
     
-    def __init__(self, params, child: Optional[NodeInspectorWidget] = None):
+    def __init__(self, params, child: NodeInspectorWidget | None = None):
         QWidget.__init__(self)
         NodeInspectorWidget.__init__(self, params)
 

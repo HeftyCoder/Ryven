@@ -1,9 +1,6 @@
 import pathlib
-import os
-from typing import Optional, Literal, List, Dict, Set, Union
-
 from .. import NodesPackage
-from ..gui.styling.window_theme import RyvenPalette, WindowThemeType
+from ..gui.styling.window_theme import WindowThemeType
 
 
 class Config:
@@ -26,16 +23,16 @@ class Config:
     # by the args parser.
     #
 
-    project: Optional[pathlib.Path] = None
+    project: pathlib.Path | None = None
     show_dialog: bool = True
     verbose: bool = False
-    nodes: Union[Set[pathlib.Path], Set[NodesPackage]] = []
-    example: Optional[str] = None
-    window_theme: Union[str, WindowThemeType] = WindowThemeType.QDARKTHEME_DARK.value
-    flow_theme: Optional[str] = None  # None means it depends on window_theme
+    nodes: set[pathlib.Path] | set[NodesPackage] = []
+    example: str | None = None
+    window_theme: str | WindowThemeType = WindowThemeType.QDARKTHEME_DARK.value
+    flow_theme: str | None = None  # None means it depends on window_theme
     performance_mode: str = 'fast'
     animations: bool = True
-    window_geometry: Optional[str] = None
+    window_geometry: str | None = None
     window_title: str = 'CogniX'
     qt_api: str = 'pyside6'
     src_code_edits_enabled: bool = False
@@ -44,11 +41,11 @@ class Config:
     rest_api_port: int = 7555
 
     @staticmethod
-    def get_available_window_themes() -> List[WindowThemeType]:
+    def get_available_window_themes() -> list[WindowThemeType]:
         return [theme for theme in WindowThemeType]
 
     @staticmethod
-    def get_available_flow_themes() -> Set[str]:
+    def get_available_flow_themes() -> set[str]:
         # TODO: expose this in ryvencore_qt without requiring Qt import, since QT_API is not set yet
         return {
             "Toy", "Tron", "Ghost", "Blender", "Simple",
@@ -57,7 +54,7 @@ class Config:
         }
 
     @staticmethod
-    def get_available_performance_modes() -> Set[str]:
+    def get_available_performance_modes() -> set[str]:
         return {'pretty', 'fast'}
 
     def __init__(self, *args, **kwargs):
@@ -69,4 +66,4 @@ class Config:
         instance = self
 
 
-instance: Optional[Config] = None
+instance: Config | None = None

@@ -1,5 +1,4 @@
 import types
-from typing import Union, List
 
 
 def get_method_funcs(cls_def_str: str, obj):
@@ -7,16 +6,12 @@ def get_method_funcs(cls_def_str: str, obj):
     Parses the class definition string and returns a dict with python functions under their names,
     parsed from the methods in the class definition string using the ast module.
     """
-
-    import sys
-    if sys.version_info < (3, 9):
-        raise Exception('src code modifications are only supported on Python >=3.9')
-
+    
     # requires Python >= 3.9 for ast.unparse()
     import ast
 
     # extract functions
-    ast_funcs: List[ast.FunctionDef] = [
+    ast_funcs: list[ast.FunctionDef] = [
         f
         for f in ast.parse(cls_def_str).body[0].body
         if type(f) == ast.FunctionDef
@@ -41,7 +36,7 @@ class SrcCodeUpdater:
     """
 
     @staticmethod
-    def override_code(obj: object, new_class_src) -> Union[None, Exception]:
+    def override_code(obj: object, new_class_src) -> Exception | None:
         try:
             funcs = get_method_funcs(new_class_src, obj)
             for name, f in funcs.items():  # override all methods

@@ -1,5 +1,5 @@
-from typing import Tuple, TYPE_CHECKING
-from qtpy.QtGui import QPainter
+from __future__ import annotations
+from typing import TYPE_CHECKING
 from qtpy.QtWidgets import QStyleOptionGraphicsItem, QWidget
 
 from qtpy.QtWidgets import QGraphicsGridLayout, QGraphicsWidget, QGraphicsLayoutItem
@@ -60,7 +60,7 @@ def connections(port):
 class PortItem(GUIBase, QGraphicsWidget):
     """The GUI representative for ports of nodes, also handling mouse events for connections."""
 
-    def __init__(self, node_gui: 'NodeGUI', node_item: 'NodeItem', port: NodePort, flow_view):
+    def __init__(self, node_gui: NodeGUI, node_item: NodeItem, port: NodePort, flow_view):
         GUIBase.__init__(self, representing_component=port)
         QGraphicsWidget.__init__(self)
 
@@ -114,7 +114,7 @@ class PortItem(GUIBase, QGraphicsWidget):
 
 
 class InputPortItem(PortItem):
-    def __init__(self, node_gui: 'NodeGUI', node_item: 'NodeItem', port: NodePort, input_widget: Tuple[type, str] = None):
+    def __init__(self, node_gui: NodeGUI, node_item: NodeItem, port: NodePort, input_widget: tuple[type, str] = None):
         super().__init__(node_gui, node_item, port, node_gui.flow_view)
 
         self.proxy = None  # widget proxy
@@ -239,7 +239,7 @@ class PinState(IntEnum):
         
 class PortItemPin(QGraphicsWidget):
     
-    def __init__(self, port: NodePort, port_item, node_gui: 'NodeGUI', node_item: 'NodeItem'):
+    def __init__(self, port: NodePort, port_item, node_gui: NodeGUI, node_item: NodeItem):
         super(PortItemPin, self).__init__(node_item)
 
         self.port = port

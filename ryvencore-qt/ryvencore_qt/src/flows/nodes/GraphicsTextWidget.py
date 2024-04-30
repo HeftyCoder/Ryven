@@ -15,11 +15,14 @@ from dataclasses import dataclass, field
 
 @dataclass
 class TextStyle:
+    """A simple config class for GraphicsTextWidget"""
+    
     color: QColor = field(default_factory=lambda: QColor('#FFFFFF'))
     font: QFont = field(default_factory=QFont)
 
 
 class GraphicsTextWidget(QGraphicsWidget):
+    """Wraps QGraphicsTextItem as a QGraphicsWidget"""
     
     def __init__(self, parent = None) -> None:
         super().__init__(parent)
