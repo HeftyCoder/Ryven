@@ -10,7 +10,7 @@ from qtpy.QtWidgets import (
 from ..gui_base import GUIBase, AnimationTimer, QGraphicsItemAnimated
 from ..utils import sqrt, pythagoras
 from ..ports.item import PortItem
-from ryvencore_qt.src.Design import Design
+from ..design import Design
 from ryvencore import NodeOutput, NodeInput, Data, Node
 
 from enum import Enum

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from qtpy.QtGui import (
     QFont, 
     QFontMetrics, 
@@ -36,7 +38,7 @@ from .codes_storage import (
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from ryvencore import Node
-    from ryvencore_qt.src.flows.FlowView import FlowView
+    from ..flows.view import FlowView
     from ryvencore_qt import NodeGUI
 
 class EditSrcCodeInfoDialog(QDialog):

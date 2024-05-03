@@ -67,7 +67,7 @@ from .commands import (
     SelectComponents_Command,
 )
 
-from .node_list_widget.NodeListWidget import NodeListWidget
+from ..nodes.list_widget import NodeListWidget
 from ..nodes.gui import NodeGUI
 from ..nodes.item import NodeItem
 from ..ports.item import (

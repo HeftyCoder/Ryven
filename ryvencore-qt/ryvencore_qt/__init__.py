@@ -17,5 +17,5 @@ from .nodes.inspector import NodeInspectorWidget
 from ryvencore import Node
 
 # gui classes
-from .src.widgets import *
+from .addons import *
 from .flows.themes import flow_themes

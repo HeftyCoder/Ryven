@@ -34,6 +34,7 @@ from qtpy.QtCore import (
 )
 from statistics import median
 from re import escape
+from ryvencore import Node
 
 #   UTIL
 
@@ -95,7 +96,7 @@ class NodeListItemWidget(QWidget):
     custom_focused_from_inside = Signal()
 
     @staticmethod
-    def _create_mime_data(node) -> QMimeData:
+    def _create_mime_data(node: Node) -> QMimeData:
         mime_data = QMimeData()
         mime_data.setData('application/json', bytes(json.dumps(
                 {
@@ -118,6 +119,7 @@ class NodeListItemWidget(QWidget):
         main_layout.setContentsMargins(0, 0, 0, 0)
 
         self_ = self
+        
         class NameLabel(QLineEdit):
             def __init__(self, text):
                 super().__init__(text)
@@ -184,7 +186,7 @@ class NodeListItemWidget(QWidget):
         r, g, b = QColor(color).red(), QColor(color).green(), QColor(color).blue()
 
         new_style_sheet = f'''
-NodeWidget {{
+NodeListItemWidget {{
     border: 1px solid rgba(255,255,255,150);
     border-radius: 2px;
     {(

@@ -18,7 +18,7 @@ from traits.observation.events import (
 )
 from qtpy.QtWidgets import QVBoxLayout, QWidget
 from ryven.gui_env import NodeGUI
-from ryvencore_qt.src.flows.FlowCommands import Delegate_Command
+from ryvencore_qt.flows.commands import Delegate_Command
 
 @node_config_gui(NodeTraitsConfig)
 class NodeTraitsConfigInspector(NodeConfigInspector, QWidget):

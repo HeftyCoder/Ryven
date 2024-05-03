@@ -5,7 +5,7 @@ This module automatically imports all requirements for Gui definitions of a node
 from ryvencore import Node
 from ryvencore.info_msgs import InfoMsgs
 from ryvencore_qt import NodeGUI, NodeInspectorWidget
-from ryvencore_qt.src.flows.nodes.WidgetBaseClasses import InspectorWidget
+from ryvencore_qt.nodes.inspector import InspectorWidget
 
 from typing import TypeVar, Generic
 

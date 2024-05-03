@@ -14,16 +14,18 @@ from qtpy.QtWidgets import (
 )
 from qtpy.QtCore import Qt, QByteArray
 
-import ryvencore_qt.src.widgets as GUI
+from ryvencore_qt.addons.variables import VariablesListWidget
+from ryvencore_qt.addons.logging import LogWidget
+
 from ryvencore.rc import FlowAlg
 from ryvencore import Flow
 
-from ryvencore_qt.src.code_editor.CodePreviewWidget import CodePreviewWidget
+from ryvencore_qt.code_editor.widgets import CodePreviewWidget
 from ..gui.uic.ui_flow_window import Ui_FlowWindow
-from ryvencore_qt.src.flows.FlowView import FlowView
-from ryvencore_qt.src.flows.nodes.NodeInspector import InspectorView
-from typing import List, TYPE_CHECKING
+from ryvencore_qt.flows.view import FlowView
+from ryvencore_qt.nodes.inspector import InspectorView
 
+from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .main_window import MainWindow
 
@@ -93,7 +95,7 @@ class FlowUI(QMainWindow):
         self.flow_alg_mode_changed(self.flow.algorithm_mode())
 
         # variables list widget
-        self.vars_list_widget = GUI.VarsList(
+        self.vars_list_widget = VariablesListWidget(
             self.flow.session.addons.get('Variables'), self.flow
         )  # TODO: how are vars now managed?
         self.ui.variables_dock.setWidget(self.vars_list_widget)
@@ -159,7 +161,7 @@ class FlowUI(QMainWindow):
         return w
 
     def add_logger_widget(self, logger):
-        self.ui.logs_scrollArea.widget().layout().addWidget(GUI.LogWidget(logger))
+        self.ui.logs_scrollArea.widget().layout().addWidget(LogWidget(logger))
 
     def flow_alg_mode_changed(self, mode: str):
         self.flow_alg_mode_dropdown.setCurrentText(

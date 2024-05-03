@@ -9,7 +9,7 @@ from qtpy.QtWidgets import (
 from qtpy.QtCore import Qt
 from ryvencore import Node
 from ryvencore.port import NodePort
-from ..gui_base import InspectorWidget
+from ..base_widgets import InspectorWidget
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:

@@ -1,7 +1,7 @@
 import code
 import re
 
-from ryvencore_qt.src.code_editor.CodeEditorWidget import CodeEditorWidget
+from ryvencore_qt.code_editor.widgets import CodeEditorWidget
 
 from qtpy.QtWidgets import (
     QWidget, 

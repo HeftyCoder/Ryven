@@ -1,3 +1,4 @@
+from __future__ import annotations
 from qtpy.QtWidgets import QGraphicsProxyWidget, QGraphicsSceneHoverEvent
 
 from typing import TYPE_CHECKING

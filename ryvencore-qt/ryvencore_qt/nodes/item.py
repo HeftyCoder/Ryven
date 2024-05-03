@@ -48,7 +48,6 @@ from ..utils import (
     get_resource
 )
 
-from .item import NodeItemWidget
 from ..ports.item import InputPortItem, OutputPortItem
 from ..util_widgets import GraphicsProgressBar, GraphicsTextWidget
 from ..design import Design

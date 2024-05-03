@@ -31,8 +31,9 @@ from .. import import_nodes_package
 from ..gui.dialogs import GetTextDialog, ChooseFlowDialog
 
 # ryvencore_qt
-import ryvencore_qt as rc
-import ryvencore_qt.src.widgets as rc_GUI
+from ryvencore_qt import SessionGUI
+from ryvencore_qt.flows.list_widget import FlowsListWidget
+from ryvencore_qt.nodes.list_widget import NodeListWidget
 
 from ryvencore import InfoMsgs, Flow
 
@@ -43,7 +44,7 @@ class MainWindow(QMainWindow):
     __session_gui_instance = None
     
     @classmethod
-    def get_session_gui_instance(cls) -> rc.SessionGUI:
+    def get_session_gui_instance(cls) -> SessionGUI:
         return cls.__session_gui_instance
         
     def __init__(
@@ -68,7 +69,7 @@ class MainWindow(QMainWindow):
         
         # Init Session GUI
 
-        self.session_gui = rc.SessionGUI(self)
+        self.session_gui = SessionGUI(self)
         MainWindow.__session_gui_instance = self.session_gui
 
         self.session_gui.cd_storage.edit_src_codes = self.config.src_code_edits_enabled
@@ -227,10 +228,10 @@ CONTROLS
         # self.ui.left_vertical_splitter.setSizes([350, 350])
         self.ui.main_vertical_splitter.setSizes([700, 0])
 
-        self.flows_list_widget = rc_GUI.FlowsList(self.session_gui)
+        self.flows_list_widget = FlowsListWidget(self.session_gui)
         self.ui.flows_dock.setWidget(self.flows_list_widget)
 
-        self.nodes_list_widget = rc_GUI.NodeListWidget(self.session_gui, True)
+        self.nodes_list_widget = NodeListWidget(self.session_gui, True)
         self.ui.nodes_dock.setWidget(self.nodes_list_widget)
 
         self.ui.main_horizontal_splitter.setSizes([120, 800 - 120])

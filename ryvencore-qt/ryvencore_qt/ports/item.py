@@ -1,18 +1,16 @@
 from __future__ import annotations
-from qtpy.QtWidgets import QStyleOptionGraphicsItem, QWidget
 
 from qtpy.QtWidgets import QGraphicsGridLayout, QGraphicsWidget, QGraphicsLayoutItem
 from qtpy.QtCore import Qt, QRectF, QPointF, QSizeF
-from qtpy.QtGui import QFontMetricsF, QFont
+from qtpy.QtGui import QFont
 
 from ryvencore import serialize, Data
-from ryvencore import NodeOutput, NodeInput
-from ryvencore.port import NodePort
+from ryvencore import NodeOutput, NodeInput, NodePort
 from ryvencore.utils import deserialize
 
 from ..gui_base import GUIBase
-from ..utils import get_longest_line, shorten
-from ..flows.view import FlowViewProxyWidget
+from ..utils import shorten
+from ..flows.widget_proxies import FlowViewProxyWidget
 from ..util_widgets import GraphicsTextWidget
 
 from enum import IntEnum
@@ -20,12 +18,13 @@ from enum import IntEnum
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from ..nodes.gui import NodeGUI
-    from .item import NodeItem
+    from ..nodes.item import NodeItem
+    from ..flows.view import FlowView
     
 # utils
 
 
-def is_connected(port):
+def is_connected(port: NodePort):
     if isinstance(port, NodeOutput):
         is_connected = len(port.node.flow.connected_inputs(port)) > 0
     else:
@@ -33,7 +32,7 @@ def is_connected(port):
     return is_connected
 
 
-def val(port):
+def val(port: NodePort):
     if isinstance(port, NodeOutput):
         return port.val.payload if isinstance(port.val, Data) else None
     else:
@@ -44,7 +43,7 @@ def val(port):
             return None
 
 
-def connections(port):
+def connections(port: NodePort):
     if isinstance(port, NodeOutput):
         return [(port, i) for i in port.node.flow.connected_inputs(port)]
     else:
@@ -61,7 +60,7 @@ def connections(port):
 class PortItem(GUIBase, QGraphicsWidget):
     """The GUI representative for ports of nodes, also handling mouse events for connections."""
 
-    def __init__(self, node_gui: NodeGUI, node_item: NodeItem, port: NodePort, flow_view):
+    def __init__(self, node_gui: NodeGUI, node_item: NodeItem, port: NodePort, flow_view: FlowView):
         GUIBase.__init__(self, representing_component=port)
         QGraphicsWidget.__init__(self)
 
@@ -69,7 +68,7 @@ class PortItem(GUIBase, QGraphicsWidget):
 
         self.node_gui = node_gui
         self.node_item = node_item
-        self.port: NodePort = port
+        self.port = port
         self.flow_view = flow_view
 
         self.pin = PortItemPin(self.port, self, self.node_gui, self.node_item)

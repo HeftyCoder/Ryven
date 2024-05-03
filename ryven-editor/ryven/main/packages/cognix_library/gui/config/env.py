@@ -1,4 +1,4 @@
-from ryvencore_qt.src.flows.nodes.WidgetBaseClasses import InspectorWidget
+from ryvencore_qt.nodes.inspector import InspectorWidget
 from cognix.api import NodeConfig
 from ryven.gui_env import Association
 from .abc import NodeConfigInspector
