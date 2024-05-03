@@ -2,15 +2,15 @@
 from __future__ import annotations
 from ryvencore import Data, Node
 
-from ..FlowCommands import Delegate_Command
-from ...GUIBase import SerializableItem
+from ..flows.commands import Delegate_Command
+from ..gui_base import SerializableItem
 
 from typing import Generic, TypeVar, TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from .NodeItem import NodeItem
-    from .NodeGUI import NodeGUI
-    from ..FlowView import FlowView
+    from .item import NodeItem
+    from .gui import NodeGUI
+    from ..flows.view import FlowView
     from ryvencore import NodeInput
 
 class NodeMainWidget(SerializableItem):
@@ -99,89 +99,4 @@ class InspectorWidget(SerializableItem, Generic[InspectType]):
             ),
             silent
         )
-    
-class NodeInspectorWidget(InspectorWidget[Node]):
-    """Base class for the inspector widget of a node."""
-
-    def __init__(self, params: tuple[Node, 'NodeGUI']):
-        self.node, self.node_gui = params
-        self.inspected = self.node
-        self.flow_view = self.node_gui.flow_view
-    
-    def on_node_deleted(self):
-        """Called when the node is deleted"""
-        pass
-
-
-class NodeViewerWidget:
-    """
-    Base class for the view widget of a node.
-    
-    A view is a detached window for interacting with the node other than the inspector.
-    """
-
-    def __init__(self, params: tuple[Node, 'NodeGUI']):
-        self.node, self.node_gui = params
-    
-    def on_before_shown(self):
-        """
-        VIRTUAL
-        
-        Called before the viewer is shown
-        """
-        pass
-    
-    def on_after_shown(self):
-        """
-        VIRTUAL
-        
-        Called after the viewer is shown
-        """
-        pass
-    
-    def on_before_hidden(self):
-        """
-        VIRTUAL
-        
-        Called before the viewer is hidden.
-        """
-    
-    def on_after_hidden(self):
-        """
-        VIRTUAL
-        
-        Called after the viewer is hidden.
-        """
-        
-    def on_before_closed(self):
-        """
-        VIRTUAL
-        
-        Called before the viewer is closed
-        """
-        pass
-
-    def on_after_closed(self):
-        """
-        VIRTUAL
-        
-        Called after the viewer is closed
-        """
-    
-    def on_node_update(self, data):
-        """
-        VIRTUAL
-        
-        Called when a node is updated (the updated event).
-        The developer can pass any kind of data and update the view.
-        """
-        pass
-
-    def on_node_deleted(self):
-        """
-        VIRTUAL
-        
-        Called when a node is deleted
-        """
-        pass
         

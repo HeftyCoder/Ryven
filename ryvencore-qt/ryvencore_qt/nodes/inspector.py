@@ -9,10 +9,25 @@ from qtpy.QtWidgets import (
 from qtpy.QtCore import Qt
 from ryvencore import Node
 from ryvencore.port import NodePort
+from ..gui_base import InspectorWidget
 
-from .WidgetBaseClasses import NodeInspectorWidget
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from .gui import NodeGUI
 
+class NodeInspectorWidget(InspectorWidget[Node]):
+    """Base class for the inspector widget of a node."""
 
+    def __init__(self, params: tuple[Node, 'NodeGUI']):
+        self.node, self.node_gui = params
+        self.inspected = self.node
+        self.flow_view = self.node_gui.flow_view
+    
+    def on_node_deleted(self):
+        """Called when the node is deleted"""
+        pass
+    
+    
 class InspectorView(QWidget):
     """
     A widget that can display the inspector of the currently selected node.

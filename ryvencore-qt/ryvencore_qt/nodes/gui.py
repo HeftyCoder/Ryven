@@ -5,18 +5,20 @@ from qtpy.QtCore import QObject, Signal
 from qtpy.QtWidgets import QWidget, QApplication
 from qtpy.QtGui import Qt
 
-from .WidgetBaseClasses import NodeMainWidget, NodeInputWidget, NodeInspectorWidget, NodeViewerWidget
-from .NodeInspector import NodeInspectorDefaultWidget
-from .NodeViewer import NodeViewerDefault
+from .base_widgets import NodeMainWidget, NodeInputWidget
+from ..nodes.inspector import NodeInspectorWidget
+from .viewer import NodeViewerWidget, NodeViewerDefault
+from .inspector import NodeInspectorDefaultWidget
+from .viewer import NodeViewerDefault
 
 from ryvencore.rc import ProgressState
 from ryvencore import Node
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from .NodeItem import NodeItem
-    from ...SessionGUI import SessionGUI
-    from ..FlowView import FlowView
+    from .item import NodeItem
+    from ..session_gui import SessionGUI
+    from ..flows.view import FlowView
 
 class NodeGUI(QObject):
     """

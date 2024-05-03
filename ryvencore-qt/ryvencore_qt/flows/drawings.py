@@ -1,7 +1,7 @@
 from qtpy.QtWidgets import QGraphicsItem
 from qtpy.QtGui import QPen, QPainter, QColor, QPainterPath
 from qtpy.QtCore import Qt, QRectF, QPointF, QLineF
-from ...utils import MovementEnum, generate_name
+from ..utils import MovementEnum, generate_name
 
 class DrawingObject(QGraphicsItem):
     """GUI implementation for 'drawing objects' in the scene, written by hand using a stylus pen"""

@@ -2,13 +2,20 @@ import enum
 import pathlib
 from math import sqrt
 
-from qtpy.QtCore import QPointF, QByteArray
-
+from qtpy.QtCore import QPointF, QByteArray, Signal
 from ryvencore.utils import serialize, deserialize
-from .GlobalAttributes import *
+from ryvencore.base import Event
 
+class Location:
+    PACKAGE_PATH = None
+    
+def connect_signal_event(signal: Signal, ev: Event, callback):
+    signal.connect(callback)
+    ev.sub(signal.emit)
+    
 def generate_name(obj, name):
    return f'{name}:[{id(obj)}]'
+    
     
 def pythagoras(a, b):
     return sqrt(a ** 2 + b ** 2)
@@ -47,6 +54,7 @@ def pointF_mapped(p1, p2):
 
 def points_dist(p1, p2):
     return sqrt(abs(p1.x() - p2.x())**2 + abs(p1.y() - p2.y())**2)
+
 
 def middle_point(p1, p2):
     return QPointF((p1.x() + p2.x())/2, (p1.y() + p2.y())/2)

@@ -1,19 +1,29 @@
-from typing import TYPE_CHECKING
-
-from qtpy.QtCore import Qt
-from qtpy.QtWidgets import (
-    QWidget, 
-    QHBoxLayout, 
-    QVBoxLayout, 
-    QRadioButton, 
-    QPushButton
+from qtpy.QtGui import (
+    QFont, 
+    QFontMetrics, 
+    QTextCursor, 
+    QKeySequence,
 )
+from qtpy.QtWidgets import (
+    QWidget,
+    QTextEdit, 
+    QDialog, 
+    QGridLayout, 
+    QPushButton,
+    QRadioButton,
+    QVBoxLayout,
+    QHBoxLayout,
+)
+from qtpy.QtCore import Qt
 
-from ryvencore import Node
+from pygments import highlight
+from pygments.lexers import get_lexer_by_name
+from pygments.formatters import get_formatter_by_name
 
-from .EditSrcCodeInfoDialog import EditSrcCodeInfoDialog
-from .CodeEditorWidget import CodeEditorWidget
-from .SourceCodeUpdater import SrcCodeUpdater
+from .pygments.dracula import DraculaStyle
+from .pygments.light import LightStyle
+
+from .code_updater import SrcCodeUpdater
 from .codes_storage import ( 
     NodeTypeCodes,
     Inspectable, 
@@ -23,9 +33,182 @@ from .codes_storage import (
     SourceCodeStorage,
 )
 
+from typing import TYPE_CHECKING
 if TYPE_CHECKING:
+    from ryvencore import Node
     from ryvencore_qt.src.flows.FlowView import FlowView
     from ryvencore_qt import NodeGUI
+
+class EditSrcCodeInfoDialog(QDialog):
+
+    dont_show_again = False
+
+    def __init__(self, parent):
+        super(EditSrcCodeInfoDialog, self).__init__(parent)
+
+        self.setLayout(QGridLayout())
+
+        # info text edit
+        info_text_edit = QTextEdit()
+        info_text_edit.setHtml('''
+            <h2 style="font-family: Poppins; font-size: xx-large; color: #a9d5ef;">Some info before you delete the
+            universe</h2>
+            <div style="font-family: Corbel; font-size: x-large;">
+                <p>
+                    Yes, you can change method implementations of objects.
+                    This can be quite useful but since changing an instance's implementation at runtime is kinda sketchy, 
+                    you should be a bit careful, it's not exactly bulletproof, and doesnt <i>always</i> work.
+                    When you override a method implementation, a new function object will be created using python's ast 
+                    module, which then gets bound to the object as method, which essentially shadows the old implementation. 
+                    Therefore, you might need to add imports etc. you noder uses in the original nodes package. 
+                    All changes are temporary and only apply on a single 
+                    object.
+                </p>
+                <p>
+                    Have fun.
+                </p>
+            </div>
+        ''')
+        info_text_edit.setReadOnly(True)
+        self.layout().addWidget(info_text_edit, 0, 0, 1, 2)
+
+        dont_show_again_button = QPushButton('Stop being annoying')
+        dont_show_again_button.clicked.connect(self.close_and_dont_show_again)
+        self.layout().addWidget(dont_show_again_button, 1, 0)
+
+        ok_button = QPushButton('Got it')
+        ok_button.clicked.connect(self.accept)
+        self.layout().addWidget(ok_button, 1, 1)
+
+        ok_button.setFocus()
+
+        self.setWindowTitle('Editing Source Code Info')
+        self.resize(560, 366)
+
+    def close_and_dont_show_again(self):
+        EditSrcCodeInfoDialog.dont_show_again = True
+        self.accept()
+  
+        
+class CodeEditorWidget(QTextEdit):
+    
+    def __init__(self, window_theme='dark', highlight=True, enabled=False):
+        super(CodeEditorWidget, self).__init__()
+
+        self.highlighting = highlight
+        self.editing = enabled
+        
+        f = QFont('Consolas', 12)
+        self.setFont(f)
+        self.update_tab_stop_width()
+
+        # also not working:
+        # copy_shortcut = QShortcut(QKeySequence.Copy, self)
+        # copy_shortcut.activated.connect(self.copy)
+        # https://forum.qt.io/topic/121474/qshortcuts-catch-external-shortcuts-from-readonly-textedit/4
+
+        self.textChanged.connect(self.text_changed)
+        self.block_change_signal = False
+
+        self.lexer = get_lexer_by_name('python')
+
+        self.update_formatter(window_theme)
+
+        if self.editing:
+            self.enable_editing()
+        else:
+            self.disable_editing()
+
+    def update_formatter(self, window_theme):
+        if window_theme == 'dark':
+            self.formatter = get_formatter_by_name('html', noclasses=True, style=DraculaStyle)
+        else:
+            self.formatter = get_formatter_by_name('html', noclasses=True, style=LightStyle)
+
+    def enable_editing(self):
+        self.editing = True
+        self.setReadOnly(False)
+        self.update_appearance()
+
+    def disable_editing(self):
+        self.editing = False
+        self.setReadOnly(True)
+        self.update_appearance()
+
+    def disable_highlighting(self):
+        self.highlighting = False
+        # self.update_appearance()
+
+    def enable_highlighting(self):
+        self.highlighting = True
+        # self.update_appearance()
+
+    def highlight(self):
+        self.enable_highlighting()
+        self.update_appearance()
+
+    def mousePressEvent(self, e) -> None:
+        if not self.highlighting and not self.editing:
+            self.highlight()
+        else:
+            return super().mousePressEvent(e)
+
+    def wheelEvent(self, e) -> None:
+        super().wheelEvent(e)
+        if e.modifiers() == Qt.CTRL:  # for some reason this also catches touch pad zooming
+            self.update_tab_stop_width()
+            # and for some reason QTextEdit doesn't seem to zoom using zoomIn()/zoomOut(), but by changing the font size
+            # so I need to update the (pixel measured) tab stop width
+
+    def set_code(self, new_code):
+        # self.highlighting = self.editing
+        self.setText(new_code.replace('    ', '\t'))
+        self.update_appearance()
+
+    def get_code(self):
+        return self.toPlainText().replace('\t', '    ')
+
+    def text_changed(self):
+        if not self.block_change_signal:
+            self.update_appearance()
+
+    def update_tab_stop_width(self):
+        self.setTabStopWidth(QFontMetrics(self.font()).width('_')*4)
+
+    def update_appearance(self):
+        if not self.editing and not self.highlighting:
+            return
+
+        self.setUpdatesEnabled(False)  # speed up, doesnt really seem to help though
+
+        cursor_pos = self.textCursor().position()
+        scroll_pos = (self.horizontalScrollBar().sliderPosition(), self.verticalScrollBar().sliderPosition())
+
+        self.block_change_signal = True
+
+        highlighted = """
+<style>
+* {
+    font-family: Consolas;
+}
+</style>
+        """ + highlight(self.toPlainText(), self.lexer, self.formatter)
+
+        self.setHtml(highlighted)
+
+        self.block_change_signal = False
+
+        if self.hasFocus():
+            c = QTextCursor(self.document())
+            c.setPosition(cursor_pos)
+            self.setTextCursor(c)
+            self.horizontalScrollBar().setSliderPosition(scroll_pos[0])
+            self.verticalScrollBar().setSliderPosition(scroll_pos[1])
+        else:
+            self.textCursor().setPosition(0)
+
+        self.setUpdatesEnabled(True)
+
 
 class LoadSrcCodeButton(QPushButton):
     def __init__(self):
@@ -292,3 +475,4 @@ class CodePreviewWidget(QWidget):
         else:
             # TODO: show error message
             ...
+

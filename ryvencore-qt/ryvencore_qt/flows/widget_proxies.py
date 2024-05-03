@@ -1,10 +1,13 @@
 from qtpy.QtWidgets import QGraphicsProxyWidget, QGraphicsSceneHoverEvent
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from .view import FlowView
 
 class FlowViewProxyWidget(QGraphicsProxyWidget):
     """Ensures easy controls event handling for QProxyWidgets in the flow."""
 
-    def __init__(self, flow_view, parent=None):
+    def __init__(self, flow_view: FlowView, parent=None):
         super(FlowViewProxyWidget, self).__init__(parent)
 
         self.flow_view = flow_view
@@ -30,7 +33,7 @@ class FlowViewProxyWidget(QGraphicsProxyWidget):
 class FlowViewProxyHoverWidget(FlowViewProxyWidget):
     """Additional hover controls for QProxyWidgets in the flow."""
 
-    def __init__(self, flow_view, parent=None):
+    def __init__(self, flow_view: FlowView, parent=None):
         super(FlowViewProxyHoverWidget, self).__init__(flow_view, parent)
         self._is_hovered = False
 

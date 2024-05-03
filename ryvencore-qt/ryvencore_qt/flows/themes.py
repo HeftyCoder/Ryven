@@ -22,8 +22,8 @@ from qtpy.QtGui import (
 )
 from qtpy.QtWidgets import QStyleOption
 
-from ..flows.nodes.PortItem import PinState
-from .nodes.GraphicsTextWidget import GraphicsTextWidget, TextStyle
+from ..ports.item import PinState
+from ..util_widgets import GraphicsTextWidget, TextStyle
 from ..utils import pythagoras
 
 from typing import Dict

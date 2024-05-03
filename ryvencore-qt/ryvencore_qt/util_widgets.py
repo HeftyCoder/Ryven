@@ -1,22 +1,80 @@
-from qtpy.QtCore import QRectF
+from qtpy.QtGui import QFont
+
 from qtpy.QtWidgets import (
-    QWidget, 
-    QGraphicsItem, 
-    QGraphicsWidget, 
-    QStyleOptionGraphicsItem,
+    QWidget,
+    QGraphicsWidget,
+    QGraphicsTextItem,
     QGraphicsLayoutItem,
+    QGraphicsItem,
+    QStyleOptionGraphicsItem,
 )
+
+from dataclasses import dataclass, field
 from numbers import Real, Integral
-from typing import Union
-from qtpy.QtCore import Qt, QPointF, QSizeF, QTimeLine
+from qtpy.QtCore import Qt, QPointF, QSizeF, QTimeLine, QRectF
 from qtpy.QtGui import QColor, QPainter, QFont
+
+
+@dataclass
+class TextStyle:
+    """A simple config class for GraphicsTextWidget"""
+    
+    color: QColor = field(default_factory=lambda: QColor('#FFFFFF'))
+    font: QFont = field(default_factory=QFont)
+
+
+class GraphicsTextWidget(QGraphicsWidget):
+    """Wraps QGraphicsTextItem as a QGraphicsWidget"""
+    
+    def __init__(self, parent = None) -> None:
+        super().__init__(parent)
+        self._text_item = QGraphicsTextItem(parent=self)
+        
+    def boundingRect(self):
+        return self._text_item.boundingRect()
+    
+    def sizeHint(self, which, constraint=...):
+        return self._text_item.boundingRect().size()
+    
+    def setGeometry(self, rect):
+        self.prepareGeometryChange()
+        QGraphicsLayoutItem.setGeometry(self, rect)
+        self.setPos(rect.topLeft())
+        
+    def set_text(self, value: str):
+        self._text_item.setPlainText(value)
+        self.update()
+        
+    def set_html(self, html: str):
+        self._text_item.setHtml(html)
+        self.update()
+        
+    def set_text_width(self, width):
+        self._text_item.setTextWidth(width)
+        self.update()
+        
+    def set_default_text_color(self, color: QColor):
+        self._text_item.setDefaultTextColor(color)
+        self.update()
+        
+    def default_text_color(self):
+        return self._text_item.defaultTextColor()
+    
+    def set_font(self, font):
+        self._text_item.setFont(font)
+        self.update()
+        
+    def set_text_style(self, style: TextStyle):
+        self._text_item.setFont(style.font)
+        self._text_item.setDefaultTextColor(style.color)
+        self.update()
 
 
 class GraphicsProgressBar(QGraphicsWidget):
     
     """A graphics progress bar for display in a Graphics View"""
     
-    def __init__(self, color: QColor = QColor(0, 255, 0), height: Real = 20, parent: Union[QGraphicsItem, None] = None):
+    def __init__(self, color: QColor = QColor(0, 255, 0), height: Real = 20, parent: QGraphicsItem | None = None):
         super().__init__(parent)
         self._color = color
         self._progress: Real = 0
@@ -166,7 +224,7 @@ class GraphicsProgressBar(QGraphicsWidget):
     def sizeHint(self, which, constraint=...):
         return QSizeF(self._width, self._height)
         
-    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Union[QWidget, None] = ...):
+    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget | None = ...):
         rect = self.boundingRect()
         x, y, width, height = rect.x(), rect.y(), rect.width(), rect.height()
         
@@ -196,3 +254,5 @@ class GraphicsProgressBar(QGraphicsWidget):
     
     def __clamp(self, num, min_value, max_value):
         return max(min(num, max_value), min_value)
+
+

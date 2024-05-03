@@ -1,7 +1,7 @@
 from qtpy.QtGui import QFontMetrics, QFont
 from qtpy.QtWidgets import QSpinBox, QLineEdit, QCheckBox, QComboBox
 
-from .WidgetBaseClasses import NodeInputWidget
+from ..nodes.base_widgets import NodeInputWidget
 
 
 class DType_IW_Base(NodeInputWidget):

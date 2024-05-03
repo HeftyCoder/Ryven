@@ -1,24 +1,43 @@
-from qtpy.QtWidgets import QWidget, QHBoxLayout, QLabel, QMenu, QAction
-from qtpy.QtGui import QIcon, QDrag
-from qtpy.QtCore import QMimeData, Qt, QEvent, QByteArray
+from __future__ import annotations
 
-import json
+from qtpy.QtWidgets import (
+    QWidget, 
+    QHBoxLayout, 
+    QVBoxLayout,
+    QLabel, 
+    QMenu, 
+    QAction,
+    QComboBox,
+    QFrame,
+    QLineEdit,
+)
+
+from qtpy.QtGui import QIcon, QDrag
+from qtpy.QtCore import (
+    QMimeData, 
+    Qt,
+    QEvent,
+    QByteArray,
+)
 
 from ..GlobalAttributes import Location
-from .ListWidget_NameLineEdit import ListWidget_NameLineEdit
-from ..utils import shorten
+from ..utils import shorten, connect_signal_event
 from .EditVal_Dialog import EditVal_Dialog
-from ryvencore.addons.variables import VarsAddon
+from typing import TYPE_CHECKING
+from json import dumps
 
+if TYPE_CHECKING:
+    from ryvencore.addons.variables import Variable
+    from .VariablesListWidget import VariablesListWidget
 
 class VarsList_VarWidget(QWidget):
     """A QWidget representing a single script variable for the VariablesListWidget."""
 
-    def __init__(self, vars_list_widget, vars_addon: VarsAddon, flow, var):
+    def __init__(self, vars_list_widget: VariablesListWidget, var: Variable):
         super().__init__()
 
-        self.vars_addon = vars_addon
-        self.flow = flow
+        self.vars_addon = var.addon
+        self.flow = var.flow
         self.var = var
         self.vars_list_widget = vars_list_widget
         self.previous_var_name = ''  # for editing
@@ -28,31 +47,41 @@ class VarsList_VarWidget(QWidget):
 
         # UI
 
-        main_layout = QHBoxLayout()
+        self.main_layout = main_layout = QHBoxLayout()
         main_layout.setContentsMargins(0, 0, 0, 0)
-
+        self.setLayout(main_layout)
         # create icon
 
         variable_icon = QIcon(Location.PACKAGE_PATH+'/resources/pics/variable_picture.png')
 
-        icon_label = QLabel()
+        self.icon_label = icon_label = QLabel()
         icon_label.setFixedSize(15, 15)
         icon_label.setStyleSheet('border:none;')
         icon_label.setPixmap(variable_icon.pixmap(15, 15))
         main_layout.addWidget(icon_label)
 
+        # content-layout
+        self.content_widget = QFrame()
+        self.content_widget.setFrameStyle(QFrame.StyledPanel | QFrame.Plain)
+        self.content_widget.setLineWidth(1)
+        self.content_widget.setLayout(QVBoxLayout())
+        main_layout.addWidget(self.content_widget)
+        
         #   name line edit
 
-        self.name_line_edit = ListWidget_NameLineEdit(self.var.name, self)
+        self.name_line_edit = QLineEdit(self.var.name, self)
         self.name_line_edit.setPlaceholderText('name')
         self.name_line_edit.setEnabled(False)
         self.name_line_edit.editingFinished.connect(self.name_line_edit_editing_finished)
 
-        main_layout.addWidget(self.name_line_edit)
-
-        self.setLayout(main_layout)
-
-
+        self.content_widget.layout().addWidget(self.name_line_edit)
+        
+        # Data options
+        s = self.flow.session
+        for i in range(1):
+            combo = QLabel("I CAN SHOW YOU THE WORLD")
+            self.content_widget.layout().addWidget(combo)
+        
 
     def mouseDoubleClickEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -125,7 +154,7 @@ class VarsList_VarWidget(QWidget):
         data = {'type': 'variable',
                 'name': self.var.name,
                 'value': self.var.get()}  # value is probably unnecessary
-        data_text = json.dumps(data)
+        data_text = dumps(data)
         return data_text
 
 
@@ -133,14 +162,18 @@ class VarsList_VarWidget(QWidget):
         if self.ignore_name_line_edit_signal:
             return
 
-        name = self.name_line_edit.text()
+        new_name = self.name_line_edit.text()
 
         self.ignore_name_line_edit_signal = True
-
-        if self.vars_addon.var_name_valid(self.flow, name):
-            self.var.name = name
-        else:
+        
+        rename_result = self.vars_addon.rename_var(self.flow, self.var.name, new_name)
+        if not rename_result:
             self.name_line_edit.setText(self.previous_var_name)
 
         self.name_line_edit.setEnabled(False)
+        self.ignore_name_line_edit_signal = False
+    
+    def set_name_text(self, name: str):
+        self.ignore_name_line_edit_signal = True
+        self.name_line_edit.setText(name)
         self.ignore_name_line_edit_signal = False

@@ -3,9 +3,9 @@ from qtpy.QtWidgets import QWidget, QApplication
 
 import ryvencore
 
-from .flows.FlowView import FlowView
-from .Design import Design
-from .GUIBase import GUIBase
+from .flows.view import FlowView
+from .design import Design
+from .gui_base import GUIBase
 from .code_editor.codes_storage import SourceCodeStorage
 from cognix.api import CognixSession
 

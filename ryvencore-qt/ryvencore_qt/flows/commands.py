@@ -12,7 +12,7 @@ from ryvencore import InfoMsgs, Flow, Node
 import traceback
 
 if TYPE_CHECKING:
-    from .FlowView import FlowView
+    from .view import FlowView
 
 def undo_text_multi(items:list, command: str, to_str=None):
     """Generates a text for an undo command that has zero, one or multiple items"""
@@ -213,9 +213,9 @@ class RemoveComponents_Command(FlowUndoCommand):
         )  # the connections that go beyond the removed nodes and need to be restored in undo
         self.internal_connections = set()
         
-        from .nodes.NodeItem import NodeItem
-        from .connections.ConnectionItem import ConnectionItem
-        from .drawings.DrawingObject import DrawingObject
+        from ..nodes.item import NodeItem
+        from .connections import ConnectionItem
+        from .drawings import DrawingObject
     
         self.node_items: list[NodeItem] = []
         self.nodes: list[Node] = []

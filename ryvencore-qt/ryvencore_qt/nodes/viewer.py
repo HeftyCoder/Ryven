@@ -5,12 +5,84 @@ from qtpy.QtCore import Qt
 
 from ryvencore import Node
 
-from .WidgetBaseClasses import NodeViewerWidget
-from ...code_editor.CodePreviewWidget import CodePreviewWidget
+from ..code_editor.widgets import CodePreviewWidget
 
 if TYPE_CHECKING:
-    from .NodeGUI import NodeGUI
+    from .gui import NodeGUI
 
+class NodeViewerWidget:
+    """
+    Base class for the view widget of a node.
+    
+    A view is a detached window for interacting with the node other than the inspector.
+    """
+
+    def __init__(self, params: tuple[Node, 'NodeGUI']):
+        self.node, self.node_gui = params
+    
+    def on_before_shown(self):
+        """
+        VIRTUAL
+        
+        Called before the viewer is shown
+        """
+        pass
+    
+    def on_after_shown(self):
+        """
+        VIRTUAL
+        
+        Called after the viewer is shown
+        """
+        pass
+    
+    def on_before_hidden(self):
+        """
+        VIRTUAL
+        
+        Called before the viewer is hidden.
+        """
+    
+    def on_after_hidden(self):
+        """
+        VIRTUAL
+        
+        Called after the viewer is hidden.
+        """
+        
+    def on_before_closed(self):
+        """
+        VIRTUAL
+        
+        Called before the viewer is closed
+        """
+        pass
+
+    def on_after_closed(self):
+        """
+        VIRTUAL
+        
+        Called after the viewer is closed
+        """
+    
+    def on_node_update(self, data):
+        """
+        VIRTUAL
+        
+        Called when a node is updated (the updated event).
+        The developer can pass any kind of data and update the view.
+        """
+        pass
+
+    def on_node_deleted(self):
+        """
+        VIRTUAL
+        
+        Called when a node is deleted
+        """
+        pass
+    
+    
 class NodeViewerDefault(NodeViewerWidget, QDialog):
     """
     The default class for creating a view window for a node.

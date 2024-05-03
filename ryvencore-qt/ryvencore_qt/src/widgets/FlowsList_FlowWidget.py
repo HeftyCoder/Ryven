@@ -1,15 +1,21 @@
-from qtpy.QtWidgets import QWidget, QHBoxLayout, QLabel, QMenu, QAction
+from qtpy.QtWidgets import (
+    QWidget, 
+    QHBoxLayout, 
+    QLabel, 
+    QMenu, 
+    QAction,
+    QLineEdit,
+)
 from qtpy.QtGui import QIcon, QImage
 from qtpy.QtCore import Qt, QEvent, QBuffer
 
 from ..GlobalAttributes import Location
-from .ListWidget_NameLineEdit import ListWidget_NameLineEdit
-
+from ryvencore import Flow
 
 class FlowsList_FlowWidget(QWidget):
     """A QWidget representing a single Flow for the FlowsListWidget."""
 
-    def __init__(self, flows_list_widget, session_gui, flow):
+    def __init__(self, flows_list_widget, session_gui, flow: Flow):
         super().__init__()
 
         self.session_gui = session_gui
@@ -39,7 +45,7 @@ class FlowsList_FlowWidget(QWidget):
 
         #   title line edit
 
-        self.title_line_edit = ListWidget_NameLineEdit(flow.title, self)
+        self.title_line_edit = QLineEdit(flow.title, self)
         self.title_line_edit.setPlaceholderText('title')
         self.title_line_edit.setEnabled(False)
         self.title_line_edit.editingFinished.connect(self.title_line_edit_editing_finished)

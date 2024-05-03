@@ -1,24 +1,34 @@
 from qtpy.QtWidgets import QVBoxLayout, QWidget, QLineEdit, QScrollArea
-from qtpy.QtCore import Qt
+from qtpy.QtCore import Qt, Signal
 
 from .VarsList_VarWidget import VarsList_VarWidget
+from ..utils import connect_signal_event
 
+from ryvencore.addons.variables import VarsAddon, Variable
+from ryvencore import Flow
 
 class VariablesListWidget(QWidget):
     """Convenience class for a QWidget to easily manage script variables of a script."""
 
-    def __init__(self, vars_addon, flow):
+    on_var_created_signal = Signal(Variable)
+    on_var_deleted_signal = Signal(Variable)
+    on_var_renamed_signal = Signal(Variable, str)
+    
+    def __init__(self, vars_addon: VarsAddon, flow: Flow):
         super(VariablesListWidget, self).__init__()
 
         self.vars_addon = vars_addon
         self.flow = flow
-        self.vars_addon.var_created.sub(self.on_var_created)
-        self.vars_addon.var_deleted.sub(self.on_var_deleted)
-        self.widgets = []
-        self.currently_edited_var = ''
-        self.ignore_name_line_edit_signal = False  # because disabling causes firing twice otherwise
-        # self.data_type_line_edits = []  # same here
+        
+        # signals and events
+        connect_signal_event(self.on_var_created_signal, self.vars_addon.var_created, self.on_var_created)
+        connect_signal_event(self.on_var_deleted_signal, self.vars_addon.var_deleted, self.on_var_deleted)
+        connect_signal_event(self.on_var_renamed_signal, self.vars_addon.var_renamed, self.on_var_renamed)
 
+        self.widgets: dict[str, VarsList_VarWidget] = {}
+        self.currently_edited_var = ''
+        self.ignore_name_line_edit_signal = False  
+        
         self.setup_UI()
 
 
@@ -56,40 +66,45 @@ class VariablesListWidget(QWidget):
         self.recreate_list()
 
 
-    def on_var_created(self, flow, name, var):
-        if flow == self.flow:
-            self.widgets.append(
-                VarsList_VarWidget(self, self.vars_addon, self.flow, var)
-            )
-            self.rebuild_list()
+    def on_var_created(self, var: Variable):
+        if var.flow == self.flow:
+            w = VarsList_VarWidget(self, var)
+            self.widgets[var.name] = w
+            self.list_layout.addWidget(w)
 
 
-    def on_var_deleted(self, flow, name):
-        # apparently, I cannot remove widgets the same way I add them
-        self.recreate_list()
+    def on_var_deleted(self, var: Variable):
+        if var.name in self.widgets:
+            self.widgets[var.name].setParent(None)
+            del self.widgets[var.name]
 
 
+    def on_var_renamed(self, var: Variable, old_name: str):
+        w = self.widgets[old_name]
+        del self.widgets[old_name]
+        self.widgets[var.name] = w
+        w.set_name_text(var.name)
+        
+        
     def recreate_list(self):
-        for w in self.widgets:
-            w.hide()
+        for w in self.widgets.values():
+            w.setParent(None)
             del w
 
         self.widgets.clear()
-        # self.data_type_line_edits.clear()
 
-        for var_name, var_info in self.vars_addon.flow_variables[self.flow].items():
-            new_widget = VarsList_VarWidget(self, self.vars_addon, self.flow, var_info['var'])
-            # new_widget.name_LE_editing_finished.connect(self.name_line_edit_editing_finished)
-            self.widgets.append(new_widget)
+        for var_name, var_sub in self.vars_addon.flow_variables[self.flow].items():
+            new_widget = VarsList_VarWidget(self, self.vars_addon, self.flow, var_sub.variable)
+            self.widgets[var_name] = new_widget
 
         self.rebuild_list()
 
 
     def rebuild_list(self):
-        for i in range(self.list_layout.count()):
-            self.list_layout.removeItem(self.list_layout.itemAt(0))
+        for w in self.widgets.values():
+            w.setParent(None)
 
-        for w in self.widgets:
+        for w in self.widgets.values():
             self.list_layout.addWidget(w)
 
 
@@ -98,20 +113,6 @@ class VariablesListWidget(QWidget):
         if not self.vars_addon.var_name_valid(self.flow, name=name):
             return
         v = self.vars_addon.create_var(self.flow, name=name)
-
-
-    # def name_line_edit_editing_finished(self):
-    #     var_widget: VarsList_VarWidget = self.sender()
-    #     var_widget.name_line_edit.setEnabled(False)
-    #
-    #     # search for name issues
-    #     new_var_name = var_widget.name_line_edit.text()
-    #     for v in self.vars_manager.variables:
-    #         if v.name == new_var_name:
-    #             var_widget.name_line_edit.setText(self.currently_edited_var.name)
-    #             return
-    #
-    #     var_widget.var.name = new_var_name
 
 
     def del_var(self, var):

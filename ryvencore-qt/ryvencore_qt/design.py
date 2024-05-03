@@ -3,8 +3,8 @@ import json
 from qtpy.QtCore import QObject, Signal
 from qtpy.QtGui import QFontDatabase
 
-from .flows.FlowTheme import FlowTheme, flow_themes
-from .GlobalAttributes import Location
+from .flows.themes import FlowTheme, flow_themes
+from .utils import Location
 
 
 class Design(QObject):

@@ -1,5 +1,4 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
 from qtpy.QtWidgets import QStyleOptionGraphicsItem, QWidget
 
 from qtpy.QtWidgets import QGraphicsGridLayout, QGraphicsWidget, QGraphicsLayoutItem
@@ -11,16 +10,17 @@ from ryvencore import NodeOutput, NodeInput
 from ryvencore.port import NodePort
 from ryvencore.utils import deserialize
 
-from ...GUIBase import GUIBase
-from ...utils import get_longest_line, shorten
-from ..FlowViewProxyWidget import FlowViewProxyWidget
-from .GraphicsTextWidget import GraphicsTextWidget
+from ..gui_base import GUIBase
+from ..utils import get_longest_line, shorten
+from ..flows.view import FlowViewProxyWidget
+from ..util_widgets import GraphicsTextWidget
 
 from enum import IntEnum
 
+from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from .NodeGUI import NodeGUI
-    from .NodeItem import NodeItem
+    from ..nodes.gui import NodeGUI
+    from .item import NodeItem
     
 # utils
 
