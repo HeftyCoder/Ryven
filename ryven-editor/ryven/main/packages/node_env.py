@@ -74,18 +74,18 @@ def export_nodes(
     for n_cls in node_types:
         # store the package id as identifier prefix, which will be added
         # by ryvencore when registering the node type
-        n_cls.identifier_prefix = pkg_name
+        n_cls.id_prefix = pkg_name
 
         # also add the identifier without the prefix as fallback for older versions
-        n_cls.legacy_identifiers = [
-            *n_cls.legacy_identifiers,
-            n_cls.identifier if n_cls.identifier else n_cls.__name__,
+        n_cls.legacy_ids = [
+            *n_cls.legacy_ids,
+            n_cls.id_name if n_cls.id_name else n_cls.__name__,
         ]
     
     # same for data types
     for d_cls in data_types:
-        d_cls.identifier = f'{pkg_name}.{d_cls.identifier}'
-
+        d_cls.id_prefix = pkg_name
+        
     metadata = NodesEnvRegistry.exported_package_metadata
     nodes_datas = (node_types, data_types)
     metadata[pkg_name] = nodes_datas

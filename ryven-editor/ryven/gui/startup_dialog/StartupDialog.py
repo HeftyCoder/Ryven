@@ -190,7 +190,7 @@ class StartupDialog(QDialog):
         # qt api availability
         qt_api = config.qt_api
         qt_available = f'Qt API: {qt_api}. Available in your system: [ '
-        for api_string in ['PySide2', 'PySide6', 'PyQt5', 'PyQt6']:
+        for api_string in ['PySide6', 'PyQt6']:
             if is_package_available(api_string):
                 qt_available += f'{api_string.lower()} '
         qt_available += ' ]. Restart with arg --qt-api <your_api> if you need another API.'

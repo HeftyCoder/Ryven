@@ -1,5 +1,7 @@
+from __future__ import annotations
+
+from ryvencore.base import IdentifiableGroups
 import textdistance
-from qtpy.QtGui import QFont
 import json
 
 from qtpy.QtWidgets import (
@@ -23,6 +25,7 @@ from qtpy.QtGui import (
     QPainter,
     QColor,
     QDrag,
+    QFont,
 )
 
 from qtpy.QtCore import (
@@ -32,9 +35,15 @@ from qtpy.QtCore import (
     QModelIndex, 
     QSortFilterProxyModel,
 )
+
 from statistics import median
 from re import escape
 from ryvencore import Node
+from ..utils import IdentifiableGroupsModel
+
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from ..session_gui import SessionGUI
 
 #   UTIL
 
@@ -60,8 +69,6 @@ def sort_by_val(d: dict) -> dict:
         k: v
         for k, v in sorted(
             d.items(),
-
-            # x: (key, value); sort by value
             key=lambda x: x[1]
         )
     }
@@ -96,17 +103,17 @@ class NodeListItemWidget(QWidget):
     custom_focused_from_inside = Signal()
 
     @staticmethod
-    def _create_mime_data(node: Node) -> QMimeData:
+    def _create_mime_data(node: type[Node]) -> QMimeData:
         mime_data = QMimeData()
         mime_data.setData('application/json', bytes(json.dumps(
                 {
                     'type': 'node',
-                    'node identifier': node.identifier,
+                    'node identifier': node.id(),
                 }
             ), encoding='utf-8'))
         return mime_data
     
-    def __init__(self, parent, node):
+    def __init__(self, parent, node: Node):
         super(NodeListItemWidget, self).__init__(parent)
 
         self.custom_focused = False
@@ -135,16 +142,8 @@ class NodeListItemWidget(QWidget):
                 ev.ignore()
 
         name_label = NameLabel(node.title)
-
-        type_layout = QHBoxLayout()
-
-        #type_label = QLabel(node.type_)
-        #type_label.setFont(QFont('Segoe UI', 8, italic=True))
-        # type_label.setStyleSheet('color: white;')
-
         main_layout.addWidget(name_label, 0, 0)
-        #main_layout.addWidget(type_label, 0, 1)
-
+        
         self.setLayout(main_layout)
         self.setContentsMargins(0, 0, 0, 0)
         self.setMaximumWidth(250)
@@ -161,15 +160,9 @@ class NodeListItemWidget(QWidget):
     def mouseMoveEvent(self, event):
         if self.left_mouse_pressed_on_me:
             drag = QDrag(self)
-            mime_data = QMimeData()
-            mime_data.setData('application/json', bytes(json.dumps(
-                {
-                    'type': 'node',
-                    'node identifier': self.node.identifier,
-                }
-            ), encoding='utf-8'))
+            mime_data = NodeListItemWidget._create_mime_data(self.node)
             drag.setMimeData(mime_data)
-            drop_action = drag.exec_()
+            drag.exec_()
 
     def mouseReleaseEvent(self, event):
         self.left_mouse_pressed_on_me = False
@@ -213,45 +206,67 @@ QLineEdit {{
 
 
 #   LIST WIDGET
-
-class NodeStandardItemModel(QStandardItemModel):
-    
-    def mimeData(self, indexes):
-        item = self.itemFromIndex(indexes[0])
-        return item.mimeData()
     
 class NodeStandardItem(QStandardItem):
     """A node item for use in a model. Helpful when creating a tree view"""
-    def __init__(self, node, text = None):
+    def __init__(self, node_type: type[Node], text: str = None):
         super().__init__(text)
+        self.setEditable(False)
         self.setDragEnabled(True)
         self.setFont(text_font())
-        self.node = node
+        self.node_type = node_type
     
     def mimeData(self):
-        return NodeListItemWidget._create_mime_data(self.node) 
+        return NodeListItemWidget._create_mime_data(self.node_type) 
+        
+class NodeGroupModel(IdentifiableGroupsModel[Node]):
     
+    def __init__(self, list_widget: NodeListWidget, groups: IdentifiableGroups[Node], label="Packages", separator='.'):
+        self.list_widget = list_widget
+        super().__init__(groups, label, separator)
+       
+    def create_id_item(self, id: type[Node]):
+        return NodeStandardItem(id, id.name())
+     
+    def create_subgroup(self, name: str, path: str) -> QStandardItem:
+        item = QStandardItem(name)
+        item.setFont(text_font())
+        # https://specifications.freedesktop.org/icon-naming-spec/latest/ar01s04.html
+        item.setIcon(QIcon.fromTheme('folder', self.list_widget.style().standardIcon(QStyle.SP_DirIcon)))
+        item.setDragEnabled(False)
+        item.setEditable(False)
+        
+        def on_item_clicked():
+            group = self.groups.group(path)
+            node_types = list(group.values() if group else self.groups.id_set)
+            self.list_widget.make_nodes_current(node_types, path)
+        
+        item.setData(on_item_clicked, Qt.UserRole + 1)
+        return item
+
+    def mimeData(self, indexes):
+        item: NodeStandardItem = self.itemFromIndex(indexes[0])
+        return item.mimeData()
+        
 class NodeListWidget(QWidget):
     # SIGNALS
     escaped = Signal()
     node_chosen = Signal(object)
 
-    def __init__(self, session, show_packages: bool = False):
+    def __init__(self, session_gui: SessionGUI, show_packages: bool = False):
         super().__init__()
 
-        self.session = session
-        self.nodes: list = []  # should be list[type[Node]] in 3.9+
-        self.package_nodes: list = []  # should be list[type[Node]] in 3.9+
-
-        self.current_nodes = []  # currently selectable nodes
+        self.session_gui = session_gui
+        self.nodes: list[type[Node]] = []
+        self.package_nodes: list[type[Node]] = []  
+        self.current_nodes: list[type[Node]] = []  # currently selectable nodes
         self.active_node_widget_index = -1  # index of focused node widget
         self.active_node_widget = None  # focused node widget
         self.node_widgets = {}  # Node-NodeWidget assignments
         self._node_widget_index_counter = 0
 
         # holds the path to the tree item
-        self.path_to_item: dict = {}
-        self.tree_items: list[QStandardItem] = []
+        self.node_model = NodeGroupModel(self, self.session_gui.core_session.node_groups)
         self.show_packages: bool = show_packages
         self._setup_UI()
 
@@ -279,6 +294,7 @@ class NodeListWidget(QWidget):
         self.pack_tree.setModel(self.pack_proxy_model)
         self.pack_tree.setDragDropMode(QAbstractItemView.DragDropMode.DragOnly)
         self.pack_tree.setDragEnabled(True)
+        self.pack_proxy_model.setSourceModel(self.node_model)
 
         def on_select(index: QModelIndex):
             source_index = index.model().mapToSource(index)
@@ -334,7 +350,7 @@ class NodeListWidget(QWidget):
 
         self._update_view('')
 
-        self.setStyleSheet(self.session.design.node_selection_stylesheet)
+        self.setStyleSheet(self.session_gui.design.node_selection_stylesheet)
 
         self.search_line_edit.setFocus()
 
@@ -350,69 +366,11 @@ class NodeListWidget(QWidget):
             self.pack_tree.collapseAll()
 
     def make_nodes_current(self, pack_nodes, pkg_name: str):
-        def select_nodes():
-            if not pack_nodes or self.package_nodes == pack_nodes:
-                return
-            self.package_nodes = pack_nodes
-            self.current_pack_label.setText(f'Package: {pkg_name}')
-            self._update_view()
-
-        return select_nodes
-
-    def make_pack_hier(self):
-        """
-        Creates a hierarchical view of the packages based on the nodes' identifier.
-        """
-
-        self.tree_items.clear()
-
-        model = NodeStandardItemModel()
-        model.setHorizontalHeaderLabels(["Packages"])
-        root_item = model.invisibleRootItem()
-
-        # should be dict[str, QStandardItem | (QStandardItem, list)] in 3.9+
-        h_dict: dict = {"root_item": root_item}
-        font = text_font()
-        # A completely nestable tree-view
-        for n in self.nodes:
-            full_name = n.identifier
-            comps = full_name.rsplit('.', 1)
-            path = comps[0]
-            # node_name = comps[1]
-
-            # if the path isn't found, create all the nested items that are needed
-            if not path in h_dict:
-                split_path = path.split('.')
-                current_path = split_path[0]
-                current_root = root_item
-                split_path_len = len(split_path)
-                for i, s in enumerate(split_path):
-                    if not current_path in h_dict:
-                        item = QStandardItem(s)
-                        item.setFont(font)
-                        # https://specifications.freedesktop.org/icon-naming-spec/latest/ar01s04.html
-                        item.setIcon(QIcon.fromTheme('folder', self.style().standardIcon(QStyle.SP_DirIcon)))
-                        item.setDragEnabled(False)
-                        self.tree_items.append(item)
-                        item.setEditable(False)
-                        node_list = []
-                        h_dict[current_path] = (item, node_list)
-                        item.setData(self.make_nodes_current(node_list, current_path), Qt.UserRole + 1)
-                        current_root.appendRow(item)
-                    current_root = h_dict[current_path][0]
-                    if i != split_path_len - 1:
-                        current_path = current_path + f'.{split_path[i+1]}'
-
-            item, pack_nodes = h_dict[path]
-
-            node_item = NodeStandardItem(n, n.title)
-
-            node_item.setEditable(False)
-            item.appendRow(node_item)
-            pack_nodes.append(n)
-            self.tree_items.append(node_item)
-        
-        self.pack_proxy_model.setSourceModel(model)
+        if not pack_nodes or self.package_nodes == pack_nodes:
+            return
+        self.package_nodes = pack_nodes
+        self.current_pack_label.setText(f'Package: {pkg_name}')
+        self._update_view()
 
     def mousePressEvent(self, event):
         # need to accept the event, so the scene doesn't process it further

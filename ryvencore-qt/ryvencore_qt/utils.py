@@ -3,8 +3,12 @@ import pathlib
 from math import sqrt
 
 from qtpy.QtCore import QPointF, QByteArray, Signal
+from qtpy.QtGui import QStandardItem, QStandardItemModel
+
 from ryvencore.utils import serialize, deserialize
-from ryvencore.base import Event
+from ryvencore.base import Event, IdentifiableGroups, IdType
+
+from typing import Generic, Callable
 
 class Location:
     PACKAGE_PATH = None
@@ -92,3 +96,79 @@ def change_svg_color(filepath: str, color_hex: str):
     svg_renderer.render(pix_painter)
 
     return pix
+
+
+class IdentifiableGroupsModel(QStandardItemModel, Generic[IdType]):
+    """
+    A nested model that works with identifiables.
+    
+    Useful for building tree views
+    """
+    id_added_signal = Signal(type(IdType))
+    group_added_signal = Signal(str)
+    
+    def __init__(self, groups: IdentifiableGroups[IdType], label = "Something", separator = '.'):
+        super().__init__()
+        self.setHorizontalHeaderLabels([label])
+        self.groups = groups
+        self.root_item = self.invisibleRootItem()
+        self.separator = separator
+        self.model_nodes: dict[str, QStandardItem] = {"root_item": self.root_item}
+        
+        # create the initial state
+        for group_id, node_types in self.groups.groups.items():
+            self.create_subgroups(group_id)
+            for node_type in node_types.values():
+                self.on_identifiable_added(node_type)
+                
+        connect_signal_event(self.group_added_signal, self.groups.group_added, self.create_subgroups)
+        connect_signal_event(self.id_added_signal, self.groups.id_added, self.on_identifiable_added)
+    
+    def on_identifiable_added(self, id: type[IdType]):
+        """Adds the item to its parent"""
+        if not self.has_subgroup_item(id.id_prefix):
+            return
+        parent_item = self.model_nodes[id.id_prefix]
+        parent_item.appendRow(self.create_id_item(id))
+    
+    def create_id_item(self, id: type[IdType]):
+        """
+        VIRTUAL
+        
+        Override this to create a model item for an identifiable
+        """
+        return QStandardItem(id.id_name)
+    
+    def has_subgroup_item(self, group_id: str):
+        return group_id in self.model_nodes
+             
+    def create_subgroup(self, name: str, path: str) -> QStandardItem:
+        """
+        VIRTUAL
+        Creates a subgroup item
+        
+        Override this to handle subgroup item creation
+        """
+        return QStandardItem(name)
+    
+    def create_subgroups(self, group_id: str):
+        """
+        Creates the various groups as QStandardItems from a group id path. 
+        An optional creat_item function can be given for creation of an item.
+        """
+        if group_id in self.model_nodes:
+            return 
+        
+        split_groups = group_id.split(self.separator)
+        current_path = split_groups[0]
+        current_root = self.root_item
+        sg_len = len(split_groups)
+        for i in range(sg_len):
+            sg_name = split_groups[i]
+            if not current_path in self.model_nodes:
+                item = self.create_subgroup(sg_name, current_path)
+                current_root.appendRow(item)
+                self.model_nodes[current_path] = item
+            current_root = self.model_nodes[current_path]
+            if i != sg_len - 1:
+                current_path = f"{current_path}.{split_groups[i+1]}"

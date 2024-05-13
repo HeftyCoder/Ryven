@@ -1,8 +1,7 @@
 """
 This file contains the implementations of undoable actions for FlowView.
 """
-
-from typing import TYPE_CHECKING
+from __future__ import annotations
 
 from qtpy.QtCore import QObject, QPointF
 from qtpy.QtWidgets import QUndoCommand
@@ -11,6 +10,7 @@ from ryvencore import InfoMsgs, Flow, Node
 
 import traceback
 
+from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .view import FlowView
 
@@ -39,7 +39,7 @@ class FlowUndoCommand(QObject, QUndoCommand):
     # prevent recursive calls of redo() and undo()
     _any_cmd_active = False
 
-    def __init__(self, flow_view: 'FlowView'):
+    def __init__(self, flow_view: FlowView):
         self.flow_view = flow_view
         self.flow: Flow = flow_view.flow
         self._activated = False
@@ -88,7 +88,7 @@ class FlowUndoCommand(QObject, QUndoCommand):
         pass
 
 
-class Delegate_Command(FlowUndoCommand):
+class DelegateCommand(FlowUndoCommand):
     """
     Custom undo command that delegates the undo and redo actions to two functions.
     """
@@ -105,9 +105,9 @@ class Delegate_Command(FlowUndoCommand):
         self._on_redo()
 
 
-class MoveComponents_Command(FlowUndoCommand):
+class MoveComponentsCommand(FlowUndoCommand):
     def __init__(self, flow_view, items_list, p_from, p_to):
-        super(MoveComponents_Command, self).__init__(flow_view)
+        super(MoveComponentsCommand, self).__init__(flow_view)
 
         self.items_list = items_list
         self.p_from = p_from
@@ -137,8 +137,8 @@ class MoveComponents_Command(FlowUndoCommand):
         self.flow_view.scene().destroyItemGroup(items_group)
 
 
-class PlaceNode_Command(FlowUndoCommand):
-    def __init__(self, flow_view: 'FlowView', node_class, pos):
+class PlaceNodeCommand(FlowUndoCommand):
+    def __init__(self, flow_view: FlowView, node_class, pos):
         super().__init__(flow_view)
 
         self.node_class = node_class
@@ -162,8 +162,8 @@ class PlaceNode_Command(FlowUndoCommand):
             raise e
 
 
-class PlaceDrawing_Command(FlowUndoCommand):
-    def __init__(self, flow_view: 'FlowView', posF, drawing):
+class PlaceDrawingCommand(FlowUndoCommand):
+    def __init__(self, flow_view: FlowView, posF, drawing):
         super().__init__(flow_view)
 
         self.drawing = drawing
@@ -186,8 +186,8 @@ class PlaceDrawing_Command(FlowUndoCommand):
         self.setText(self.drawing(True))
 
 
-class SelectComponents_Command(FlowUndoCommand):
-    def __init__(self, flow_view: 'FlowView', new_items, prev_items):
+class SelectComponentsCommand(FlowUndoCommand):
+    def __init__(self, flow_view: FlowView, new_items, prev_items):
         super().__init__(flow_view)
         self.items = new_items
         self.prev_items = prev_items
@@ -200,8 +200,8 @@ class SelectComponents_Command(FlowUndoCommand):
         self.flow_view.select_items(self.prev_items)
 
 
-class RemoveComponents_Command(FlowUndoCommand):
-    def __init__(self, flow_view: 'FlowView', items, silent: bool = False):
+class RemoveComponentsCommand(FlowUndoCommand):
+    def __init__(self, flow_view: FlowView, items, silent: bool = False):
         super().__init__(flow_view)
         self.items = items
         self.selection = flow_view._current_selected
@@ -304,7 +304,7 @@ class RemoveComponents_Command(FlowUndoCommand):
             self.flow.remove_connection(c, self.silent)
 
 
-class ConnectPorts_Command(FlowUndoCommand):
+class ConnectPortsCommand(FlowUndoCommand):
     def __init__(self, flow_view, out, inp, silent: bool = False):
         super().__init__(flow_view)
 
@@ -343,7 +343,7 @@ class ConnectPorts_Command(FlowUndoCommand):
             self.flow.remove_connection(self.connection, self.silent)
         
 
-class Paste_Command(FlowUndoCommand):
+class PasteCommand(FlowUndoCommand):
     def __init__(self, flow_view, data, offset_for_middle_pos):
         super().__init__(flow_view)
 

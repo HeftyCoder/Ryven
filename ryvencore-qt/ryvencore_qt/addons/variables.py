@@ -22,14 +22,16 @@ from qtpy.QtWidgets import (
 
 from ..utils import shorten, connect_signal_event, Location
 from ..util_widgets import EditVal_Dialog
-from typing import TYPE_CHECKING
+from ..base_widgets import InspectorWidget
+
 from json import dumps
+from typing import Callable
 
 from ryvencore.addons.variables import VarsAddon, Variable
-from ryvencore import Flow
+from ryvencore import Flow, Data
     
 
-class VarsList_VarWidget(QWidget):
+class VarsItemWidget(QWidget):
     """A QWidget representing a single script variable for the VariablesListWidget."""
 
     def __init__(self, vars_list_widget: VariablesListWidget, var: Variable):
@@ -119,10 +121,7 @@ class VarsList_VarWidget(QWidget):
         delete_action = QAction('delete')
         delete_action.triggered.connect(self.action_delete_triggered)
 
-        edit_value_action = QAction('edit value')
-        edit_value_action.triggered.connect(self.action_edit_val_triggered)
-
-        actions = [delete_action, edit_value_action]
+        actions = [delete_action]
         for a in actions:
             menu.addAction(a)
 
@@ -185,23 +184,26 @@ class VariablesListWidget(QWidget):
     on_var_deleted_signal = Signal(Variable)
     on_var_renamed_signal = Signal(Variable, str)
     
-    def __init__(self, vars_addon: VarsAddon, flow: Flow):
+    def __init__(self, vars_addon: VarsAddon, flow: Flow, get_inspector: Callable[[type[Data]], type[InspectorWidget[Data]]] = None):
         super(VariablesListWidget, self).__init__()
 
         self.vars_addon = vars_addon
         self.flow = flow
+        self.get_inspector = get_inspector
+        """A callable that returns an inspector type"""
         
         # signals and events
         connect_signal_event(self.on_var_created_signal, self.vars_addon.var_created, self.on_var_created)
         connect_signal_event(self.on_var_deleted_signal, self.vars_addon.var_deleted, self.on_var_deleted)
         connect_signal_event(self.on_var_renamed_signal, self.vars_addon.var_renamed, self.on_var_renamed)
 
-        self.widgets: dict[str, VarsList_VarWidget] = {}
+        self.widgets: dict[str, VarsItemWidget] = {}
         self.currently_edited_var = ''
         self.ignore_name_line_edit_signal = False  
         
+        
         self.setup_UI()
-
+        
 
     def setup_UI(self):
         main_layout = QVBoxLayout()
@@ -239,7 +241,7 @@ class VariablesListWidget(QWidget):
 
     def on_var_created(self, var: Variable):
         if var.flow == self.flow:
-            w = VarsList_VarWidget(self, var)
+            w = VarsItemWidget(self, var)
             self.widgets[var.name] = w
             self.list_layout.addWidget(w)
 
@@ -265,7 +267,7 @@ class VariablesListWidget(QWidget):
         self.widgets.clear()
 
         for var_name, var_sub in self.vars_addon.flow_variables[self.flow].items():
-            new_widget = VarsList_VarWidget(self, self.vars_addon, self.flow, var_sub.variable)
+            new_widget = VarsItemWidget(self, self.vars_addon, self.flow, var_sub.variable)
             self.widgets[var_name] = new_widget
 
         self.rebuild_list()

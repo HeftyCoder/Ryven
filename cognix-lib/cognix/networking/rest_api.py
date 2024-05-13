@@ -194,4 +194,5 @@ class CognixRestAPI:
             self._run_thread.start()
     
     def shutdown(self):
-        self._server.close()
+        if self._server:
+            self._server.close()

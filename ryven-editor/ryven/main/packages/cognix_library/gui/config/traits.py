@@ -18,7 +18,7 @@ from traits.observation.events import (
 )
 from qtpy.QtWidgets import QVBoxLayout, QWidget
 from ryven.gui_env import NodeGUI
-from ryvencore_qt.flows.commands import Delegate_Command
+from ryvencore_qt.flows.commands import DelegateCommand
 
 @node_config_gui(NodeTraitsConfig)
 class NodeTraitsConfigInspector(NodeConfigInspector, QWidget):
@@ -74,7 +74,7 @@ class NodeTraitsConfigInspector(NodeConfigInspector, QWidget):
                 
             undo, redo = u_pair
             gui.flow_view.push_undo(
-                Delegate_Command(
+                DelegateCommand(
                     gui.flow_view,
                     message,
                     undo,

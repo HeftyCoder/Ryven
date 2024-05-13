@@ -25,6 +25,7 @@ from ..gui.uic.ui_flow_window import Ui_FlowWindow
 from ryvencore_qt.flows.view import FlowView
 from ryvencore_qt.nodes.inspector import InspectorView
 
+from ryvencore.addons.variables import VarsAddon
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .main_window import MainWindow
@@ -96,8 +97,8 @@ class FlowUI(QMainWindow):
 
         # variables list widget
         self.vars_list_widget = VariablesListWidget(
-            self.flow.session.addons.get('Variables'), self.flow
-        )  # TODO: how are vars now managed?
+            self.flow.session.addons.get(VarsAddon.addon_name()), self.flow
+        )
         self.ui.variables_dock.setWidget(self.vars_list_widget)
 
         # flow

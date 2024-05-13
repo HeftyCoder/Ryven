@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from ryvencore import Event
+from ryvencore import Event, NoArgsEvent
 from enum import Enum, auto
 from dataclasses import dataclass
 from enum import IntEnum
@@ -55,7 +55,7 @@ class GraphEvents:
         
         self._state_changed.sub(func, nice, one_off)
         
-    def unsub_state_changed(self, func):
+    def unsub_state_changed(self, func: Callable[[GraphStateEvent], None]):
         self._state_changed.unsub(func)
         
     def sub_event(self, e_type: GraphState | str, func, nice=0, one_off=False):
@@ -71,11 +71,11 @@ class GraphEvents:
             e.unsub(func)
             
     def reset(self):
-        self._state_changed = Event(GraphState, GraphState)
+        self._state_changed = Event[GraphStateEvent]()
         
-        self._on_play = Event()
-        self._on_pause = Event()
-        self._on_stop = Event()
+        self._on_play = NoArgsEvent()
+        self._on_pause = NoArgsEvent()
+        self._on_stop = NoArgsEvent()
         
         self._type_events = {
             GraphState.PLAYING: self._on_play,
@@ -215,13 +215,6 @@ class GraphPlayer(ABC):
     def state(self):
         """The state of the player."""
         return self._state
-    
-    @property
-    def state_event(self):
-        return self.__state_changed
-    
-    def reset_state_events(self):
-        self.__state_changed = Event(GraphState)
     
     @abstractmethod
     def play(self):

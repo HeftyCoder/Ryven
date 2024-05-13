@@ -549,11 +549,9 @@ CONTROLS
         for n in nodes:
             self.node_packages[n] = p
 
-        self.nodes_list_widget.update_list(self.core_session.nodes)
-        self.nodes_list_widget.make_pack_hier()
+        self.nodes_list_widget.update_list(self.core_session.node_types)
 
-    # should be dict[str, str] | dict[str, QByteArray | dict] | None in 3.9+
-    def set_flow_ui_template(self, template):
+    def set_flow_ui_template(self, template: dict[str, str | QByteArray | dict] | None):
         if template is None:
             self.flow_ui_template = None
             return

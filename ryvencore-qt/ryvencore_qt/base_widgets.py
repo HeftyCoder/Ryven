@@ -1,7 +1,7 @@
 from __future__ import annotations
 from .gui_base import SerializableItem
 from typing import Generic, TypeVar
-from .flows.commands import Delegate_Command
+from .flows.commands import DelegateCommand
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -40,7 +40,7 @@ class InspectorWidget(SerializableItem, Generic[InspectType]):
         If silent, the redo is not invoked upon pushing.
         """
         self.flow_view.push_undo(
-            Delegate_Command(
+            DelegateCommand(
                 self.flow_view,
                 text=text,
                 on_undo=undo_fn,

@@ -32,7 +32,7 @@ class CognixNode(Node, metaclass=ABCMeta):
     def __init__(self, flow: CognixFlow):
         super().__init__(flow)
         
-        self.updated = Event(int)
+        self.updated = Event[int]()
         self.flow = flow
         self.__vars_addon = self.flow.session.addons[VarsAddon.addon_name()]
         config_type = self.config_type if self.config_type else self._config_as_cls_type

@@ -1,5 +1,7 @@
 from __future__ import annotations
+
 import json
+import traceback
 
 from qtpy.QtCore import (
     Qt,
@@ -57,14 +59,14 @@ from cognix.api import CognixNode, CognixFlow
 from ..gui_base import GUIBase
 from ..utils import *
 from .commands import (
-    MoveComponents_Command,
-    PlaceNode_Command,
-    PlaceDrawing_Command,
-    RemoveComponents_Command,
-    ConnectPorts_Command,
-    Paste_Command,
+    MoveComponentsCommand,
+    PlaceNodeCommand,
+    PlaceDrawingCommand,
+    RemoveComponentsCommand,
+    ConnectPortsCommand,
+    PasteCommand,
     FlowUndoCommand,
-    SelectComponents_Command,
+    SelectComponentsCommand,
 )
 
 from ..nodes.list_widget import NodeListWidget
@@ -95,6 +97,7 @@ from cognix.graph_player import GraphStateEvent, GraphState
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from ..session_gui import SessionGUI
+    from ryvencore import Node
     
 class _SelectionMode(Enum):
     """
@@ -971,17 +974,17 @@ class FlowView(GUIBase, QGraphicsView):
         try:
             text = str(event.mimeData().data('application/json'), 'utf-8')
             data: dict = json.loads(text)
-
             if data['type'] == 'node':
                 self._node_place_pos = self.mapToScene(event.pos())
                 self.create_node__cmd(
                     node_from_identifier(
-                        data['node identifier'], self.session_gui.core_session.nodes
+                        data['node identifier'], self.session_gui.core_session.node_types
                     )
                 )
             # without this keyPressed function isn't called if we don't click in the view
             self.setFocus()
         except Exception:
+            traceback.print_exc()
             pass
     
     def contextMenuEvent(self, event):
@@ -1258,9 +1261,9 @@ class FlowView(GUIBase, QGraphicsView):
 
     # NODES
     def create_node__cmd(self, node_class):
-        self.push_undo(PlaceNode_Command(self, node_class, self._node_place_pos))
+        self.push_undo(PlaceNodeCommand(self, node_class, self._node_place_pos))
 
-    def add_node(self, node):
+    def add_node(self, node: Node):
         # create item
         item: NodeItem = None
 
@@ -1371,12 +1374,12 @@ class FlowView(GUIBase, QGraphicsView):
         if self.flow.graph_adj_rev.get(inp) not in (None, out): # out connected to something else
             # remove existing connection
             self.push_undo(
-                ConnectPorts_Command(self, out=self.flow.graph_adj_rev[inp], inp=inp, silent=self.silent_on_connecting())
+                ConnectPortsCommand(self, out=self.flow.graph_adj_rev[inp], inp=inp, silent=self.silent_on_connecting())
             )
         
         # using Flow.can_nodes_connect to avoid removing the connection since we can now select and delete it
         # otherwise this would delete the connection if it existed
-        self.push_undo(ConnectPorts_Command(self, out=out, inp=inp, silent=self.silent_on_connecting()))
+        self.push_undo(ConnectPortsCommand(self, out=out, inp=inp, silent=self.silent_on_connecting()))
 
     def add_connection(self, c: tuple[NodeOutput, NodeInput]):
         out, inp = c
@@ -1491,7 +1494,7 @@ class FlowView(GUIBase, QGraphicsView):
 
     def _create_and_place_drawing__cmd(self, posF, data=None):
         new_drawing_obj = self.create_drawing(data)
-        place_command = PlaceDrawing_Command(self, posF, new_drawing_obj)
+        place_command = PlaceDrawingCommand(self, posF, new_drawing_obj)
         self.push_undo(place_command)
         return new_drawing_obj
 
@@ -1514,7 +1517,7 @@ class FlowView(GUIBase, QGraphicsView):
 
     def remove_selected_components__cmd(self):
         if self._current_selected:
-            self.push_undo(RemoveComponents_Command(self, self._current_selected, self.silent_on_connecting()))
+            self.push_undo(RemoveComponentsCommand(self, self._current_selected, self.silent_on_connecting()))
 
         self.viewport().update()
 
@@ -1546,7 +1549,7 @@ class FlowView(GUIBase, QGraphicsView):
 
         # saving the command
         self.push_undo(
-            MoveComponents_Command(
+            MoveComponentsCommand(
                 self,
                 self.scene().selectedItems(),
                 p_from=-pos_diff,
@@ -1594,7 +1597,7 @@ class FlowView(GUIBase, QGraphicsView):
         items = self.scene().selectedItems()
         if items != self._current_selected:
             self.push_undo(
-                SelectComponents_Command(self, items, self._current_selected)
+                SelectComponentsCommand(self, items, self._current_selected)
             )
 
     def selected_node_items(self, item_list: list = None) -> list[NodeItem]:
@@ -1648,7 +1651,7 @@ class FlowView(GUIBase, QGraphicsView):
     def _select_all_action(self):  # ctrl+a
         all_items = self.scene().items()
         if all_items != self._current_selected:
-            self.push_undo(SelectComponents_Command(self, all_items, self._current_selected))
+            self.push_undo(SelectComponentsCommand(self, all_items, self._current_selected))
 
     def _copy(self):  # ctrl+c
         data = {
@@ -1707,7 +1710,7 @@ class FlowView(GUIBase, QGraphicsView):
 
             offset_for_middle_pos = self._last_mouse_move_pos - rect.center()
 
-        self.push_undo(Paste_Command(self, data, offset_for_middle_pos))
+        self.push_undo(PasteCommand(self, data, offset_for_middle_pos))
 
     # DATA
     def complete_data(self, data: dict):
