@@ -219,7 +219,7 @@ class NodeStandardItem(QStandardItem):
     def mimeData(self):
         return NodeListItemWidget._create_mime_data(self.node_type) 
         
-class NodeGroupModel(IdentifiableGroupsModel[Node]):
+class NodeGroupsModel(IdentifiableGroupsModel[Node]):
     
     def __init__(self, list_widget: NodeListWidget, groups: IdentifiableGroups[Node], label="Packages", separator='.'):
         self.list_widget = list_widget
@@ -266,7 +266,7 @@ class NodeListWidget(QWidget):
         self._node_widget_index_counter = 0
 
         # holds the path to the tree item
-        self.node_model = NodeGroupModel(self, self.session_gui.core_session.node_groups)
+        self.node_model = NodeGroupsModel(self, self.session_gui.core_session.node_groups)
         self.show_packages: bool = show_packages
         self._setup_UI()
 

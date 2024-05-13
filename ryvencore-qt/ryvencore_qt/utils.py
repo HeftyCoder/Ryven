@@ -16,14 +16,12 @@ class Location:
 def connect_signal_event(signal: Signal, ev: Event, callback):
     signal.connect(callback)
     ev.sub(signal.emit)
-    
+       
 def generate_name(obj, name):
-   return f'{name}:[{id(obj)}]'
-    
+   return f'{name}:[{id(obj)}]' 
     
 def pythagoras(a, b):
     return sqrt(a ** 2 + b ** 2)
-
 
 def get_longest_line(s: str):
     lines = s.split('\n')
@@ -33,7 +31,6 @@ def get_longest_line(s: str):
         if len(line) > len(longest_line_found):
             longest_line_found = line
     return line
-
 
 def shorten(s: str, max_chars: int, line_break: bool = False):
     """Ensures, that a given string does not exceed a given max length. If it would, its cut in the middle."""
@@ -49,7 +46,23 @@ def shorten(s: str, max_chars: int, line_break: bool = False):
     else:
         return s
 
-
+def create_tooltip(value, linebreak=True):
+    """
+    Creates a tooltip string for an object.
+    
+    Checks if the object has a __len__ dunder method to get a subset of it if it's too big.
+    """
+    
+    tooltip_str = "None"
+    if not isinstance(value, str):
+        # if there is a __len__ function, get a subset if it's too big
+        if hasattr(value, '__len__') and len(value) > 10:
+            tooltip_str = str(value[:10])
+            tooltip_str = f'{tooltip_str}\n. . .'
+        else:
+            tooltip_str = str(value)
+    return shorten(tooltip_str, 1000, linebreak)
+    
 def pointF_mapped(p1, p2):
     """adds the floating part of p2 to p1"""
     p2.setX(p1.x() + p2.x()%1)
@@ -59,10 +72,8 @@ def pointF_mapped(p1, p2):
 def points_dist(p1, p2):
     return sqrt(abs(p1.x() - p2.x())**2 + abs(p1.y() - p2.y())**2)
 
-
 def middle_point(p1, p2):
     return QPointF((p1.x() + p2.x())/2, (p1.y() + p2.y())/2)
-
 
 class MovementEnum(enum.Enum):
     # this should maybe get removed later
@@ -70,10 +81,8 @@ class MovementEnum(enum.Enum):
     position_changed = 2
     mouse_released = 3
 
-
 def get_resource(filepath: str):
     return pathlib.Path(Location.PACKAGE_PATH, 'resources', filepath)
-
 
 def change_svg_color(filepath: str, color_hex: str):
     """Loads an SVG, changes all '#xxxxxx' occurrences to color_hex, renders it into and a pixmap and returns it"""
@@ -96,7 +105,6 @@ def change_svg_color(filepath: str, color_hex: str):
     svg_renderer.render(pix_painter)
 
     return pix
-
 
 class IdentifiableGroupsModel(QStandardItemModel, Generic[IdType]):
     """
@@ -137,7 +145,7 @@ class IdentifiableGroupsModel(QStandardItemModel, Generic[IdType]):
         
         Override this to create a model item for an identifiable
         """
-        return QStandardItem(id.id_name)
+        return QStandardItem(id.name())
     
     def has_subgroup_item(self, group_id: str):
         return group_id in self.model_nodes

@@ -14,7 +14,6 @@ from qtpy.QtWidgets import (
     QTabWidget,
     QDockWidget,
 )
-from ryvencore_qt import NodeGUI
 from qtpy.QtCore import Qt, QByteArray
 
 from ..gui.main_console import MainConsole
@@ -31,9 +30,10 @@ from .. import import_nodes_package
 from ..gui.dialogs import GetTextDialog, ChooseFlowDialog
 
 # ryvencore_qt
-from ryvencore_qt import SessionGUI
+from ryvencore_qt import SessionGUI, NodeGUI
 from ryvencore_qt.flows.list_widget import FlowsListWidget
 from ryvencore_qt.nodes.list_widget import NodeListWidget
+from ryvencore_qt.addons.variables import DataTypeDialogue, DataGroupsModel
 
 from ryvencore import InfoMsgs, Flow
 
@@ -84,6 +84,10 @@ class MainWindow(QMainWindow):
         self.session_gui.flow_view_created.connect(self.flow_created)
         self.session_gui.flow_renamed.connect(self.flow_renamed)
         self.session_gui.flow_deleted.connect(self.flow_deleted)
+        
+        # Create data type dialogue
+        self.data_model = DataGroupsModel(self.core_session.inst_data_groups)
+        self.type_dialog = DataTypeDialogue(self.data_model, parent=self)
 
         # unused; default flow theme etc. are defined by Config
         # self.session_gui.design.load_from_config(abs_path_from_package_dir('gui/styling/design_config.json'))

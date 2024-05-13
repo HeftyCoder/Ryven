@@ -9,7 +9,7 @@ from ryvencore import NodeOutput, NodeInput, NodePort
 from ryvencore.utils import deserialize
 
 from ..gui_base import GUIBase
-from ..utils import shorten
+from ..utils import shorten, create_tooltip
 from ..flows.widget_proxies import FlowViewProxyWidget
 from ..util_widgets import GraphicsTextWidget
 
@@ -317,31 +317,9 @@ class PortItemPin(QGraphicsWidget):
         else:
             return QGraphicsWidget.mousePressEvent(self, event)
 
-    def moveEvent(self, event):
-        super().moveEvent(event)
-
-        # update connections
-        conn_items = self.flow_view.connection_items
-        for c in self.port.connections:
-            i = conn_items[c]
-
-            # if the items are grouped (which means they move together), don't recompute
-            if i.out.group() is None or i.out.group() != i.inp.group():  # not entirely sure if this is working
-                i.recompute()
-
     def hoverEnterEvent(self, event):
         if self.port.type_ == 'data':
-            value = val(self.port)
-            tooltip_str = "None"
-            if not isinstance(value, str):
-                # if there is a __len__ function, get a subset if it's too big
-                if hasattr(value, '__len__') and len(value) > 10:
-                    tooltip_str = str(value[:10])
-                    tooltip_str = f'{tooltip_str}\n. . .'
-                else:
-                    tooltip_str = str(value)
-            tooltip_str = shorten(tooltip_str, 1000, True)
-            self.setToolTip(tooltip_str)
+            self.setToolTip(create_tooltip(val(self.port)))
 
         # highlight connections
         items = self.flow_view.connection_items

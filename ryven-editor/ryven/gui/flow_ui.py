@@ -1,4 +1,5 @@
 """A UI for flows. Will be displayed in the tab widget in MainWindow."""
+from __future__ import annotations
 
 from qtpy.QtWidgets import (
     QWidget,
@@ -26,6 +27,7 @@ from ryvencore_qt.flows.view import FlowView
 from ryvencore_qt.nodes.inspector import InspectorView
 
 from ryvencore.addons.variables import VarsAddon
+
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .main_window import MainWindow
@@ -38,7 +40,7 @@ class FlowUI(QMainWindow):
         FlowAlg.EXEC: 'exec-flow',
     }
 
-    def __init__(self, main_window: 'MainWindow', flow: Flow, flow_view: FlowView):
+    def __init__(self, main_window: MainWindow, flow: Flow, flow_view: FlowView):
         super().__init__(main_window)
 
         self.setWindowFlag(Qt.Widget)
@@ -97,7 +99,9 @@ class FlowUI(QMainWindow):
 
         # variables list widget
         self.vars_list_widget = VariablesListWidget(
-            self.flow.session.addons.get(VarsAddon.addon_name()), self.flow
+            self.flow.session.addons.get(VarsAddon.addon_name()),
+            self.flow,
+            main_window.type_dialog,
         )
         self.ui.variables_dock.setWidget(self.vars_list_widget)
 
