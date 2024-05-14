@@ -103,7 +103,7 @@ class LSLInput(FrameNode):
                 if self.search_action == 'name':
                     results = resolve_bypred(f"name='{self.stream_name}'", 1, 3)
                 if self.search_action == 'type':
-                    results = resolve_bypred(f"name='{self.stream_type}'", 1, 3)
+                    results = resolve_bypred(f"type='{self.stream_type}'", 1, 3)
                 
                 if results or self.force_stop:
                     break
