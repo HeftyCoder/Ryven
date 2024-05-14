@@ -35,23 +35,33 @@ class Segmentation(CognixNode):
     def update_event(self, inp=-1):
         if not self.input(0):
             return 
+        
         else:
             data = self.input(0)            
-            samples = np.array(data.payload[0]).T
-            timestamps  = data.payload[1]
+            
+            samples = np.array(data.payload.samples()).T
+            timestamps  = data.payload.timestamps()
             
             print(samples[0],timestamps[0])
             
             self.buffer.insert_data_to_buffer(samples,timestamps)
             
-            marker = self.input(1).payload
-            
-            if marker:
-                segment = find_segment(tm = marker, x = self.config.x, y = self.config.y, buffer_tm = self.buffer.buffer_timestamps, buffer_data= self.buffer.buffer_data, \
-                        current_index = self.buffer.current_index, buffer_duration = self.config.buffer_duration, tstart = self.buffer.tstart, tend = self.buffer.tend, \
-                            sampling_frequency = 2048.0)
-                if segment:
-                    self.set_output_val(0,Data(segment))
+        if not self.input(1):
+            return 
+        
+        marker = self.input(1)
+        
+        marker_sample = marker.payload.samples()
+        marker_timestamp = marker.payload.timestamps()
+        
+        print(marker_sample,marker_timestamp)
+        
+        if marker:
+            segment = find_segment(tm = marker_timestamp, x = self.config.x, y = self.config.y, buffer_tm = self.buffer.buffer_timestamps, buffer_data= self.buffer.buffer_data, \
+                    current_index = self.buffer.current_index, buffer_duration = self.config.buffer_duration, tstart = self.buffer.tstart, tend = self.buffer.tend, \
+                        sampling_frequency = data.payload.stream_info.nominal_srate)
+            if segment:
+                self.set_output_val(0,Data(segment))
             
     
 def find_index(tx: float, buffer: Sequence, current_index: int, buffer_duration: float, tstart: float, tend: float, sampling_frequency: float):

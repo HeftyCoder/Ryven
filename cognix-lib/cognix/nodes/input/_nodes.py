@@ -36,18 +36,16 @@ class LSLInput(FrameNode):
             editor=CheckListEditor(
                 values=
                 [
-                    (1, 'one'),  
-                    (2, 'two'),
-                    (4, 'three'),
-                    (8, 'four')
-                ]
+                    (1, 'synchronization'),  
+                    (2, 'dejitter'),
+                    (4, 'monotonize'),
+                    (8, 'threadsafe')
+                ],
+                cols=2
             ),
-            style='readonly'
+            style='custom'
         )
-        # clocksync_flag = Bool()
-        # dejitter_flag = Bool()
-        # monotize_flag = Bool()
-        # threadsage_flag = Bool()
+
         
     
     title = 'LSL Input'
@@ -88,15 +86,19 @@ class LSLInput(FrameNode):
         self.stream_type = self.config.stream_type
         self.search_action = self.config.search_action
         self.processing_flag_mode = self.config.processing_flag_mode
-
-        print(self.processing_flag_mode)
+        
+        flags = 0
+        for flag in self.processing_flag_mode:
+            flags |= flag
+        print(flags)
         
         def _search_stream():
             
             print(self.stream_name)
             
             self.progress = None
-            self.progress = ProgressState(1,-1,'Searching data')
+            self.progress = ProgressState(1,-1,'Searching stream')
+            
             while True:
                 print('Searching data')
                 
@@ -113,8 +115,7 @@ class LSLInput(FrameNode):
                 flags = 0
                 for flag in self.processing_flag_mode:
                     flags |= flag
-                                  
-                print(flags)                  
+                                                                 
                 self.inlet = StreamInlet(results[0],processing_flags=flags)
                 
                 print('Found Stream!!')
@@ -129,10 +130,14 @@ class LSLInput(FrameNode):
         if not self.inlet:
             return
         data = self.inlet.pull_chunk()
-        print(data)
         samples, timestamps = data
         if not timestamps:
             return
         
+        print(timestamps[0])
+        
+        stream_info = LSLStreamInfo(inlet=self.inlet)
+        stream_payload = LSLStreamPayload(stream_info = stream_info, samples = samples, timestamps = timestamps)
+        
         ### inside of Data -> Payload
-        self.set_output_val(0, Data(data))
+        self.set_output_val(0, Data(stream_payload))

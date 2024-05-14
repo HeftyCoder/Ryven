@@ -53,7 +53,7 @@ class LSLStreamPayload(StreamPayload):
         self._timestamps = timestamps
         
     def stream_info(self) -> StreamInfo:
-        return LSLStreamInfo
+        return self._stream_info
     
     def timestamps(self) -> Sequence[float]:
         return self._timestamps
