@@ -15,7 +15,8 @@ class LSLInput(FrameNode):
         
         f = File('Some path')
         stream_name = CX_Str('stream_name')
-        some_list = List(CX_Int(54))    
+        stream_type = CX_Str('stream_type')
+        search_action = Enum('name','type')    
     
     title = 'LSL Input'
     version = '0.0.1'
@@ -47,6 +48,7 @@ class LSLInput(FrameNode):
         
         def _search_stream():
             
+            self.progress = ProgressState(1,-1,'Searching data')
             while True:
                 print('Searching data')
                 results = resolve_bypred("type='EEG'", 1, 3)
@@ -55,7 +57,9 @@ class LSLInput(FrameNode):
             if results:
                 self.inlet = StreamInlet(results[0])
                 print('Found Stream!!')
-                self.set_output_val(0, Data(self.inlet))
+                self.set_progress_value(1, 'Streaming')
+                self.progress = ProgressState(1,1,'Searching data')
+                # self.set_output_val(0, Data(self.inlet))
         
         self.t = Thread(target=_search_stream)
         self.t.start()
@@ -67,6 +71,8 @@ class LSLInput(FrameNode):
         samples, timestamps = data
         if not timestamps:
             return
+        
+        
         self.set_output_val(0, Data(data))
     
 class MyConfig(NodeTraitsConfig):

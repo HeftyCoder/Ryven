@@ -13,6 +13,7 @@ from .nodes import (
 
 from .flow import CognixFlow
 import time
+import traceback
 
 class GraphActionResponse(IntEnum):
     """
@@ -250,6 +251,7 @@ class CognixPlayer(GraphPlayer):
         try:
             self.__play()
         except Exception as e:
+            traceback.print_exc()
             raise e
         finally:
             self.__on_stop()

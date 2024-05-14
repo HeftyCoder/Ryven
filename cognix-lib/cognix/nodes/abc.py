@@ -87,15 +87,21 @@ class CognixNode(Node, metaclass=ABCMeta):
         """
         VIRTUAL
         
-        Happens at the start of the graph player
+        Invoked when the graph player is started
         """
         pass
     
+    def on_pause(self):
+        """
+        VIRTUAL
+        
+        Invoked when the graph player is paused
+        """
     def on_stop(self):
         """
         VIRTUAL
         
-        Happens at the stop of the graph player
+        Invoked when the graph player is stopped
         """
         pass
     

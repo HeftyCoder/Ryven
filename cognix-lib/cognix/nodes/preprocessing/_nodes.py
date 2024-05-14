@@ -1,0 +1,129 @@
+from ryvencore.data.built_in import *
+from ryvencore import Data,PortConfig
+
+from cognix.config.traits import *
+from cognix.api import CognixNode,FrameNode
+
+from typing import Union
+import numpy as np
+from collections.abc import Sequence
+
+from pylsl import local_clock
+
+import numpy as np
+from collections.abc import Sequence
+
+class Segmentation(CognixNode):
+    title = 'Segmentation'
+    version = '0.1'
+
+    class Config(NodeTraitsConfig):
+        x: float = CX_Float(-0.5)
+        y: float = CX_Float(0.5)
+        buffer_duration: float = CX_Float(5.0, desc = 'Duration of the buffer in seconds')
+        error_margin: float = CX_Float()
+
+    init_inputs = [PortConfig(label='data'),
+                   PortConfig(label='marker')]
+
+    init_outputs = [PortConfig(label='segment',allowed_data=ListData)]
+    
+    def on_start(self):
+        self.buffer = Buffer(sampling_frequency = 2048.0, buffer_duration = self.config.buffer_duration, error_margin = self.config.error_margin, start_time = local_clock())
+        print(self.buffer.buffer_data.shape)
+        
+    def update_event(self, inp=-1):
+        if not self.input(0):
+            return 
+        else:
+            data = self.input(0)            
+            samples = np.array(data.payload[0]).T
+            timestamps  = data.payload[1]
+            
+            print(samples[0],timestamps[0])
+            
+            self.buffer.insert_data_to_buffer(samples,timestamps)
+            
+            marker = self.input(1).payload
+            
+            if marker:
+                segment = find_segment(tm = marker, x = self.config.x, y = self.config.y, buffer_tm = self.buffer.buffer_timestamps, buffer_data= self.buffer.buffer_data, \
+                        current_index = self.buffer.current_index, buffer_duration = self.config.buffer_duration, tstart = self.buffer.tstart, tend = self.buffer.tend, \
+                            sampling_frequency = 2048.0)
+                if segment:
+                    self.set_output_val(0,Data(segment))
+            
+    
+def find_index(tx: float, buffer: Sequence, current_index: int, buffer_duration: float, tstart: float, tend: float, sampling_frequency: float):
+    size = int(buffer_duration * sampling_frequency)
+    dts = 1/sampling_frequency
+    tc = buffer[current_index-1]
+    if (tx > tc) or ((tc - tx) > buffer_duration): 
+        return (-1,False)
+    if tx <= tc:
+        return (
+            (int((tx - tstart)/dts), False) 
+            if tx >= tstart
+            else (size - int((tend - tx)/dts), True)
+        )
+  
+def find_segment(tm: float, x: float, y:float,buffer_tm: Sequence,buffer_data: Sequence,current_index: int, buffer_duration: float, tstart: float, tend: float, sampling_frequency: float):
+    size = int(buffer_duration * sampling_frequency)
+       
+    m_index,m_overflow = find_index(tm,buffer_tm,current_index,buffer_duration,tstart,tend,sampling_frequency)
+    x_index,x_overflow = find_index(tm + x,buffer_tm,current_index,buffer_duration,tstart,tend,sampling_frequency)
+    y_index,y_overflow = find_index(tm + y,buffer_tm,current_index,buffer_duration,tstart,tend,sampling_frequency)   
+
+    if (m_index < 0 or x_index < 0 or y_index < 0) or \
+        buffer_tm[m_index] < 0 or buffer_tm[x_index] < 0 or buffer_tm[y_index] < 0 or x>y: return None
+        
+    if not (x_overflow or y_overflow) or (x_overflow and y_overflow):
+        return buffer_data[:,x_index:y_index]
+    
+    else:
+        start,end = (x_index,y_index) if x_overflow else (y_index,x_index)
+        return np.concatenate((buffer_data[:,start:size],buffer_data[:,0:end]))
+
+
+class Buffer():
+    def __init__(self,sampling_frequency:float,buffer_duration:float,error_margin:float,start_time:float):
+        self.srate = sampling_frequency
+        self.error_margin = error_margin
+        self.buffer_duration = buffer_duration
+        self.size = int(buffer_duration * self.srate)
+        self.current_index = 0
+        
+        self.tstart = start_time
+        self.dts = 1/self.srate
+
+        self.buffer_data = np.full((32,self.size),-1.0,dtype=float)
+        self.buffer_timestamps = np.full(self.size,-1.0,dtype=float)
+        self.tc = self.buffer_timestamps[self.current_index]
+
+    def insert_data_to_buffer(self, data: Sequence,timestamps: Sequence):
+        if self.current_index + len(timestamps) < self.size:
+            self.buffer_timestamps[self.current_index:len(timestamps)+self.current_index] = timestamps
+            self.buffer_data[:,self.current_index:len(timestamps)+self.current_index] = data
+            self.current_index = self.current_index + len(timestamps)
+
+        elif self.current_index + len(timestamps) == self.size:
+            self.buffer_timestamps[self.current_index:self.size] = timestamps
+            self.buffer_data[:,self.current_index:self.size] = data
+
+            self.current_index = 0
+            self.start_time = timestamps[-1] 
+            
+        else:
+            index = len(timestamps) - (self.size - self.current_index)
+            self.buffer_timestamps[self.current_index:self.size] = timestamps[:len(timestamps) - index]
+            self.buffer_data[:,self.current_index:self.size] = data[:len(timestamps) - index]
+
+
+            self.tstart = timestamps[len(timestamps) - index]
+
+            self.buffer_timestamps[0:index] = timestamps[len(timestamps) - index:]
+            self.buffer_data[:,0:index] = data[len(timestamps) - index:]
+
+            self.current_index = index
+        
+        self.tend = self.buffer_timestamps[-1] 
