@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from qtpy.QtCore import QObject, Signal, Qt
 from qtpy.QtWidgets import QWidget, QApplication
 
@@ -8,6 +10,9 @@ from .design import Design
 from .gui_base import GUIBase
 from .code_editor.codes_storage import SourceCodeStorage
 from cognix.api import CognixSession
+from .env import create_default_env, GUIEnvProxy
+
+from typing import TYPE_CHECKING
 
 class SessionGUI(GUIBase, QObject):
     """
@@ -25,10 +30,11 @@ class SessionGUI(GUIBase, QObject):
     flow_renamed = Signal(object, str)
     flow_view_created = Signal(object, object)
 
-    def __init__(self, gui_parent: QWidget):
+    def __init__(self, gui_parent: QWidget, gui_env: GUIEnvProxy = create_default_env()):
         GUIBase.__init__(self)
         QObject.__init__(self)
 
+        self.__gui_env = gui_env
         self.core_session = CognixSession(gui=True, load_addons=True)
         setattr(self.core_session, 'gui', self)
 
@@ -36,7 +42,7 @@ class SessionGUI(GUIBase, QObject):
 
         # code storage
         self.wnd_light_type = 'dark'
-        self.cd_storage = SourceCodeStorage()
+        self.cd_storage = SourceCodeStorage(self.__gui_env)
         # flow views
         self.flow_views = {}  # {Flow : FlowView}
 
@@ -54,6 +60,10 @@ class SessionGUI(GUIBase, QObject):
         self.core_session.flow_deleted.sub(self._flow_deleted)
         self.core_session.flow_renamed.sub(self._flow_renamed)
 
+    @property
+    def gui_env(self):
+        return self.__gui_env
+    
     def _flow_created(self, flow: ryvencore.Flow):
         """
         Builds the flow view for a newly created flow, saves it in

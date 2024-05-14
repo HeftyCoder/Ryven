@@ -7,7 +7,7 @@ from cognix.api import NodeConfig, CognixNode
 from cognix.config.traits import NodeTraitsConfig, NodeTraitsGroupConfig
 
 from .abc import NodeConfigInspector
-from .env import node_config_gui
+from ryvencore_qt.env import inspector
 
 from traitsui.api import View, Group, Item
 from traits.observation.events import (
@@ -20,7 +20,7 @@ from qtpy.QtWidgets import QVBoxLayout, QWidget
 from ryven.gui_env import NodeGUI
 from ryvencore_qt.flows.commands import DelegateCommand
 
-@node_config_gui(NodeTraitsConfig)
+@inspector(NodeTraitsConfig)
 class NodeTraitsConfigInspector(NodeConfigInspector, QWidget):
     """Basic config inspector"""
     
@@ -149,7 +149,7 @@ class NodeTraitsConfigInspector(NodeConfigInspector, QWidget):
             self.ui = None
                           
         
-@node_config_gui(NodeTraitsGroupConfig)
+@inspector(NodeTraitsGroupConfig)
 class NodeTraitsGroupConfigInspector(NodeTraitsConfigInspector):
     
     traits_view = None

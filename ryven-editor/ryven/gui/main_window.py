@@ -537,6 +537,8 @@ CONTROLS
         try:
             nodes, data_types = import_nodes_package(p)
         except ModuleNotFoundError as e:
+            import traceback
+            traceback.print_exc()
             msg_box = QMessageBox(
                 QMessageBox.Warning,
                 'Missing Python module',

@@ -9,6 +9,8 @@ os.environ['QT_ENABLE_HIGHDPI_SCALING'] = '1'
 # expose ryvencore
 import ryvencore
 
+#expose gui env and load it
+from .env import *
 from .session_gui import SessionGUI
 from .nodes.gui import NodeGUI
 from .nodes.base_widgets import NodeMainWidget, NodeInputWidget

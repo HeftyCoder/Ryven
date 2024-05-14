@@ -8,7 +8,11 @@ from qtpy.QtGui import QStandardItem, QStandardItemModel
 from ryvencore.utils import serialize, deserialize
 from ryvencore.base import Event, IdentifiableGroups, IdType
 
-from typing import Generic, Callable
+from typing import Generic, Callable, TYPE_CHECKING, Any
+if TYPE_CHECKING:
+    from ryvencore import Node
+    from .nodes.gui import NodeGUI
+    from .base_widgets import InspectorWidget
 
 class Location:
     PACKAGE_PATH = None

@@ -166,12 +166,6 @@ class SetVarsGui(NodeGUI):
 
     def rebuild_remove_actions(self):
 
-        # remove_keys = []
-        # for k, v in self.actions['remove var input'].items():
-        #     if k.startswith('remove var'):
-        #         remove_keys.append(k)
-        # for k in remove_keys:
-        #     del self.gui.actions['remove var input'][k]
         self.actions['remove var input'] = {}
 
         for i in range(self.node.num_vars):
@@ -187,10 +181,7 @@ class SetVarGui(NodeGUI):
         'varname': inp_widgets.Builder.str_line_edit(),
         'val': inp_widgets.Builder.str_line_edit(),
     }
-    # init_input_widgets = {
-    #     1: {'name': 'varname', 'pos': 'besides'},
-    #     2: {'name': 'val', 'pos': 'besides'}
-    # }
+
     style = 'normal'
     color = '#c69a15'
 

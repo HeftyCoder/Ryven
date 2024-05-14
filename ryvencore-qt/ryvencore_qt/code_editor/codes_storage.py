@@ -1,21 +1,24 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 from inspect import getsource, getmodule
 
 from ryvencore import Node
-
 from types import MappingProxyType
 
+from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from ryvencore_qt import NodeGUI
+    from ..env import GUIEnvProxy
+    from ..nodes.gui import NodeGUI
 
 class SourceCodeStorage:
     """
     Stores node's source code as well as custom gui code.
     """
     
-    def __init__(self, edit_src_codes = False):
+    def __init__(self, gui_env: GUIEnvProxy, edit_src_codes = False):
+        
+        self.gui_env = gui_env
+        """Tells the storage where to search for a node's GUI definition"""
         self.edit_src_codes = edit_src_codes
         self.__class_codes: dict[type[Node], NodeTypeCodes] = {}
         self.__class_codes_proxy = MappingProxyType(self.__class_codes)
@@ -63,7 +66,7 @@ class SourceCodeStorage:
         if custom_gui:
             gui = custom_gui
         else:
-            gui: type[NodeGUI] = n.GUI if hasattr(n, 'GUI') else None 
+            gui: type[NodeGUI] = self.gui_env.get_node_gui(n) 
         
         has_gui = gui is not None
         has_mw = has_gui and gui.main_widget_class is not None

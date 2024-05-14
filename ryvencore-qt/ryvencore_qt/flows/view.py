@@ -88,8 +88,8 @@ from .connections import (
     ExecConnectionItem,
 )
 from .drawings import DrawingObject
-
 from ..design import Design
+
 from enum import Enum
 
 from cognix.graph_player import GraphStateEvent, GraphState
@@ -1273,10 +1273,11 @@ class FlowView(GUIBase, QGraphicsView):
             self._add_node_item(item)
 
         else:  # create new item
+            gui_cls = self.session_gui.gui_env.get_node_gui(type(node))
             item = NodeItem(
                 node=node,
                 node_gui=
-                    (node.GUI if hasattr(node, 'GUI') else NodeGUI)     # use custom GUI class if available
+                    (gui_cls if gui_cls else NodeGUI)     # use custom GUI class if available
                     ((node, self.session_gui, self)),                         # calls __init__ of NodeGUI class with tuple arg
                 flow_view=self,
                 design=self.session_gui.design,

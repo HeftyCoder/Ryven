@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from ryvencore.base import IdentifiableGroups
 import textdistance
 import json
 
@@ -36,10 +35,13 @@ from qtpy.QtCore import (
     QSortFilterProxyModel,
 )
 
+
 from statistics import median
 from re import escape
 from ryvencore import Node
+from ryvencore.base import IdentifiableGroups
 from ..utils import IdentifiableGroupsModel
+from ..env import GUIEnvProxy
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -113,11 +115,12 @@ class NodeListItemWidget(QWidget):
             ), encoding='utf-8'))
         return mime_data
     
-    def __init__(self, parent, node: Node):
+    def __init__(self, parent, node_type: type[Node], gui_env: GUIEnvProxy):
         super(NodeListItemWidget, self).__init__(parent)
 
         self.custom_focused = False
-        self.node = node
+        self.node_type = node_type
+        self.gui_env = gui_env
 
         self.left_mouse_pressed_on_me = False
 
@@ -141,14 +144,14 @@ class NodeListItemWidget(QWidget):
             def mouseReleaseEvent(self, ev):
                 ev.ignore()
 
-        name_label = NameLabel(node.title)
+        name_label = NameLabel(node_type.title)
         main_layout.addWidget(name_label, 0, 0)
         
         self.setLayout(main_layout)
         self.setContentsMargins(0, 0, 0, 0)
         self.setMaximumWidth(250)
 
-        self.setToolTip(node.__doc__)
+        self.setToolTip(node_type.__doc__)
         self.update_stylesheet()
 
 
@@ -160,7 +163,7 @@ class NodeListItemWidget(QWidget):
     def mouseMoveEvent(self, event):
         if self.left_mouse_pressed_on_me:
             drag = QDrag(self)
-            mime_data = NodeListItemWidget._create_mime_data(self.node)
+            mime_data = NodeListItemWidget._create_mime_data(self.node_type)
             drag.setMimeData(mime_data)
             drag.exec_()
 
@@ -174,7 +177,8 @@ class NodeListItemWidget(QWidget):
         self.update_stylesheet()
 
     def update_stylesheet(self):
-        color = self.node.GUI.color if hasattr(self.node, 'GUI') else '#888888'
+        gui = self.gui_env.get_node_gui(self.node_type)
+        color = gui.color if gui else '#888888'
 
         r, g, b = QColor(color).red(), QColor(color).green(), QColor(color).blue()
 
@@ -454,7 +458,7 @@ class NodeListWidget(QWidget):
             self._set_active_node_widget_index(0)
 
     def _create_node_widget(self, node):
-        node_widget = NodeListItemWidget(self, node)
+        node_widget = NodeListItemWidget(self, node, self.session_gui.gui_env)
         node_widget.custom_focused_from_inside.connect(self._node_widget_focused_from_inside)
         node_widget.setObjectName('node_widget_' + str(self._node_widget_index_counter))
         self._node_widget_index_counter += 1

@@ -3,8 +3,12 @@ from ryven.gui_env import (
     node_gui, 
     NodeGUI, 
     NodeInspectorWidget,
-    get_config_inspector_cls,
+    obj_insp_assoc,
 )
+
+from ryvencore_qt.flows.view import FlowView
+from ryvencore_qt.session_gui import SessionGUI
+from ryven.main.packages.cognix_library.gui.config.abc import NodeConfigInspector
 
 from cognix.api import CognixNode
 
@@ -18,7 +22,7 @@ class CognixNodeInspectorWidget(NodeInspectorWidget, QWidget):
         
         self.setLayout(QVBoxLayout())
         
-        config_gui_cls = get_config_inspector_cls(type(self.node.config))
+        config_gui_cls = obj_insp_assoc().get_assoc(type(self.node.config))
         self.config_gui = config_gui_cls((self.node.config, self.node_gui)) if config_gui_cls else None
         if self.config_gui:
             self.layout().addWidget(self.config_gui)
@@ -45,8 +49,11 @@ class CognixNodeGUI(NodeGUI):
     inspector_widget_class = CognixNodeInspectorWidget
     wrap_inspector_in_default = True
     
+    def __init__(self, params: tuple[CognixNode, SessionGUI, FlowView]):
+        super().__init__(params)
+        self.node: CognixNode = self.node
+
     def initialized(self):
-        
         self.config_changed_func = self.apply_config_changed_event()
 
     def _on_deleted(self):
@@ -66,7 +73,7 @@ class CognixNodeGUI(NodeGUI):
         if not config:
             return None
         
-        config_gui_cls = get_config_inspector_cls(type(config))
+        config_gui_cls: NodeConfigInspector = obj_insp_assoc().get_assoc(type(config))
         if not config_gui_cls:
             return None
         
