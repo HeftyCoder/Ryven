@@ -120,7 +120,10 @@ class NodeTraitsConfigInspector(NodeConfigInspector, QWidget):
         
         items: list[Item] = []
         for tr in insp_traits:
-            items.append(Item(tr))
+            internal_tr = inspected_obj.trait(tr)
+            style = getattr(internal_tr, 'style', None)
+            item = Item(tr, style=style) if style else Item(tr)
+            items.append(item)
             
         config_group = Group (
             *items,
