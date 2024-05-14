@@ -24,6 +24,7 @@ from .input import node_types as input_node_types
 from .utility import node_types as util_node_types
 from .test import node_types as test_node_types
 from .preprocessing import node_types as preprocessing_node_types
+from .output import node_types as output_node_types
 
 cognix_package: dict[str, list[type[CognixNode]]] = {
     'classification': classification_node_types,
@@ -32,4 +33,6 @@ cognix_package: dict[str, list[type[CognixNode]]] = {
     'util': util_node_types,
     'test': test_node_types,
     'preprocessing': preprocessing_node_types,
+    'output':output_node_types,
+    
 }

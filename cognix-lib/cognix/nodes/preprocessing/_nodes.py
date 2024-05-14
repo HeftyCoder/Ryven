@@ -6,12 +6,12 @@ from cognix.api import CognixNode,FrameNode
 
 from typing import Union
 import numpy as np
-from collections.abc import Sequence
+from traitsui.api import CheckListEditor
 
 from pylsl import local_clock
 
-import numpy as np
 from collections.abc import Sequence
+from .utils_for_preprocessing.segmentation_helper import Buffer,find_index,find_segment
 
 class Segmentation(CognixNode):
     title = 'Segmentation'
@@ -20,7 +20,7 @@ class Segmentation(CognixNode):
     class Config(NodeTraitsConfig):
         x: float = CX_Float(-0.5)
         y: float = CX_Float(0.5)
-        buffer_duration: float = CX_Float(5.0, desc = 'Duration of the buffer in seconds')
+        buffer_duration: float = CX_Float(10.0, desc = 'Duration of the buffer in seconds')
         error_margin: float = CX_Float()
 
     init_inputs = [PortConfig(label='data'),
@@ -30,7 +30,6 @@ class Segmentation(CognixNode):
     
     def on_start(self):
         self.buffer = Buffer(sampling_frequency = 2048.0, buffer_duration = self.config.buffer_duration, error_margin = self.config.error_margin, start_time = local_clock())
-        print(self.buffer.buffer_data.shape)
         
     def update_event(self, inp=-1):
         if not self.input(0):
@@ -42,7 +41,7 @@ class Segmentation(CognixNode):
             samples = np.array(data.payload.samples()).T
             timestamps  = data.payload.timestamps()
             
-            print(samples[0],timestamps[0])
+            print('Data',timestamps[0],timestamps[-1])
             
             self.buffer.insert_data_to_buffer(samples,timestamps)
             
@@ -52,88 +51,65 @@ class Segmentation(CognixNode):
         marker = self.input(1)
         
         marker_sample = marker.payload.samples()
-        marker_timestamp = marker.payload.timestamps()
+        marker_timestamp = marker.payload.timestamps()[0]
         
         print(marker_sample,marker_timestamp)
         
         if marker:
             segment = find_segment(tm = marker_timestamp, x = self.config.x, y = self.config.y, buffer_tm = self.buffer.buffer_timestamps, buffer_data= self.buffer.buffer_data, \
                     current_index = self.buffer.current_index, buffer_duration = self.config.buffer_duration, tstart = self.buffer.tstart, tend = self.buffer.tend, \
-                        sampling_frequency = data.payload.stream_info.nominal_srate)
+                        sampling_frequency = data.payload.stream_info().nominal_srate())
             if segment:
+                print(segment)
                 self.set_output_val(0,Data(segment))
             
     
-def find_index(tx: float, buffer: Sequence, current_index: int, buffer_duration: float, tstart: float, tend: float, sampling_frequency: float):
-    size = int(buffer_duration * sampling_frequency)
-    dts = 1/sampling_frequency
-    tc = buffer[current_index-1]
-    if (tx > tc) or ((tc - tx) > buffer_duration): 
-        return (-1,False)
-    if tx <= tc:
-        return (
-            (int((tx - tstart)/dts), False) 
-            if tx >= tstart
-            else (size - int((tend - tx)/dts), True)
-        )
-  
-def find_segment(tm: float, x: float, y:float,buffer_tm: Sequence,buffer_data: Sequence,current_index: int, buffer_duration: float, tstart: float, tend: float, sampling_frequency: float):
-    size = int(buffer_duration * sampling_frequency)
-       
-    m_index,m_overflow = find_index(tm,buffer_tm,current_index,buffer_duration,tstart,tend,sampling_frequency)
-    x_index,x_overflow = find_index(tm + x,buffer_tm,current_index,buffer_duration,tstart,tend,sampling_frequency)
-    y_index,y_overflow = find_index(tm + y,buffer_tm,current_index,buffer_duration,tstart,tend,sampling_frequency)   
-
-    if (m_index < 0 or x_index < 0 or y_index < 0) or \
-        buffer_tm[m_index] < 0 or buffer_tm[x_index] < 0 or buffer_tm[y_index] < 0 or x>y: return None
-        
-    if not (x_overflow or y_overflow) or (x_overflow and y_overflow):
-        return buffer_data[:,x_index:y_index]
+class EEGChannelSelection(CognixNode):
+    title = 'EEG Channel Selection'
+    version = '0.1'
     
-    else:
-        start,end = (x_index,y_index) if x_overflow else (y_index,x_index)
-        return np.concatenate((buffer_data[:,start:size],buffer_data[:,0:end]))
-
-
-class Buffer():
-    def __init__(self,sampling_frequency:float,buffer_duration:float,error_margin:float,start_time:float):
-        self.srate = sampling_frequency
-        self.error_margin = error_margin
-        self.buffer_duration = buffer_duration
-        self.size = int(buffer_duration * self.srate)
-        self.current_index = 0
+    class Config(NodeTraitsConfig):
         
-        self.tstart = start_time
-        self.dts = 1/self.srate
+        channels = ['Fp1', 'Af3', 'F7', 'F3', 'Fc1', 'Fc5', 'T7',
+            'C3', 'Cp1', 'Cp5', 'P7', 'P3', 'Pz', 'Po3', 'O1', 'Oz', 'O2', 'Po4',
+            'P4', 'P8', 'Cp6', 'Cp2', 'C4', 'T8', 'Fc6', 'Fc2', 'F4', 'F8', 'Af4',
+            'Fp2', 'Fz', 'Cz']
+        
+        
+        channels_selected = List(
+            editor=CheckListEditor(
+                values= [(channel,channel) for channel in channels],
+                cols=4
+            ),
+            style='custom'
+        )
+        
+    init_inputs = [PortConfig(label='data_in')]
+    
+    init_outputs = [PortConfig(label='data_out')]
 
-        self.buffer_data = np.full((32,self.size),-1.0,dtype=float)
-        self.buffer_timestamps = np.full(self.size,-1.0,dtype=float)
-        self.tc = self.buffer_timestamps[self.current_index]
-
-    def insert_data_to_buffer(self, data: Sequence,timestamps: Sequence):
-        if self.current_index + len(timestamps) < self.size:
-            self.buffer_timestamps[self.current_index:len(timestamps)+self.current_index] = timestamps
-            self.buffer_data[:,self.current_index:len(timestamps)+self.current_index] = data
-            self.current_index = self.current_index + len(timestamps)
-
-        elif self.current_index + len(timestamps) == self.size:
-            self.buffer_timestamps[self.current_index:self.size] = timestamps
-            self.buffer_data[:,self.current_index:self.size] = data
-
-            self.current_index = 0
-            self.start_time = timestamps[-1] 
-            
+    def on_start(self):
+        self.selected_channels = self.config.channels_selected
+        print(self.selected_channels)
+        
+    def update_event(self, inp=-1):
+        if not self.input(0):
+            return 
         else:
-            index = len(timestamps) - (self.size - self.current_index)
-            self.buffer_timestamps[self.current_index:self.size] = timestamps[:len(timestamps) - index]
-            self.buffer_data[:,self.current_index:self.size] = data[:len(timestamps) - index]
-
-
-            self.tstart = timestamps[len(timestamps) - index]
-
-            self.buffer_timestamps[0:index] = timestamps[len(timestamps) - index:]
-            self.buffer_data[:,0:index] = data[len(timestamps) - index:]
-
-            self.current_index = index
-        
-        self.tend = self.buffer_timestamps[-1] 
+            data = np.array(self.input(0).payload.samples()).T
+            channels_stream = self.input(0).stream_info().channels
+            
+            selected_data = np.zeros((len(self.selected_channels),data.shape(1)))
+            for ch in self.selected_channels:
+                selected_data[channels_stream[ch]] = data[channels_stream[ch]]
+            self.set_output_val(0,Data(selected_data))
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
