@@ -1,12 +1,14 @@
 import numpy as np
 from collections.abc import Sequence
 
-def find_index(tx: float, buffer: Sequence, current_index: int, buffer_duration: float, tstart: float, tend: float, sampling_frequency: float):
+def find_index(tx: float, buffer: Sequence, current_index: int, buffer_duration: float, tstart: float, tend: float, sampling_frequency: float) -> tuple[int, bool]:
     size = int(buffer_duration * sampling_frequency)
     dts = 1/sampling_frequency
     tc = buffer[current_index-1]
+    
     if (tx > tc) or ((tc - tx) > buffer_duration): 
         return (-1,False)
+    
     if tx <= tc:
         return (
             (int((tx - tstart)/dts), False) 
@@ -14,15 +16,16 @@ def find_index(tx: float, buffer: Sequence, current_index: int, buffer_duration:
             else (size - int((tend - tx)/dts), True)
         )
   
-def find_segment(tm: float, x: float, y:float,buffer_tm: Sequence,buffer_data: Sequence,current_index: int, buffer_duration: float, tstart: float, tend: float, sampling_frequency: float):
+def find_segment(tm: float, x: float, y: float,buffer_tm: Sequence, buffer_data: Sequence, current_index: int, buffer_duration: float, tstart: float, tend: float, sampling_frequency: float):
     size = int(buffer_duration * sampling_frequency)
        
-    m_index,m_overflow = find_index(tm,buffer_tm,current_index,buffer_duration,tstart,tend,sampling_frequency)
-    x_index,x_overflow = find_index(tm + x,buffer_tm,current_index,buffer_duration,tstart,tend,sampling_frequency)
-    y_index,y_overflow = find_index(tm + y,buffer_tm,current_index,buffer_duration,tstart,tend,sampling_frequency)   
+    m_index, m_overflow = find_index(tm,buffer_tm,current_index,buffer_duration,tstart,tend,sampling_frequency)
+    x_index, x_overflow = find_index(tm + x,buffer_tm,current_index,buffer_duration,tstart,tend,sampling_frequency)
+    y_index, y_overflow = find_index(tm + y,buffer_tm,current_index,buffer_duration,tstart,tend,sampling_frequency)   
 
-    if (m_index < 0 or x_index < 0 or y_index < 0 or m_index > size) or \
-        buffer_tm[m_index] < 0 or buffer_tm[x_index] < 0 or buffer_tm[y_index] < 0 or x>y: return []
+    if ((m_index < 0 or x_index < 0 or y_index < 0 or m_index > size) or 
+        buffer_tm[m_index] < 0 or buffer_tm[x_index] < 0 or buffer_tm[y_index] < 0 or x>y): 
+            return []
         
     if not (x_overflow or y_overflow) or (x_overflow and y_overflow):
         return buffer_data[:,x_index:y_index]
@@ -32,8 +35,10 @@ def find_segment(tm: float, x: float, y:float,buffer_tm: Sequence,buffer_data: S
         return np.concatenate((buffer_data[:,start:size],buffer_data[:,0:end]))
 
 
-class Buffer():
-    def __init__(self,sampling_frequency:float,buffer_duration:float,error_margin:float,start_time:float):
+class CircularBuffer:
+    """An implementation of a circular buffer for handling data and timestamps"""
+    
+    def __init__(self, sampling_frequency:float, buffer_duration:float, error_margin:float, start_time:float):
         self.srate = sampling_frequency
         self.error_margin = error_margin
         self.buffer_duration = buffer_duration
@@ -41,13 +46,18 @@ class Buffer():
         self.current_index = 0
         
         self.tstart = start_time
-        self.dts = 1/self.srate
+        self.tend = start_time
+        self.dts = 1 / self.srate
 
         self.buffer_data = np.full((32,self.size),-1.0,dtype=float)
         self.buffer_timestamps = np.full(self.size,-1.0,dtype=float)
         self.tc = self.buffer_timestamps[self.current_index]
 
-    def insert_data_to_buffer(self, data: Sequence,timestamps: Sequence):
+    def append(self, data: Sequence, timestamps: Sequence):
+        """Appends data and corresponding timestamps to the buffer"""
+        
+        assert len(data) == len(timestamps), "Length of data and timestamps was not equal!"
+            
         if self.current_index + len(timestamps) < self.size:
             self.buffer_timestamps[self.current_index:len(timestamps)+self.current_index] = timestamps
             self.buffer_data[:,self.current_index:len(timestamps)+self.current_index] = data
@@ -73,4 +83,24 @@ class Buffer():
 
             self.current_index = index
         
-        self.tend = self.buffer_timestamps[-1] 
+        self.tend = self.buffer_timestamps[-1]
+    
+    def find_index(self, timestamp: float):
+        """Finds closest index of the buffer based on a timestamp"""
+        return find_index(timestamp, self.buffer_data, self.current_index, self.buffer_duration, self.tstart, self.tend, self.srate)
+    
+    def find_segment(self, timestamp: float, offsets: tuple[float, float]):
+        """Extracts a segment of the buffer based around a timestamp and offsets"""
+        x_offset, y_offset = offsets
+        return find_segment(
+            timestamp, 
+            x_offset, 
+            y_offset,
+            self.buffer_timestamps,
+            self.buffer_data,
+            self.current_index,
+            self.buffer_duration,
+            self.tstart,
+            self.tend,
+            self.srate
+        )
