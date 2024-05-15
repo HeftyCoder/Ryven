@@ -1,3 +1,4 @@
+from __future__ import annotations
 from ryvencore.data.built_in import *
 from ryvencore import Data,PortConfig
 
@@ -22,7 +23,7 @@ from traitsui.api import CheckListEditor
 from threading import Thread
 import os
 
-class XDFwriting(FrameNode):
+class XDFWriterNode(FrameNode):
     title = 'XDF Writer'
     version = '0.1'
     
@@ -65,11 +66,15 @@ class XDFwriting(FrameNode):
             self.path = self.path + dir_path[i] + "\\"
     
         print(self.path)
-        
+    
+    @property
+    def config(self) -> XDFWriterNode.Config:
+        return self._config
+    
     def on_stop(self):
         import time
-                
-        for i in range(len(self.inputs)):
+        
+        for i in range(len(self._inputs)):
             creation_of_xdf(self.xdfile,i,self.infos[i],None,None,False,False,True,first_time=self.timestamps[i][0][0],last_time=self.timestamps[i][-1][-1],samples_count=self.samples_count[i])  
         
         self.set_progress_value(-1,'Attempting stop!')

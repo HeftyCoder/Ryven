@@ -1,3 +1,4 @@
+from __future__ import annotations
 from cognix.flow import CognixFlow
 from ryvencore.data.built_in import *
 from ryvencore import Data,PortConfig
@@ -16,7 +17,7 @@ from collections.abc import Sequence
 from ..input.payloads.core import Signal
 from .utils_for_preprocessing.segmentation_helper import CircularBuffer
 
-class Segmentation(CognixNode):
+class SegmentationNode(CognixNode):
     title = 'Segmentation'
     version = '0.1'
 
@@ -39,6 +40,10 @@ class Segmentation(CognixNode):
             1: self.update_marker
         }
         self.reset()
+    
+    @property
+    def config(self) -> SegmentationNode.Config:
+        return self._config
     
     def reset(self):
         self.current_timestamp = -1
@@ -90,7 +95,7 @@ class Segmentation(CognixNode):
         return True
 
   
-class SignalSelection(CognixNode):
+class SignalSelectionNode(CognixNode):
     
     title = 'EEG Signal Selection'
     version = '0.1'
@@ -118,6 +123,10 @@ class SignalSelection(CognixNode):
         super().__init__(flow)
         self.reset()
 
+    @property
+    def config(self) -> SignalSelectionNode.Config:
+        return self._config
+    
     def reset(self):
         self.chan_inds = None
         
