@@ -21,8 +21,8 @@ def find_segment(tm: float, x: float, y:float,buffer_tm: Sequence,buffer_data: S
     x_index,x_overflow = find_index(tm + x,buffer_tm,current_index,buffer_duration,tstart,tend,sampling_frequency)
     y_index,y_overflow = find_index(tm + y,buffer_tm,current_index,buffer_duration,tstart,tend,sampling_frequency)   
 
-    if (m_index < 0 or x_index < 0 or y_index < 0) or \
-        buffer_tm[m_index] < 0 or buffer_tm[x_index] < 0 or buffer_tm[y_index] < 0 or x>y: return None
+    if (m_index < 0 or x_index < 0 or y_index < 0 or m_index > size) or \
+        buffer_tm[m_index] < 0 or buffer_tm[x_index] < 0 or buffer_tm[y_index] < 0 or x>y: return []
         
     if not (x_overflow or y_overflow) or (x_overflow and y_overflow):
         return buffer_data[:,x_index:y_index]

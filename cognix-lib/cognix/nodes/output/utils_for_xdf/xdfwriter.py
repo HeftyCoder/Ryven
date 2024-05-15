@@ -1,6 +1,6 @@
 import io,time,sys,struct,threading
 from typing import Optional
-from conversions import *
+from .conversions import *
 import numpy as np
 from xml.etree.ElementTree import fromstring
 import xmltodict

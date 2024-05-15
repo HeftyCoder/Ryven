@@ -81,7 +81,6 @@ class LSLInput(FrameNode):
         self.inlet = None
         
     def on_start(self):
-        print(self.config.processing_flag_mode)
         self.stream_name = self.config.stream_name
         self.stream_type = self.config.stream_type
         self.search_action = self.config.search_action

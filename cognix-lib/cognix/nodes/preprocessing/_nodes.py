@@ -26,7 +26,7 @@ class Segmentation(CognixNode):
     init_inputs = [PortConfig(label='data'),
                    PortConfig(label='marker')]
 
-    init_outputs = [PortConfig(label='segment',allowed_data=ListData)]
+    init_outputs = [PortConfig(label='segment')]
     
     def on_start(self):
         self.buffer = Buffer(sampling_frequency = 2048.0, buffer_duration = self.config.buffer_duration, error_margin = self.config.error_margin, start_time = local_clock())
@@ -59,8 +59,9 @@ class Segmentation(CognixNode):
             segment = find_segment(tm = marker_timestamp, x = self.config.x, y = self.config.y, buffer_tm = self.buffer.buffer_timestamps, buffer_data= self.buffer.buffer_data, \
                     current_index = self.buffer.current_index, buffer_duration = self.config.buffer_duration, tstart = self.buffer.tstart, tend = self.buffer.tend, \
                         sampling_frequency = data.payload.stream_info().nominal_srate())
-            if segment:
+            if len(segment)!=0:
                 print(segment)
+                print(type(segment))
                 self.set_output_val(0,Data(segment))
             
     
