@@ -55,7 +55,6 @@ class LSLInput(FrameNode):
     def __init__(self, params):
         super().__init__(params)
         
-        self.config: LSLInput.Config = self.config
         self.inlet: StreamInlet = None
         
         self.reset()

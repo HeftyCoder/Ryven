@@ -34,7 +34,6 @@ class Segmentation(CognixNode):
     def __init__(self, flow: CognixFlow):
         super().__init__(flow)
         self.buffer: CircularBuffer = None
-        self.config: Segmentation.Config = self.config
         self.update_dict = {
             0: self.update_data,
             1: self.update_marker
@@ -117,7 +116,6 @@ class SignalSelection(CognixNode):
     
     def __init__(self, flow: CognixFlow):
         super().__init__(flow)
-        self.config: SignalSelection.Config = self.config
         self.reset()
 
     def reset(self):
