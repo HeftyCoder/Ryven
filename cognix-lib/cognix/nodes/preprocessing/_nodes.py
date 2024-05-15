@@ -26,8 +26,8 @@ class Segmentation(CognixNode):
         buffer_duration: float = CX_Float(10.0, desc = 'Duration of the buffer in seconds')
         error_margin: float = CX_Float()
 
-    init_inputs = [PortConfig(label='data', allowed_data=Signal),
-                   PortConfig(label='marker', allowed_data=Signal)]
+    init_inputs = [PortConfig(label='data'),
+                   PortConfig(label='marker')]
 
     init_outputs = [PortConfig(label='segment')]
     
@@ -71,7 +71,7 @@ class Segmentation(CognixNode):
                 start_time=local_clock()
             )
         
-        self.buffer.append(data_signal.data, data_signal.timestamps)
+        self.buffer.append(data_signal.data.T, data_signal.timestamps)
         return True
 
     def update_marker(self, inp: int):
@@ -111,8 +111,8 @@ class SignalSelection(CognixNode):
             style='custom'
         )
     
-    init_inputs = [PortConfig(label='data_in', allowed_data=Signal)]
-    init_outputs = [PortConfig(label='data_out', allowed_data=Signal)]
+    init_inputs = [PortConfig(label='data_in')]
+    init_outputs = [PortConfig(label='data_out')]
     
     def __init__(self, flow: CognixFlow):
         super().__init__(flow)

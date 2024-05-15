@@ -32,6 +32,8 @@ class LSLInput(FrameNode):
         stream_name: str = CX_Str('stream_name',desc='Stream name')
         stream_type: str = CX_Str('stream_type',desc = 'Stream type')
         search_action: str = Enum('name','type',desc='Filtering of streams based of specific value')    
+        #### configuration for buffer size of data received
+        #### (define buffer) Boolean for transformation from list to np.array (if False transform else keep)
         processing_flag_mode: int = List(
             editor=CheckListEditor(
                 values=
@@ -50,7 +52,7 @@ class LSLInput(FrameNode):
     
     title = 'LSL Input'
     version = '0.0.1'
-    init_outputs = [PortConfig(label='data', allowed_data=Signal)]
+    init_outputs = [PortConfig(label='data')]
     
     def __init__(self, params):
         super().__init__(params)
@@ -78,8 +80,10 @@ class LSLInput(FrameNode):
         self.force_stop = False
         self.inlet = None
         self.signal_info = None
-        
+        ### buffer = None
+         
     def on_start(self):
+        ### Check boolean for buffer
         self.stream_name = self.config.stream_name
         self.stream_type = self.config.stream_type
         self.search_action = self.config.search_action
@@ -123,12 +127,18 @@ class LSLInput(FrameNode):
     def frame_update_event(self):
         if not self.inlet:
             return
+        
+        ### If boolean is True -> pull_chunk(buffer)
+        ### Else (samples) list -> np.array
+        
         data = self.inlet.pull_chunk()
         samples, timestamps = data
         if not timestamps:
             return
         
         print(timestamps[0])
+        
+        ### samples depends on the boolean for the buffer!
         
         signal = Signal(timestamps, samples, self.signal_info)
         ### inside of Data -> Payload

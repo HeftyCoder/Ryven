@@ -13,7 +13,6 @@ class LSLSignalInfo(SignalInfo):
         self._lsl_info = lsl_info
         
         stream_xml = lsl_info.desc()
-        chans_xml = stream_xml.child('channels')
         chans_xml = stream_xml.child("channels")
         chan_xml_list = []
         ch = chans_xml.child("channel")
@@ -23,7 +22,7 @@ class LSLSignalInfo(SignalInfo):
             
         channels =  {
             chan_xml_list[c_index]: c_index 
-            for c_index in chan_xml_list
+            for c_index in range(len(chan_xml_list))
         }
         
         super().__init__(
