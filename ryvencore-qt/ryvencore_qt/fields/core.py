@@ -1,5 +1,5 @@
 """
-A collection of widgets for changing fields and attributes of an object
+Core definitions of widgets for changing fields and attributes of an object
 
 This is meant as a replacement for the older std_inp_widgets in Ryven.
 """
@@ -17,7 +17,7 @@ from qtpy.QtGui import (
     QValidator,
 )
 
-from .base_widgets import InspectorWidget
+from ..inspector import InspectorWidget
 from ryvencore.base import Event
 
 from typing import Generic, TypeVar
@@ -41,7 +41,7 @@ class FieldWidget(Generic[FieldType]):
         # the attr path might refer to a nested attribute
         # it should be separated by dots .
         self._attr_path = attr_path.split('.')
-        self.set_value(self.value, True, False)
+        self.set_value(self.value, True)
         self.label = label if self.label else self._attr_path[-1]
     
     @property
@@ -94,7 +94,7 @@ class FieldWidget(Generic[FieldType]):
         """
         return self._value_changed
     
-    def set_value(self, val: FieldType, silent=False, undo=True):
+    def set_value(self, val: FieldType, silent=False):
         """Sets the value of an object"""
         
         old_val = self.value
@@ -106,15 +106,6 @@ class FieldWidget(Generic[FieldType]):
         if not silent:
             self._value_changed.emit(old_val, val)
         
-        if undo:
-            
-            self.inspector_widget.push_undo(
-                f"Field / Attr Change: [ obj: {e_obj} old: {old_val} new: {val} ]",
-                lambda _: self.set_value(old_val, False, False),
-                lambda _: self.set_value(val, False, False), 
-                silent=True
-            )
-        
         return True
     
     def __set_value(self, obj, val: FieldType):
@@ -125,31 +116,43 @@ class SingleLineWidget(QWidget):
     """A shortcut class for implementing single line widgets"""
     
     def __init__(self, label: str = None):
-        super().__init__(self)
+        super().__init__()
         layout = QHBoxLayout()
         self.label = QLabel(label)
         layout.addWidget(self.label)
         self.setLayout(layout)
-
+        self.setContentsMargins(0, 0, 0, 0)
 
 class TextField(FieldWidget[FieldType], SingleLineWidget):
-    """A basic field for handling texts"""
+    """
+    A basic field for handling texts. This default version doesn't allow editing the value
     
-    def __init__(self, insp_widget: InspectorWidget, attr_path: str, label: str = None, validator: QValidator = None):
+    This widget is also the default GUI representation of any object as a field
+    """
+    
+    def __init__(
+        self, 
+        insp_widget: InspectorWidget, 
+        attr_path: str, 
+        label: str = None,
+        validator: QValidator = None,
+        enabled=False
+    ):
         SingleLineWidget.__init__(self, label)
         
         self.edit_field = QLineEdit()
+        self.edit_field.setEnabled(enabled)
         if validator:
             self.edit_field.setValidator(validator)
         self.edit_field.returnPressed.connect(self.on_enter_pressed)
-        
         self.layout().addWidget(self.edit_field)
         
         # this should be at the bottom since it might need attributes set before
         FieldWidget.__init__(self, insp_widget, attr_path, label)
+        self.edit_field.setText(str(self.value))
         
-    def set_value(self, val: FieldType, silent=False, undo=True):
-        result = super().set_value(val, silent, undo)
+    def set_value(self, val: FieldType, silent=False):
+        result = super().set_value(val, silent)
         if result:
             self.edit_field.setText(str(val))
         
@@ -159,32 +162,3 @@ class TextField(FieldWidget[FieldType], SingleLineWidget):
         print('xD')
         val = loads(self.edit_field.text())
         self.set_value(val)
-
-
-class StrField(TextField[str]):
-    pass
-
-class IntField(TextField[int]):
-    
-    def __init__(self, insp_widget: InspectorWidget, attr_path: str, label: str = None):
-        super().__init__(insp_widget, attr_path, label, validator=QIntValidator())
-
-class DoubleField(TextField[float]):
-    
-    def __init__(self, insp_widget: InspectorWidget, attr_path: str, label: str = None):
-        super().__init__(insp_widget, attr_path, label, validator=QDoubleValidator())
-        
-
-# Don't forget to add all the widgets here
-__base_type_to_widget: dict[type, type[FieldWidget]] = {
-    str: StrField,
-    int: IntField,
-    float: DoubleField,
-}
-
-type_to_widget = MappingProxyType(__base_type_to_widget)
-"""Provides access to basic field widgets through their types"""
-
-def _add_base_type_widget(t: type, w:type[FieldWidget]):
-    """Adds a widget for a base type. Internal usage"""
-    __base_type_to_widget[t] = w

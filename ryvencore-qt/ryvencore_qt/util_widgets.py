@@ -1,4 +1,11 @@
-from qtpy.QtGui import QFont, QKeySequence
+from qtpy.QtGui import (
+    QFont, 
+    QKeySequence,
+    QColor,
+    QPainter,
+    QStandardItem,
+    QStandardItemModel,
+)
 
 from qtpy.QtWidgets import (
     QWidget,
@@ -13,13 +20,23 @@ from qtpy.QtWidgets import (
     QMessageBox,
     QDialog,
     QShortcut,
+    QTreeView,
+    QLineEdit,
+)
+
+from qtpy.QtCore import (
+    QPointF, 
+    QSortFilterProxyModel,
+    Qt,
+    QModelIndex,
+    QSizeF,
+    QTimeLine,
+    QRectF,
 )
 
 from dataclasses import dataclass, field
 from numbers import Real, Integral
-from qtpy.QtCore import Qt, QPointF, QSizeF, QTimeLine, QRectF
-from qtpy.QtGui import QColor, QPainter, QFont
-
+from re import escape
 
 @dataclass
 class TextStyle:
@@ -311,5 +328,70 @@ class EditVal_Dialog(QDialog):
         except Exception as e:
             pass
         return val
+
+class FilterTreeView(QTreeView):
+    """
+    A tree view that uses a QSortFilterProxyModel
+    
+    Items that have a function set on a user role given will
+    have the function invoked when clicked
+    """
+    
+    def __init__(self, item_model: QStandardItemModel, click_user_data=1, parent: QWidget | None = None):
+        super().__init__(parent)
+        
+        # we need qt6 for not filtering out the children if they would be filtered
+        # out otherwise
+        model = QSortFilterProxyModel()
+        model.setRecursiveFilteringEnabled(True)
+        model.setFilterCaseSensitivity(Qt.CaseInsensitive)
+        self.setModel(model)
+        model.setSourceModel(item_model)
+        self._proxy_model = model
+
+        self.click_func = None
+        def on_select(index: QModelIndex):
+            source_index = index.model().mapToSource(index)
+            item: QStandardItem = index.model().sourceModel().itemFromIndex(source_index)
+            func = item.data(Qt.UserRole + click_user_data)
+            if func:
+                func()
+        
+        self.clicked.connect(on_select)
+    
+    @property
+    def proxy_model(self):
+        return self._proxy_model
+
+class TreeViewSearcher(QWidget):
+    
+    def __init__(self, tree_view: FilterTreeView, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._tree_view = tree_view
+        
+        self._search_bar = QLineEdit()
+        self._search_bar.textChanged.connect(self.search_pkg_tree)
+        
+        self.setLayout(QVBoxLayout())
+        self.layout().addWidget(self._search_bar)
+        self.layout().addWidget(self._tree_view)
+        
+        self.layout().setContentsMargins(0, 0, 0, 0)
+    
+    @property
+    def search_bar(self):
+        return self._search_bar
+
+    def search_pkg_tree(self, search: str):
+        if search and search != '':
+            # removes whitespace and escapes all special regex chars
+            new_search = escape(search.strip())
+            # regex that enforces the text starts with <new_search>
+            self._tree_view.proxy_model.setFilterRegularExpression(f'^{new_search}')
+            self._tree_view.expandAll()
+        else:
+            self._tree_view.proxy_model.setFilterRegularExpression('')
+            self._tree_view.collapseAll()
+        
 
 

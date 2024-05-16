@@ -19,6 +19,12 @@ class NodeViewerWidget:
 
     def __init__(self, params: tuple[Node, 'NodeGUI']):
         self.node, self.node_gui = params
+        self._inspector_widget = None
+    
+    @property
+    def inspector_widget(self):
+        """A Node Inspector for the viewer, if it was attached"""
+        return self._inspector_widget
     
     def on_before_shown(self):
         """
@@ -106,12 +112,13 @@ class NodeViewerDefault(NodeViewerWidget, QDialog):
         self.content = QSplitter()
         self.content.setOrientation(Qt.Orientation.Horizontal)
         self.layout().addWidget(self.content)
+        self._inspector_widget = None
         
         if self.attach_inspect_widgets:
             self.inspect_tab_widget = QTabWidget()
             
-            self.inspector_widget = self.node_gui.create_inspector()
-            self.inspect_tab_widget.addTab(self.inspector_widget, 'Inspector')
+            self._inspector_widget = self.node_gui.create_inspector()
+            self.inspect_tab_widget.addTab(self._inspector_widget, 'Inspector')
             
             self.code_preview_widget = CodePreviewWidget(
                 self.node_gui.session_gui.cd_storage,
@@ -133,7 +140,7 @@ class NodeViewerDefault(NodeViewerWidget, QDialog):
         self.on_before_shown()
         
         if self.attach_inspect_widgets:
-            self.inspector_widget.load()
+            self._inspector_widget.load()
             
         super().showEvent(show_event)
         self.on_after_shown()
@@ -142,12 +149,12 @@ class NodeViewerDefault(NodeViewerWidget, QDialog):
         self.on_before_hidden()
         super().hideEvent(hide_event)
         if self.attach_inspect_widgets:
-            self.inspector_widget.unload()
+            self._inspector_widget.unload()
         self.on_after_hidden()
     
     def on_node_deleted(self):
         if self.attach_inspect_widgets:
-            self.inspector_widget.on_node_deleted()
+            self._inspector_widget.on_node_deleted()
     
     def closeEvent(self, close_event: QCloseEvent):
         self.on_before_closed()

@@ -38,7 +38,6 @@ from .codes_storage import (
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from ryvencore import Node
-    from ..flows.view import FlowView
     from ryvencore_qt import NodeGUI
 
 class EditSrcCodeInfoDialog(QDialog):
