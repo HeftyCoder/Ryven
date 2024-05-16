@@ -187,7 +187,7 @@ class VarsItemWidget(QWidget):
         
         # type edit
         self.type_button = QPushButton(text=var.data.name())
-        self.type_button.setFixedWidth(75)
+        self.type_button.setFixedWidth(125)
         def on_open_type_dial():
             # TODO adjust position here
             def on_confirm(data_type: type[Data]):
@@ -322,10 +322,10 @@ class VariablesListWidget(QWidget):
     """Convenience class for a QWidget to easily manage script variables of a script."""
 
     var_created_signal = Signal(Variable)
-    var_deleted_signal = Signal(Variable)
+    var_deleted_signal = Signal(Variable, VarSubscriber)
     var_renamed_signal = Signal(Variable, str)
     var_value_changed_signal = Signal(Variable, Any)
-    var_type_changed_signal = Signal(Variable)
+    var_type_changed_signal = Signal(Variable, Any)
     
     def __init__(
         self, 
@@ -409,7 +409,7 @@ class VariablesListWidget(QWidget):
             def undo():
                 w = self.widgets[var.name]
                 del self.widgets[var.name]
-                self.list_layout.removeWidget(w)
+                w.setParent(None)
                 # forcibly remove the var
                 var.addon.remove_var(self.flow, var)
             
@@ -420,11 +420,9 @@ class VariablesListWidget(QWidget):
             )
                 
 
-    def on_var_deleted(self, var: Variable):
+    def on_var_deleted(self, var: Variable, var_sub: VarSubscriber):
         if var.name in self.widgets:
             w = self.widgets[var.name]
-            var_sub = var.subscriber
-            
             def redo():
                 w.setParent(None)
                 del self.widgets[var.name]
