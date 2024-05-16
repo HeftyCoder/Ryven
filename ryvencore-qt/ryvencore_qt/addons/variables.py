@@ -39,7 +39,7 @@ from ..data.widgets import DataInspector
 from ..flows.commands import DelegateCommand
 
 from json import dumps
-from ryvencore.addons.variables import VarsAddon, Variable
+from ryvencore.addons.variables import VarsAddon, Variable, VarSubscriber
 from ryvencore import Data
 
 from typing import TYPE_CHECKING, Callable, Any
@@ -191,11 +191,7 @@ class VarsItemWidget(QWidget):
         def on_open_type_dial():
             # TODO adjust position here
             def on_confirm(data_type: type[Data]):
-                self.vars_addon.change_var_type(
-                    self.flow,
-                    self.var.name,
-                    data_type
-                )
+                self.var.set_data_type(data_type)
                 
             self.type_dial.set_confirm_func(on_confirm)
             self.type_dial.exec()
@@ -352,11 +348,9 @@ class VariablesListWidget(QWidget):
         connect_signal_event(self.var_value_changed_signal, self.vars_addon.var_value_changed, self.on_var_value_changed)
         connect_signal_event(self.var_type_changed_signal, self.vars_addon.var_type_changed, self.on_var_type_changed)
         
-
         self.widgets: dict[str, VarsItemWidget] = {}
-        self.currently_edited_var = ''
-        self.ignore_name_line_edit_signal = False  
-        
+        # to recreate the vars
+        self.deleted_vars: dict[str, VarSubscriber] = {}        
         
         self.setup_UI()
         
@@ -393,31 +387,114 @@ class VariablesListWidget(QWidget):
 
         self.recreate_list()
 
+    def push_undo(self, text: str, on_undo, on_redo):
+        self.flow_view.push_undo(
+            DelegateCommand(
+                self.flow_view,
+                text,
+                on_undo,
+                on_redo
+            )
+        )
+        
     def on_var_created(self, var: Variable):
         if var.flow == self.flow:
-            w = VarsItemWidget(self, var)
-            self.widgets[var.name] = w
-            self.list_layout.addWidget(w)
+            v_sub = var.subscriber
+            def redo():
+                w = VarsItemWidget(self, var)
+                self.widgets[var.name] = w
+                self.list_layout.addWidget(w)
+                self.vars_addon.add_var(self.flow, v_sub)
+                
+            def undo():
+                w = self.widgets[var.name]
+                del self.widgets[var.name]
+                self.list_layout.removeWidget(w)
+                # forcibly remove the var
+                var.addon.remove_var(self.flow, var)
+            
+            self.push_undo(
+                f"Created Variable: {var.name} : {var.val_str()}",
+                undo,
+                redo
+            )
+                
 
     def on_var_deleted(self, var: Variable):
         if var.name in self.widgets:
-            self.widgets[var.name].setParent(None)
-            del self.widgets[var.name]
+            w = self.widgets[var.name]
+            var_sub = var.subscriber
+            
+            def redo():
+                w.setParent(None)
+                del self.widgets[var.name]
+                self.vars_addon.remove_var(self.flow, var)
+                
+            def undo():
+                self.widgets[var.name] = w
+                self.list_layout.addWidget(w)
+                # forcibly add the var
+                self.vars_addon.add_var(self.flow, var_sub)
+            
+            self.push_undo(
+                f"Deleted Variable: {var.name}",
+                undo,
+                redo
+            )      
 
     def on_var_renamed(self, var: Variable, old_name: str):
-        w = self.widgets[old_name]
-        del self.widgets[old_name]
-        self.widgets[var.name] = w
-        w.set_name_text(var.name)
+        
+        new_name = var.name
+        def undo_redo(new_name: str, old_name: str):
+            def _undo_redo():
+                w = self.widgets[old_name]
+                del self.widgets[old_name]
+                self.widgets[new_name] = w
+                w.set_name_text(new_name)
+                self.vars_addon.rename_var(self.flow, old_name, new_name, True)
+            return _undo_redo
+        
+        self.push_undo(
+            f"Renamed Variable: {old_name} -> {new_name}",
+            undo_redo(old_name, new_name),
+            undo_redo(new_name, old_name)
+        )
     
     def on_var_value_changed(self, var: Variable, old_value: Any):
-        pass
+        new_value = var.data.payload
+        
+        def undo_redo(val):
+            def _undo_redo():
+                var.set(val, True)
+                w = self.widgets[var.name]
+                w.data_inspector.on_insp_changed(val)
+            return _undo_redo
+        
+        self.push_undo(
+            f"Variable {var.name} Value Change: {old_value} -> {new_value}",
+            undo_redo(old_value),
+            undo_redo(new_value)
+        )
     
-    def on_var_type_changed(self, var: Variable):
-        widget = self.widgets[var.name]
-        widget.type_button.setText(var.data.name())
-        widget.build_inspector()
-           
+    def on_var_type_changed(self, var: Variable, old_type):
+        new_type = var.data_type
+        
+        def undo_redo(val):
+            def _undo_redo():
+                
+                var.set_data_type(val, silent=True)
+                widget = self.widgets[var.name]
+                widget.type_button.setText(var.data.name())
+                widget.build_inspector()
+            
+            return _undo_redo
+
+        self.push_undo(
+            f"Variable {var.name} Type Change: {old_type} -> {new_type}",
+            undo_redo(old_type),
+            undo_redo(new_type),
+        )
+       
     def recreate_list(self):
         for w in self.widgets.values():
             w.setParent(None)
