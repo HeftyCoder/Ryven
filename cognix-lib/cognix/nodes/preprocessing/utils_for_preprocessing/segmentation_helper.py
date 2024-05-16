@@ -129,5 +129,5 @@ class CircularBuffer:
             self.buffer_duration,
             self.tstart,
             self.tend,
-            1/self.dts
+            self.effective_srate
         )
