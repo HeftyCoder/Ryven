@@ -251,7 +251,6 @@ class VarsItemWidget(QWidget):
 
     def event(self, event):
         if event.type() == QEvent.ToolTip:
-            val_str = ''
             try:
                 tooltip_str = create_tooltip(self.var.get())
                 tooltip_str = f"val:type {str(type(self.var.get()))}\n{tooltip_str}"

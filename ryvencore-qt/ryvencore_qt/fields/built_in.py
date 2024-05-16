@@ -18,6 +18,9 @@ class StrField(TextField[str]):
     
     def __init__(self, insp_widget: InspectorWidget, attr_path: str, label: str = None, validator: QValidator = None, enabled=True):
         super().__init__(insp_widget, attr_path, label, validator, enabled)
+    
+    def on_editing_finished(self):
+        self.set_value(self.edit_field.text())
 
 @field_widget(int)
 class IntField(TextField[int]):

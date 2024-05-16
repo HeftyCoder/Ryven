@@ -1,13 +1,14 @@
-from cognix.nodes import CognixNode
+from cognix.nodes import CognixNode, StartNode
 from ryvencore import PortConfig, Data
+
+
 
 class UtilNode(CognixNode):
     
     def have_gui(self):
         return hasattr(self, 'gui')
 
-
-class GetVar_Node(UtilNode):
+class GetVarNode(UtilNode):
     """Gets the value of a script variable"""
 
     version = 'v0.2'
@@ -29,6 +30,10 @@ class GetVar_Node(UtilNode):
         if self.input(0) is not None:
             self.var_name = self.input(0).payload
 
+    def on_start(self):
+        if not self.input_connected(0):
+            self.update_event(0)
+    
     def update_event(self, input_called=-1):
         if self.input_payload(0) != self.var_name:
             if self.var_name != '':  # disconnect old var val update connection
@@ -46,7 +51,7 @@ class GetVar_Node(UtilNode):
         self.set_output_val(0, Data(self.get_var_val(self.var_name)))
 
 
-class Result_Node(UtilNode):
+class ResultNode(UtilNode):
     """Simply shows a value converted to str"""
 
     version = 'v0.2'
@@ -68,7 +73,7 @@ class Result_Node(UtilNode):
         self.updated.emit(0)
 
 
-class Val_Node(UtilNode):
+class ValNode(UtilNode):
     """Evaluates a string from the input field"""
 
     version = 'v0.2'
@@ -90,6 +95,9 @@ class Val_Node(UtilNode):
     def place_event(self):
         self.update()
     
+    def on_start(self):
+        self.update_event(0)
+        
     def update_event(self, input_called=-1):
         self.set_output_val(0, self.val)
 
@@ -103,7 +111,7 @@ class Val_Node(UtilNode):
         self.val = data['val']
 
 
-class SetVar_Node(UtilNode):
+class SetVarNode(UtilNode):
     """Sets the value of a script variable"""
 
     version = 'v0.1'
@@ -167,7 +175,7 @@ class SetVar_Node(UtilNode):
             self.action_make_passive()
 
 
-class SetVarsPassive_Node(UtilNode):
+class SetVarsPassiveNode(UtilNode):
     """Sets the values of multiple script variables"""
 
     version = 'v0.1'

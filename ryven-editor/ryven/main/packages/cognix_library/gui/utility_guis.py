@@ -39,7 +39,7 @@ class Result_Node_MainWidget(NodeMainWidget, QLineEdit):
             self.setText(str(new_val))
             self.setCursorPosition(0)
 
-@node_gui(Result_Node)
+@node_gui(ResultNode)
 class ResultGui(NodeGUI):
     main_widget_class = Result_Node_MainWidget
     main_widget_pos = 'between ports'
@@ -127,7 +127,7 @@ class EditVal_Dialog(QDialog):
             pass
         return val
 
-@node_gui(Val_Node)
+@node_gui(ValNode)
 class ValGui(NodeGUI):
     main_widget_class = ValNode_MainWidget
     style = 'small'
@@ -148,7 +148,7 @@ class ValGui(NodeGUI):
             self.main_widget().setText(str(val_dialog.get_val()))
             self.update()
 
-@node_gui(SetVarsPassive_Node)
+@node_gui(SetVarsPassiveNode)
 class SetVarsGui(NodeGUI):
     style = 'normal'
     color = '#c69a15'
@@ -175,7 +175,7 @@ class SetVarsGui(NodeGUI):
             }
 
 
-@node_gui(SetVar_Node)
+@node_gui(SetVarNode)
 class SetVarGui(NodeGUI):
     input_widget_classes = {
         'varname': inp_widgets.Builder.str_line_edit(),
@@ -191,7 +191,7 @@ class SetVarGui(NodeGUI):
         self.input_widgets[self.node._inputs[-2]] = {'name': 'varname', 'pos': 'besides'}
         self.input_widgets[self.node._inputs[-1]] = {'name': 'val', 'pos': 'besides'}
 
-@node_gui(GetVar_Node)
+@node_gui(GetVarNode)
 class GetVarGui(NodeGUI):
     input_widget_classes = {
         'varname': inp_widgets.Builder.str_line_edit(),

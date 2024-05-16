@@ -144,7 +144,7 @@ class TextField(FieldWidget[FieldType], SingleLineWidget):
         self.edit_field.setEnabled(enabled)
         if validator:
             self.edit_field.setValidator(validator)
-        self.edit_field.returnPressed.connect(self.on_enter_pressed)
+        self.edit_field.editingFinished.connect(self.on_editing_finished)
         self.layout().addWidget(self.edit_field)
         
         # this should be at the bottom since it might need attributes set before
@@ -158,7 +158,7 @@ class TextField(FieldWidget[FieldType], SingleLineWidget):
         
         return result
     
-    def on_enter_pressed(self):
-        print('xD')
+    def on_editing_finished(self):
+        # for most types, this should be ok
         val = loads(self.edit_field.text())
         self.set_value(val)

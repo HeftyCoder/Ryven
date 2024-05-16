@@ -68,6 +68,8 @@ def create_tooltip(value, linebreak=True):
             tooltip_str = f'{tooltip_str}\n. . .'
         else:
             tooltip_str = str(value)
+    else:
+        tooltip_str = value
     return shorten(tooltip_str, 1000, linebreak)
     
 def pointF_mapped(p1, p2):

@@ -1,3 +1,4 @@
+from __future__ import annotations
 from ryvencore import PortConfig
 from cognix.api import CognixNode
 
@@ -7,6 +8,7 @@ from cognix.api import CognixNode
 from cognix.config.traits import NodeTraitsConfig, NodeTraitsGroupConfig, Int, List, Instance
 from .utils_for_classification.core import Classifier
 from cognix.config.traits import *
+from traitsui.api import CheckListEditor
 
 import traceback
 
@@ -34,7 +36,6 @@ class SVMNode(CognixNode):
 
     init_inputs = [PortConfig(label = 'data')]
     init_outputs = [PortConfig(label = 'model')]
-
 
     @property
     def config(self) -> SVMNode.Config:
