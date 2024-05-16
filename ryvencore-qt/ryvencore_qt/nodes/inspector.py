@@ -1,3 +1,4 @@
+from __future__ import annotations
 from qtpy.QtWidgets import (
     QWidget, 
     QVBoxLayout, 
@@ -9,19 +10,21 @@ from qtpy.QtWidgets import (
 from qtpy.QtCore import Qt
 from ryvencore import Node
 from ryvencore.port import NodePort
-from ..base_widgets import InspectorWidget
+
+from ..inspector import InspectorWidget, InspectedChangedEvent
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .gui import NodeGUI
+    from ..flows.view import FlowView
 
 class NodeInspectorWidget(InspectorWidget[Node]):
     """Base class for the inspector widget of a node."""
 
-    def __init__(self, params: tuple[Node, 'NodeGUI']):
+    def __init__(self, params: tuple[Node, NodeGUI]):
         self.node, self.node_gui = params
-        self.inspected = self.node
         self.flow_view = self.node_gui.flow_view
+        InspectorWidget.__init__(self, self.node, self.flow_view)
     
     def on_node_deleted(self):
         """Called when the node is deleted"""
@@ -33,7 +36,7 @@ class InspectorView(QWidget):
     A widget that can display the inspector of the currently selected node.
     """
 
-    def __init__(self, flow_view, parent: QWidget = None):
+    def __init__(self, flow_view: FlowView, parent: QWidget = None):
         super().__init__(parent=parent)
         self.node: Node = None
         self.inspector_widget: NodeInspectorWidget = None
@@ -84,10 +87,11 @@ class NodeInspectorDefaultWidget(NodeInspectorWidget, QWidget):
         return f'<b><bold>{txt}</bold></b>'
     
     def __init__(self, params, child: NodeInspectorWidget | None = None):
+        self.child = child
         QWidget.__init__(self)
         NodeInspectorWidget.__init__(self, params)
-
-        self.child = child
+    
+    def on_insp_changed(self, change_event: InspectedChangedEvent[Node]):
         self.setLayout(QVBoxLayout())
 
         self.title_label: QLabel = QLabel()
@@ -103,14 +107,22 @@ class NodeInspectorDefaultWidget(NodeInspectorWidget, QWidget):
         self.content_splitter.setOrientation(Qt.Orientation.Vertical)
         self.layout().addWidget(self.content_splitter)
         
-        if child:
-            self.content_splitter.addWidget(child)
+        if self.child:
+            # passing created as False here because we only want the main Inspector
+            # to know that it's created to avoid multiple Undo commands
+            child_change_event = InspectedChangedEvent(change_event._old, change_event._new, False)
+            self.child.on_insp_changed(child_change_event)
+            self.content_splitter.addWidget(self.child)
         
         self.description_area: QTextEdit = QTextEdit()
         self.description_area.setReadOnly(True)
     
         self.content_splitter.addWidget(self.description_area)
-    
+        
+        if self.child:
+            # not going to search why random values I put work :D
+            self.content_splitter.setSizes([75, 5])
+        
     def load(self):
         self.process_description()
         super().load()

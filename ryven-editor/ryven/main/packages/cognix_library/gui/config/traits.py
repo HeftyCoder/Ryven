@@ -5,6 +5,7 @@ built-in traits and traitsui implementation
 from __future__ import annotations
 from cognix.api import NodeConfig, CognixNode
 from cognix.config.traits import NodeTraitsConfig, NodeTraitsGroupConfig
+from ryvencore_qt.nodes.inspector import InspectedChangedEvent
 
 from .abc import NodeConfigInspector
 from ryvencore_qt.env import inspector
@@ -19,9 +20,11 @@ from traits.observation.events import (
 from qtpy.QtWidgets import QVBoxLayout, QWidget
 from ryven.gui_env import NodeGUI
 from ryvencore_qt.flows.commands import DelegateCommand
+from typing import TypeVar
+
 
 @inspector(NodeTraitsConfig)
-class NodeTraitsConfigInspector(NodeConfigInspector, QWidget):
+class NodeTraitsConfigInspector(NodeConfigInspector[NodeTraitsConfig], QWidget):
     """Basic config inspector"""
     
     #   CLASS
@@ -90,13 +93,10 @@ class NodeTraitsConfigInspector(NodeConfigInspector, QWidget):
         QWidget.__init__(self)
         
         config, _ = params
-        NodeConfigInspector.__init__(self, params)
         
         self.view: View = None
         self.ui = None
-        self.set_inspected(config)
-        
-        self.setLayout(QVBoxLayout())
+        NodeConfigInspector.__init__(self, params)
     
     def inspected_label(self):
         return (
@@ -104,10 +104,13 @@ class NodeTraitsConfigInspector(NodeConfigInspector, QWidget):
             if hasattr(self.inspected, 'label') 
             else 'Configuration'
         )
+    
+    def on_insp_changed(self, change_event: InspectedChangedEvent[NodeTraitsConfig]):
         
-    def set_inspected(self, inspected_obj: NodeTraitsConfig):
-        
+        self.setLayout(QVBoxLayout())
         self.delete_ui()
+        
+        inspected_obj = change_event.new
         
         if not inspected_obj:
             return
@@ -135,6 +138,9 @@ class NodeTraitsConfigInspector(NodeConfigInspector, QWidget):
         self.view = View (
             config_group
         )
+        
+        if not change_event.created:
+            self.load()
     
     def load(self):
         
@@ -157,8 +163,9 @@ class NodeTraitsGroupConfigInspector(NodeTraitsConfigInspector):
     
     traits_view = None
     
-    def set_inspected(self, inspected_obj: NodeTraitsGroupConfig):
+    def on_insp_changed(self, change_event: InspectedChangedEvent[NodeTraitsConfig]):
         
+        inspected_obj = change_event.new
         self.delete_ui()
         
         if not inspected_obj:
@@ -189,6 +196,10 @@ class NodeTraitsGroupConfigInspector(NodeTraitsConfigInspector):
                 springy=True
             )
         )
+        
+        if not change_event.created:
+            self.load()
+    
 
 #   ------UTIL-------
 

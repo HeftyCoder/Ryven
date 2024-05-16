@@ -1,22 +1,25 @@
 """
-Provides utilities for assigning functions for getting associations between objects
+The GUI environment that is required for setting associations between GUI types and
+object types.
 
-For example, a node must be able to get its GUI, but how it's assigned to a specific node
-and how it's retrieved from a node is set outside of this core Qt library.
+NodeGUI -> Node
+InspectorWidget -> object
+FieldWidget -> object
 """
 
-from typing import TypeVar, Generic, Any, Callable
+from typing import TypeVar, Generic
 from ryvencore import InfoMsgs, Node, Data
 from .nodes.gui import NodeGUI
-from .base_widgets import InspectorWidget
-    
+from .inspector import InspectorWidget
+from .fields.core import FieldWidget, TextField    
 
 ToType = TypeVar('ToType')
 """The To in the From-To type relationship"""
 FromType = TypeVar('FromType')
 """The From in the From-To type relationship"""
 
-
+# We're intentionally omitting type hints because they don't work well
+# with decorators or we have no knowledge on how to do this
 class Association(Generic[FromType, ToType]):
     """
     A class for associating two types. It associates the definition of
@@ -33,13 +36,13 @@ class Association(Generic[FromType, ToType]):
         
     def __init__(
         self, 
-        parent_base_type: type[FromType], 
-        assoc_base_type: type[ToType]
+        parent_base_type, 
+        assoc_base_type
     ):
         
         self.__from_type = parent_base_type
         self.__to_type = assoc_base_type
-        self.__from_to_dict: dict[type[FromType], type[ToType]] = {}
+        self.__from_to_dict: dict = {}
         """Stores any direct associations internally."""
     
     @property
@@ -50,15 +53,15 @@ class Association(Generic[FromType, ToType]):
     def to_type(self):
         return self.__to_type
     
-    def associate_decor(self, *from_types: tuple[type[FromType]]):
+    def associate_decor(self, *from_types):
         """Returns a decorator for creating the association"""
         
-        def register(to_type: type[ToType]):
+        def register(to_type):
             return self.associate(to_type, *from_types)
 
         return register
 
-    def associate(self, to_type: type[ToType], *from_types: type[FromType]):
+    def associate(self, to_type, *from_types):
         """Creates a from-to association"""
         
         if not issubclass(to_type, self.__to_type):
@@ -109,76 +112,65 @@ class Association(Generic[FromType, ToType]):
                 if issubclass(from_type, key):
                     return value
 
-#   Node and NodGUI
-_node_to_gui = Association(Node, NodeGUI)
-
-def set_node_gui_assoc(assoc: Association[Node, NodeGUI]):
-    """Sets the association between Node and NodeGUI"""
-    global _node_to_gui
-    _node_to_gui = assoc
-
-def node_gui_assoc():
-    """Retrieves the Association between Node and NodeGUI."""
-    return _node_to_gui
-
-def node_gui(node_cls: type[Node]):
-    """
-    Registers a node gui for a node class. The gui of a node is inherited to its sub-classes,
-    but can be overridden by specifying a new gui for the sub-class.
-    """
-    
-    return _node_to_gui.associate_decor(node_cls)
-
-#   Inspected and Inspector (Anything can be inspected)
-_obj_to_inspector = Association(object, InspectorWidget)
-
-def set_obj_insp_assoc(assoc: Association[object, InspectorWidget]):
-    """
-    Sets the association between an object and an Inspector
-    
-    Used for anyone who wants to mainly change the attribute name for this association
-    """
-    global _obj_to_inspector
-    _obj_to_inspector = assoc
-
-def obj_insp_assoc():
-    """Retrieves the Association between object type and inspector type"""
-    return _obj_to_inspector
-
-def inspector(obj_type):
-    """
-    Registers an inspector for an object. The inspector of an object is inherited to its sub-classes,
-    but can be overridden by specifying a new inspector for the sub-class.
-    """
-    
-    return _obj_to_inspector.associate_decor(obj_type)
-
-class GUIEnvProxy:
-    """Provides utilities for retrieving GUI related data"""
+#   Holds all information regarding a GUI environment
+class GUIEnv:
+    """Provides utilities for interfacing with the GUI side of various types"""
     
     def __init__(
-        self, 
-        get_node_gui: Callable[[type[Node]], type[NodeGUI] | None],
-        get_inspector: Callable[[Any], type[InspectorWidget]]
+        self,
+        node_gui_assoc=Association[Node, NodeGUI](Node, NodeGUI),
+        obj_insp_assoc=Association[object, InspectorWidget](object, InspectorWidget),
+        obj_field_assoc=Association[object, FieldWidget](object, FieldWidget)
     ):
-        self.__get_node_gui = get_node_gui
-        self.__get_inspector = get_inspector
+        super().__init__()
+        self._node_gui_assoc = node_gui_assoc
+        self._obj_insp_assoc = obj_insp_assoc
+        self._obj_field_assoc = obj_field_assoc
     
     def get_node_gui(self, node_type: type[Node]):
-        return self.__get_node_gui(node_type)
+        return self._node_gui_assoc.get_assoc(node_type)
     
     def get_inspector(self, obj):
-        return self.__get_inspector(obj)
-
-def create_default_env():
-    """
-    Creates a default GUI environment based on the internals of this module
+        return self._obj_insp_assoc.get_assoc(obj)
     
-    Refer to set_obj_insp_association etc.
-    """
-    
-    return GUIEnvProxy(
-        _node_to_gui.get_assoc,
-        _obj_to_inspector.get_assoc,
+    def get_field_widget(self, obj):
+        result = self._obj_field_assoc.get_assoc(obj)
+        if not result:
+            result = TextField
+        return result
         
-    )
+    def load_env(self):
+        """
+        Must be called before the start of an appliction
+        to register built_in types
+        """
+        from .fields import built_in
+
+_gui_env = GUIEnv()
+
+def get_gui_env():
+    """
+    Retrieves the GUI environment
+    
+    Useful for creating custom implementation for setting the GUI of types
+    """
+    return _gui_env
+
+def node_gui(*node_cls):
+    """
+    Shortcut decorator for registering a NodeGUI type for a Node type. Inheritance applies.
+    """
+    return _gui_env._node_gui_assoc.associate_decor(*node_cls)
+
+def inspector(*obj_type):
+    """
+    Shortcut decorator for registering an InspectorWidget type for an object type. Inheritance applies.
+    """
+    return _gui_env._obj_insp_assoc.associate_decor(*obj_type)
+
+def field_widget(*obj_type):
+    """
+    Shortcut decorator for registering a FieldWidget type for an object type. Inheritance applies.
+    """
+    
+    return _gui_env._obj_field_assoc.associate_decor(*obj_type)

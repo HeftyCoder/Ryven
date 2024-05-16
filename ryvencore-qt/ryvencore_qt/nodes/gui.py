@@ -23,6 +23,11 @@ if TYPE_CHECKING:
 class NodeGUI(QObject):
     """
     Interface class between nodes and their GUI representation.
+    
+    Both the viewer and the inspector are created when the GUI
+    itself is created. This fact prevents dynamically creating
+    viewers or inspectors for this node after the fact. This is
+    by design.
     """
 
     # customizable gui attributes
@@ -89,6 +94,10 @@ class NodeGUI(QObject):
         # init the default actions
         self.actions = self._init_default_actions()
 
+    @property
+    def gui_env(self):
+        return self.flow_view.session_gui.gui_env
+    
     def create_viewer(self):
         """Creates the viewer for this node."""
         

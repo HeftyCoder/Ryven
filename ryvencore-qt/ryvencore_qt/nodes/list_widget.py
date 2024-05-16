@@ -12,13 +12,11 @@ from qtpy.QtWidgets import (
     QStyleOption, 
     QStyle,
     QScrollArea,
-    QTreeView,
     QSplitter,
     QAbstractItemView,
     QLabel,
 )
 from qtpy.QtGui import (
-    QStandardItemModel, 
     QStandardItem, 
     QIcon,
     QPainter,
@@ -30,9 +28,7 @@ from qtpy.QtGui import (
 from qtpy.QtCore import (
     Signal, 
     Qt, 
-    QMimeData, 
-    QModelIndex, 
-    QSortFilterProxyModel,
+    QMimeData,
 )
 
 
@@ -41,7 +37,8 @@ from re import escape
 from ryvencore import Node
 from ryvencore.base import IdentifiableGroups
 from ..utils import IdentifiableGroupsModel
-from ..env import GUIEnvProxy
+from ..util_widgets import FilterTreeView, TreeViewSearcher
+from ..env import GUIEnv
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -115,7 +112,7 @@ class NodeListItemWidget(QWidget):
             ), encoding='utf-8'))
         return mime_data
     
-    def __init__(self, parent, node_type: type[Node], gui_env: GUIEnvProxy):
+    def __init__(self, parent, node_type: type[Node], gui_env: GUIEnv):
         super(NodeListItemWidget, self).__init__(parent)
 
         self.custom_focused = False
@@ -230,7 +227,7 @@ class NodeGroupsModel(IdentifiableGroupsModel[Node]):
         super().__init__(groups, label, separator)
        
     def create_id_item(self, id: type[Node]):
-        return NodeStandardItem(id, id.name())
+        return NodeStandardItem(id, id.title)
      
     def create_subgroup(self, name: str, path: str) -> QStandardItem:
         item = QStandardItem(name)
@@ -283,40 +280,16 @@ class NodeListWidget(QWidget):
         splitter = QSplitter(Qt.Vertical)
         self.layout().addWidget(splitter)
 
-        # search for the tree
-        self.search_line_tree = QLineEdit(self)
-        self.search_line_tree.setPlaceholderText('search packages...')
-        self.search_line_tree.textChanged.connect(self.search_pkg_tree)
-
-        # tree view
-        self.pack_proxy_model: QSortFilterProxyModel = QSortFilterProxyModel()
-        self.pack_proxy_model.setRecursiveFilteringEnabled(True)
-        # we need qt6 for not filtering out the children if they would be filtered
-        # out otherwise
-        self.pack_proxy_model.setFilterCaseSensitivity(Qt.CaseInsensitive)
-        self.pack_tree = QTreeView()
-        self.pack_tree.setModel(self.pack_proxy_model)
+        # searchable tree view
+        self.pack_tree = FilterTreeView(self.node_model)
         self.pack_tree.setDragDropMode(QAbstractItemView.DragDropMode.DragOnly)
         self.pack_tree.setDragEnabled(True)
-        self.pack_proxy_model.setSourceModel(self.node_model)
-
-        def on_select(index: QModelIndex):
-            source_index = index.model().mapToSource(index)
-            item: QStandardItem = index.model().sourceModel().itemFromIndex(source_index)
-            func = item.data(Qt.UserRole + 1)
-            if func != None:
-                func()
-
-        # pkg widget
-        self.pkg_widget = QWidget()
-        self.pkg_widget.setLayout(QVBoxLayout())
-        self.pkg_widget.layout().addWidget(self.search_line_tree)
-        self.pkg_widget.layout().addWidget(self.pack_tree)
-
-        self.pack_tree.clicked.connect(on_select)
+        
+        self.tree_searcher = TreeViewSearcher(self.pack_tree)
+        self.tree_searcher.search_bar.setPlaceholderText('search packages...')
 
         if self.show_packages:
-            splitter.addWidget(self.pkg_widget)
+            splitter.addWidget(self.tree_searcher)
         
         splitter.setSizes([30])
         
@@ -357,17 +330,6 @@ class NodeListWidget(QWidget):
         self.setStyleSheet(self.session_gui.design.node_selection_stylesheet)
 
         self.search_line_edit.setFocus()
-
-    def search_pkg_tree(self, search: str):
-        if search and search != '':
-            # removes whitespace and escapes all special regex chars
-            new_search = escape(search.strip())
-            # regex that enforces the text starts with <new_search>
-            self.pack_proxy_model.setFilterRegularExpression(f'^{new_search}')
-            self.pack_tree.expandAll()
-        else:
-            self.pack_proxy_model.setFilterRegularExpression('')
-            self.pack_tree.collapseAll()
 
     def make_nodes_current(self, pack_nodes, pkg_name: str):
         if not pack_nodes or self.package_nodes == pack_nodes:

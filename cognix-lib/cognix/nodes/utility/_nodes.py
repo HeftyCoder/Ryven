@@ -30,7 +30,7 @@ class GetVar_Node(UtilNode):
             self.var_name = self.input(0).payload
 
     def update_event(self, input_called=-1):
-        if self.input(0).payload != self.var_name:
+        if self.input_payload(0) != self.var_name:
             if self.var_name != '':  # disconnect old var val update connection
                 self.vars_addon.unsubscribe(self, self.var_name, self.var_val_changed)
 

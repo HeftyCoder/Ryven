@@ -100,7 +100,7 @@ class FlowUI(QMainWindow):
         # variables list widget
         self.vars_list_widget = VariablesListWidget(
             self.flow.session.addons.get(VarsAddon.addon_name()),
-            self.flow,
+            self.flow_view,
             main_window.type_dialog,
         )
         self.ui.variables_dock.setWidget(self.vars_list_widget)

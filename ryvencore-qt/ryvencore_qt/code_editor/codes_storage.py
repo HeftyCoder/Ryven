@@ -7,7 +7,7 @@ from types import MappingProxyType
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from ..env import GUIEnvProxy
+    from ..env import GUIEnv
     from ..nodes.gui import NodeGUI
 
 class SourceCodeStorage:
@@ -15,7 +15,7 @@ class SourceCodeStorage:
     Stores node's source code as well as custom gui code.
     """
     
-    def __init__(self, gui_env: GUIEnvProxy, edit_src_codes = False):
+    def __init__(self, gui_env: GUIEnv, edit_src_codes = False):
         
         self.gui_env = gui_env
         """Tells the storage where to search for a node's GUI definition"""

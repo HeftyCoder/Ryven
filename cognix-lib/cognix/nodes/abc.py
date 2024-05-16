@@ -33,6 +33,7 @@ class CognixNode(Node, metaclass=ABCMeta):
         super().__init__(flow)
         
         self.updated = Event[int]()
+        self.config_changed = Event[NodeConfig]()
         self.flow = flow
         self.__vars_addon = self.flow.session.addons[VarsAddon.addon_name()]
         config_type = self.config_type if self.config_type else self._config_as_cls_type
@@ -42,6 +43,18 @@ class CognixNode(Node, metaclass=ABCMeta):
     def config(self) -> NodeConfig | None:
         """Returns this node's configuration, if it exists"""
         return self._config
+    
+    @config.setter
+    def config(self, value: NodeConfig):
+        """Sets this node's configuration"""
+        self.set_config(value, False)
+    
+    def set_config(self, value: NodeConfig, silent):
+        if self._config == value:
+            return
+        self._config = value
+        if not silent:
+            self.config_changed.emit(self._config)
     
     @property
     def vars_addon(self) -> VarsAddon:

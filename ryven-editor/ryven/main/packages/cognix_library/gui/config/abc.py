@@ -1,13 +1,15 @@
 from __future__ import annotations
-from ryvencore_qt.nodes.inspector import InspectorWidget
+from ryvencore_qt.nodes.inspector import InspectorWidget, InspectedChangedEvent
 from cognix.api import NodeConfig, CognixNode
 from ryven.gui_env import NodeGUI
 
-from typing import TYPE_CHECKING, Callable, Any
+from typing import TYPE_CHECKING, Callable, Any, TypeVar
 if TYPE_CHECKING:
     from ..inspector import CognixNodeGUI
 
-class NodeConfigInspector(InspectorWidget[NodeConfig]):
+ConfigType = TypeVar('ConfigType', bound=NodeConfig)
+
+class NodeConfigInspector(InspectorWidget[ConfigType]):
     """Base class for inspecting a node config"""
     
     @classmethod
@@ -19,9 +21,12 @@ class NodeConfigInspector(InspectorWidget[NodeConfig]):
         """
         pass
     
-    def __init__(self, params: tuple[NodeConfig, NodeGUI]):
+    def __init__(self, params: tuple[ConfigType, NodeGUI]):
         config, gui = params
         super().__init__(config, gui.flow_view)
+    
+    def on_insp_changed(self, change_event: InspectedChangedEvent[ConfigType]):
+        pass
     
     def on_node_deleted(self, node: CognixNode):
         """Callback when a node is deleted"""

@@ -2,9 +2,12 @@ import enum
 import pathlib
 from math import sqrt
 
-from qtpy.QtCore import QPointF, QByteArray, Signal
+from qtpy.QtCore import (
+    QPointF, 
+    QByteArray, 
+    Signal,
+)
 from qtpy.QtGui import QStandardItem, QStandardItemModel
-
 from ryvencore.utils import serialize, deserialize
 from ryvencore.base import Event, IdentifiableGroups, IdType
 
@@ -12,7 +15,7 @@ from typing import Generic, Callable, TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from ryvencore import Node
     from .nodes.gui import NodeGUI
-    from .base_widgets import InspectorWidget
+    from .inspector import InspectorWidget
 
 class Location:
     PACKAGE_PATH = None
@@ -109,7 +112,7 @@ def change_svg_color(filepath: str, color_hex: str):
     svg_renderer.render(pix_painter)
 
     return pix
-
+    
 class IdentifiableGroupsModel(QStandardItemModel, Generic[IdType]):
     """
     A nested model that works with identifiables.
@@ -161,7 +164,10 @@ class IdentifiableGroupsModel(QStandardItemModel, Generic[IdType]):
         
         Override this to handle subgroup item creation
         """
-        return QStandardItem(name)
+        item = QStandardItem(name)
+        item.setEditable(False)
+        item.setDragEnabled(False)
+        return item
     
     def create_subgroups(self, group_id: str):
         """
@@ -184,3 +190,4 @@ class IdentifiableGroupsModel(QStandardItemModel, Generic[IdType]):
             current_root = self.model_nodes[current_path]
             if i != sg_len - 1:
                 current_path = f"{current_path}.{split_groups[i+1]}"
+        

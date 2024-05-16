@@ -10,9 +10,10 @@ from .design import Design
 from .gui_base import GUIBase
 from .code_editor.codes_storage import SourceCodeStorage
 from cognix.api import CognixSession
-from .env import create_default_env, GUIEnvProxy
 
 from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from .env import GUIEnv
 
 class SessionGUI(GUIBase, QObject):
     """
@@ -30,11 +31,18 @@ class SessionGUI(GUIBase, QObject):
     flow_renamed = Signal(object, str)
     flow_view_created = Signal(object, object)
 
-    def __init__(self, gui_parent: QWidget, gui_env: GUIEnvProxy = create_default_env()):
+    def __init__(self, gui_parent: QWidget, gui_env: GUIEnv=None):
         GUIBase.__init__(self)
         QObject.__init__(self)
 
-        self.__gui_env = gui_env
+        if gui_env:
+            self.__gui_env = gui_env
+        else:
+            from .env import get_gui_env # global gui env
+            self.__gui_env = get_gui_env()
+        
+        self.__gui_env.load_env()
+            
         self.core_session = CognixSession(gui=True, load_addons=True)
         setattr(self.core_session, 'gui', self)
 
@@ -62,6 +70,7 @@ class SessionGUI(GUIBase, QObject):
 
     @property
     def gui_env(self):
+        """Utility property for accessing the global GUI environment."""
         return self.__gui_env
     
     def _flow_created(self, flow: ryvencore.Flow):
