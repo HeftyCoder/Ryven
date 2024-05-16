@@ -1,6 +1,6 @@
-from __future__ import annotations
-from ryvencore import PortConfig
+from ryvencore import Data,PortConfig
 from cognix.api import CognixNode
+from __future__ import annotations
 
 # from Orange.data import Table
 # from Orange.classification import SVMLearner, LogisticRegressionLearner
@@ -8,38 +8,48 @@ from cognix.api import CognixNode
 from cognix.config.traits import NodeTraitsConfig, NodeTraitsGroupConfig, Int, List, Instance
 from .utils_for_classification.core import Classifier
 from cognix.config.traits import *
-from traitsui.api import CheckListEditor
 
 import traceback
 
-class SVMNode(CognixNode):
-    title = 'SVM Clasifier'
+class SVMTrainingNode(CognixNode):
+    title = 'SVM Traning Clasifier'
     version = '0.1'
 
     class Config(NodeTraitsConfig):
         C : float = CX_Float(1.0)
         degree: int = CX_Int(3)
-        kernel: int = List(
-            editor=CheckListEditor(
-                values=
-                [
-                    (1, 'synchronization'),  
-                    (2, 'dejitter'),
-                    (4, 'monotonize'),
-                    (8, 'threadsafe')
-                ],
-                cols=2
-            ),
-            style='custom'
-        )
+        kernel: str = Enum('linear','poly','rbf','sigmoid','precomputed')
+        gamma: str = Enum('scale','auto')
+        gamma_float: float = CX_Float(0.0)
+        selection_of_gamma: bool = Bool('gamma value from choices?')
 
-
-    init_inputs = [PortConfig(label = 'data')]
+    init_inputs = [PortConfig(label = 'data'),PortConfig(label='class')]
     init_outputs = [PortConfig(label = 'model')]
 
     @property
-    def config(self) -> SVMNode.Config:
+    def config(self) -> SVMTrainingNode.Config:
         return self._config
+    
+    def on_start(self):
+        self.params = {'C':self._config.C,
+                       'degree':self._config.degree,
+                       'kernel':self._config.kernel,
+                       'gamma':self._config.gamma if self._config.selection_of_gamma else self._config.gamma_float
+                       }
+        self.classifier = Classifier(self.params,classifier_type='SVM')
+
+    def update_event(self, inp=-1):
+
+        x = self.input_payload(0)
+        y = self.input_payload(1)
+        self.classifier.train(X_train=x,Y_train=y)
+
+    def on_stop(self):
+        self.set_output_val(0,Data(self.classifier.model))
+    
+        
+    
+
 
 
 
