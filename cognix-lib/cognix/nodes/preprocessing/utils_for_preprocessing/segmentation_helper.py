@@ -52,31 +52,38 @@ class CircularBuffer:
     """An implementation of a circular buffer for handling data and timestamps"""
     
     def __init__(self, sampling_frequency:float, buffer_duration:float, error_margin:float, start_time:float):
-        self.srate = sampling_frequency
+        self.nominal_srate = sampling_frequency
+        self.effective_srate = 0
         self.error_margin = error_margin
         self.buffer_duration = buffer_duration
-        self.size = int(buffer_duration * self.srate)
+        self.size = int(buffer_duration * self.nominal_srate)
         self.current_index = 0
         
         self.tstart = start_time
         self.tend = start_time
-        self.dts = 1 / self.srate
+        self.dts = 1 / self.nominal_srate
 
         self.buffer_data = np.full((32,self.size),-1.0,dtype=float)
         self.buffer_timestamps = np.full(self.size,-1.0,dtype=float)
         self.tc = self.buffer_timestamps[self.current_index]
-        self.first_sample_rate = False
-
+        
+        # for calculating effective srate
+        self.total_timestamps = 0
+        self.time_passed = 0
+        
+    @property
+    def effective_dts(self):
+        if self.effective_srate == 0:
+            return 0
+        return 1 / self.effective_srate
+        
     def append(self, data: Sequence, timestamps: Sequence):
-        
-        if not self.first_sample_rate:
-            self.dts = (timestamps[-1] - timestamps[0])/len(timestamps)
-            self.first_sample_rate = True
-        
-
         """Appends data and corresponding timestamps to the buffer"""
-        
         assert data.shape[1] == len(timestamps), "Length of data and timestamps was not equal!"
+        
+        self.total_timestamps += len(timestamps)
+        self.time_passed += timestamps[-1] - timestamps[0]
+        self.effective_srate = self.total_timestamps / self.time_passed
             
         if self.current_index + len(timestamps) < self.size:
             self.buffer_timestamps[self.current_index:len(timestamps)+self.current_index] = timestamps
@@ -107,7 +114,7 @@ class CircularBuffer:
     
     def find_index(self, timestamp: float):
         """Finds closest index of the buffer based on a timestamp"""
-        return find_index(timestamp, self.buffer_data, self.current_index, self.buffer_duration, self.tstart, self.tend, self.srate)
+        return find_index(timestamp, self.buffer_data, self.current_index, self.buffer_duration, self.tstart, self.tend, self.nominal_srate)
     
     def find_segment(self, timestamp: float, offsets: tuple[float, float]):
         """Extracts a segment of the buffer based around a timestamp and offsets"""
