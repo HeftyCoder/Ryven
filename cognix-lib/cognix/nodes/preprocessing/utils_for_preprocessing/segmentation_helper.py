@@ -5,16 +5,26 @@ def find_index(tx: float, buffer: Sequence, current_index: int, buffer_duration:
     size = int(buffer_duration * sampling_frequency)
     dts = 1/sampling_frequency
     tc = buffer[current_index-1]
-    
+
     if (tx > tc) or ((tc - tx) > buffer_duration): 
         return (-1,False)
     
     if tx <= tc:
-        return (
+        index = (
             (int((tx - tstart)/dts), False) 
             if tx >= tstart
             else (size - int((tend - tx)/dts), True)
         )
+
+        extra_index = 0
+        if buffer[index[0]] > 0:
+            extra_index = int((tx - buffer[index[0]])/dts)
+        
+        new_index = (index[0] + extra_index,index[1])
+
+        return new_index
+
+
   
 def find_segment(tm: float, x: float, y: float,buffer_tm: Sequence, buffer_data: Sequence, current_index: int, buffer_duration: float, tstart: float, tend: float, sampling_frequency: float):
     size = int(buffer_duration * sampling_frequency)
@@ -23,14 +33,17 @@ def find_segment(tm: float, x: float, y: float,buffer_tm: Sequence, buffer_data:
     x_index, x_overflow = find_index(tm + x,buffer_tm,current_index,buffer_duration,tstart,tend,sampling_frequency)
     y_index, y_overflow = find_index(tm + y,buffer_tm,current_index,buffer_duration,tstart,tend,sampling_frequency)   
 
-    if ((m_index < 0 or x_index < 0 or y_index < 0 or m_index > size) or 
+    if ((m_index < 0 or x_index < 0 or y_index < 0) or 
         buffer_tm[m_index] < 0 or buffer_tm[x_index] < 0 or buffer_tm[y_index] < 0 or x>y): 
             return []
-        
+    
     if not (x_overflow or y_overflow) or (x_overflow and y_overflow):
+        print(tm,buffer_tm[x_index],buffer_tm[m_index],buffer_tm[y_index])
+
         return buffer_data[:,x_index:y_index]
     
     else:
+        print(tm,buffer_tm[x_index],buffer_tm[m_index],buffer_tm[y_index])
         start,end = (x_index,y_index) if x_overflow else (y_index,x_index)
         return np.concatenate((buffer_data[:,start:size],buffer_data[:,0:end]))
 
@@ -52,11 +65,18 @@ class CircularBuffer:
         self.buffer_data = np.full((32,self.size),-1.0,dtype=float)
         self.buffer_timestamps = np.full(self.size,-1.0,dtype=float)
         self.tc = self.buffer_timestamps[self.current_index]
+        self.first_sample_rate = False
 
     def append(self, data: Sequence, timestamps: Sequence):
+        
+        if not self.first_sample_rate:
+            self.dts = (timestamps[-1] - timestamps[0])/len(timestamps)
+            self.first_sample_rate = True
+        
+
         """Appends data and corresponding timestamps to the buffer"""
         
-        assert len(data) == len(timestamps), "Length of data and timestamps was not equal!"
+        assert data.shape[1] == len(timestamps), "Length of data and timestamps was not equal!"
             
         if self.current_index + len(timestamps) < self.size:
             self.buffer_timestamps[self.current_index:len(timestamps)+self.current_index] = timestamps
@@ -102,5 +122,5 @@ class CircularBuffer:
             self.buffer_duration,
             self.tstart,
             self.tend,
-            self.srate
+            1/self.dts
         )

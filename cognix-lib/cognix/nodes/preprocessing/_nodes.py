@@ -90,7 +90,7 @@ class SegmentationNode(CognixNode):
         # marker doesn't match
         if marker_name != self.config.marker_name:
             return False
-        
+        print(marker_name,marker_ts)
         self.current_timestamp = marker_ts
         return True
 

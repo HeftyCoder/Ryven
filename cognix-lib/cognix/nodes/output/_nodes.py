@@ -21,6 +21,7 @@ from .utils_for_xdf import xdfwriter
 from ryvencore import ProgressState
 from traitsui.api import CheckListEditor
 from threading import Thread
+from ..input.payloads.core import Signal
 import os
 
 class XDFWriterNode(FrameNode):
@@ -44,7 +45,7 @@ class XDFWriterNode(FrameNode):
             style='custom'
         )
     
-    init_inputs = [PortConfig(label='stream')]
+    init_inputs = [PortConfig(label='data stream'),PortConfig(label='marker stream'),PortConfig(label='path')]
     
     def __init__(self, params):
         super().__init__(params)
@@ -53,11 +54,12 @@ class XDFWriterNode(FrameNode):
         self.t = None
         self.progress = None
         self.force_stop = False
-        self.inlets = []
+        self.inlets = dict()
         self.formats = ['double64','float32','int32','string','int16','int8','int64']
         self.stream_id = 0
-        self.infos = dict()
-        
+        self.timestamps = [[] for _ in range(len(self._inputs)-1)]
+        self.samples_count = [0 for i in range(len(self._inputs)-1)]
+
         real_path = os.path.realpath(__file__)
         dir_path = os.path.dirname(real_path).split('\\')
         self.path = ""
@@ -75,69 +77,43 @@ class XDFWriterNode(FrameNode):
         import time
         
         for i in range(len(self._inputs)):
-            creation_of_xdf(self.xdfile,i,self.infos[i],None,None,False,False,True,first_time=self.timestamps[i][0][0],last_time=self.timestamps[i][-1][-1],samples_count=self.samples_count[i])  
+            creation_of_xdf(self.xdfile,i,self.inlets[i],None,None,False,False,True,first_time=self.timestamps[i][0][0],last_time=self.timestamps[i][-1][-1],samples_count=self.samples_count[i])  
         
         self.set_progress_value(-1,'Attempting stop!')
         time.sleep(1)
         print('Stopped stream')
         self.set_progress_value(0,'Stopped writing')
-        
-
-    def on_start(self):
-        self.timestamps = [[] for _ in range(len(self.init_inputs))]
-        self.samples_count = [0 for i in range(len(self.init_inputs))]
-        
-        path = self.path 
-        if self.config.file_path != 'file path':
-            path = self.config.file_path
-            
-        self.xdfile = xdfwriter.XDFWriter(f'{path}{self.config.file_name}.xdf',True)
-        self.processing_flag_mode = self.config.processing_flag_mode
-            
-        self.progress = ProgressState(1,-1,'Searching stream')
-        
-        for i in range(len(self.init_inputs)):
-            data = self.input(i)
-            
-            self.progress = None
-            self.progress = ProgressState(1,1,'Saving Stream Metadata')
-            self.start_time = pylsl.local_clock()
-            
-            flags = 0
-            for flag in self.processing_flag_mode:
-                flags |= flag
-            
-            info = data.payload.stream_info()
-            if 'Marker' in info.stream_type:
-                if info.nominal_srate() != pylsl.IRREGULAR_RATE or info.data_format() != pylsl.cf_string:
-                    print('Invalid marker stream ' + info.name())
-                    break
-                # self.inlets.append([MarkerInlet(info,flags),self.stream_id])
-                self.infos[self.stream_id] = {'stream_name':info.name(),'stream_type':info.stream_type(),'channel_count':info.channel_count(),\
-                    'nominal_srate':info.nominal_srate(),'channel_format':self.formats[info.data_format()],'time_created':self.start_time}
-                creation_of_xdf(self.xdfile,self.stream_id,self.infos[self.stream_id],None,None,True,False,False,0,0,0)
-                self.stream_id += 1
-
-            elif info.nominal_srate() != pylsl.IRREGULAR_RATE and info.data_format() != pylsl.cf_string:
-                # self.inlets.append([DataInlet(info,flags),self.stream_id])
-                self.infos[self.stream_id] = {'stream_name':info.name(),'stream_type':info.stream_type(),'channel_count':info.channel_count(),\
-                    'nominal_srate':info.nominal_srate(),'channel_format':self.formats[info.data_format()],'time_created':self.start_time}
-                creation_of_xdf(self.xdfile,self.stream_id,self.infos[self.stream_id],None,None,True,False,False,0,0,0)
     
-                self.stream_id +=1
-                              
             
-    def update_event(self):
-        for i in range(len(self.init_inputs)):
-            data = self.input(i)
-            samples = np.array(data.payload.samples())
-            timestamps = np.array(data.payload.timestamps())
-            if timestamps:
-                self.timestamps[i].append(timestamps[0],timestamps[-1])
-                self.samples_count[i] += len(timestamps)
-                creation_of_xdf(self.xdfile,i,self.infos[i],samples,timestamps,False,True,False,0,0,0)
-
+    def update_event(self,inp:int):
         
+        if len(self.inlets) != len(self._inputs):
+
+            path = self.input_payload(2)
+            if not path:
+                path = self.path
+
+            self.xdfile = xdfwriter.XDFWriter(f'{path}{self.config.file_name}.xdf',True)
+
+            if inp!=len(self._inputs):
+                signal: Signal = self.input_payload(inp)
+                if not signal:
+                    return False
+                if 'Marker' in signal.info.signal_type and (signal.info.nominal_srate != pylsl.IRREGULAR_RATE or signal.info.data_format != pylsl.cf_string):
+                        return 
+                else:
+                    self.inlets[inp] = {'stream_name':signal.info.name,'stream_type':signal.info.signal_type,'channel_count':signal.info.channel_count,\
+                        'nominal_srate':signal.info.nominal_srate,'channel_format':self.formats[signal.info.data_format],'time_created':self.start_time}
+                    creation_of_xdf(self.xdfile,inp,self.inlets[inp],None,None,True,False,False,0,0,0)
+        
+        if inp!=len(self._inputs):
+            signal:Signal = self.input_payload(inp)
+            if signal.timestamps:
+                samples = np.array(signal.data)
+                timestamps = np.array(signal.timestamps)
+                self.timestamps[inp].append(timestamps[0],timestamps[-1])
+                self.samples_count[inp] += len(timestamps)
+                creation_of_xdf(self.xdfile,inp,self.inlets[inp],samples,timestamps,False,True,False,0,0,0)
         
             
             

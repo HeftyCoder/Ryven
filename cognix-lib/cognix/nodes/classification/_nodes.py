@@ -5,8 +5,42 @@ from cognix.api import CognixNode
 # from Orange.classification import SVMLearner, LogisticRegressionLearner
 # from Orange.evaluation import CrossValidation, CA, AUC
 from cognix.config.traits import NodeTraitsConfig, NodeTraitsGroupConfig, Int, List, Instance
+from .utils_for_classification.core import Classifier
+from cognix.config.traits import *
 
 import traceback
+
+class SVMNode(CognixNode):
+    title = 'SVM Clasifier'
+    version = '0.1'
+
+    class Config(NodeTraitsConfig):
+        C : float = CX_Float(1.0)
+        degree: int = CX_Int(3)
+        kernel: int = List(
+            editor=CheckListEditor(
+                values=
+                [
+                    (1, 'synchronization'),  
+                    (2, 'dejitter'),
+                    (4, 'monotonize'),
+                    (8, 'threadsafe')
+                ],
+                cols=2
+            ),
+            style='custom'
+        )
+
+
+    init_inputs = [PortConfig(label = 'data')]
+    init_outputs = [PortConfig(label = 'model')]
+
+
+    @property
+    def config(self) -> SVMNode.Config:
+        return self._config
+
+
 
 # class SVM_Node(CognixNode):
     
