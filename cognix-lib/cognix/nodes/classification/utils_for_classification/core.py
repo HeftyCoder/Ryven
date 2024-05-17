@@ -7,6 +7,49 @@ from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 
+from .._nodes import CognixNode, PortConfig
+from abc import ABC
+
+class BaseClassifier(ABC):
+    
+    @abstractmethod    
+    def train(self):
+        pass
+
+class SVMClassifier(BaseClassifier):
+    
+    def __init__(self):
+        self.model = SVC()
+    
+    def train(self):
+        pass
+
+class LinearRegression(BaseClassifier):
+    
+    def __init__(self):
+        super().__init__(self)
+        self.model = LogisticRegression()
+
+class RandomForestClassifier(BaseClassifier):
+    
+    def __init__(self):
+        super().__init__(self)
+        self.model = RandomForestClassifier()
+        
+class SVMNode(CognixNode):
+    
+    init_outputs=[PortConfig('model', allowed_data=SVMClassifier)]
+    
+class TrainNode(CognixNode):
+        
+    init_inputs=[
+        PortConfig('data'),
+        PortConfig('model', allowed_data=BaseClassifier)
+    ]
+    
+    def update_event(self, inp=-1):
+        pass
+    
 class Classifier:
 
     def __init__(

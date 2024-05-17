@@ -4,7 +4,7 @@ from .flow import CognixFlow
 from .graph_player import CognixPlayer, GraphPlayer, GraphState, GraphActionResponse
 from concurrent.futures import ThreadPoolExecutor, Future
 from typing import Callable
-from .networking.rest_api import CognixRestAPI
+from .networking.rest_api import CognixServer
 
         
 class CognixSession(Session):
@@ -19,7 +19,7 @@ class CognixSession(Session):
         self._graphs_playing: set[GraphPlayer] = set()
         self._flow_executor = ThreadPoolExecutor(thread_name_prefix="flow_execution_")
         self._flow_to_future: dict[str, Future] = {}
-        self._rest_api = CognixRestAPI(self)
+        self._rest_api = CognixServer(self)
     
     @property
     def rest_api(self):
