@@ -12,21 +12,21 @@ class Classifier:
     def __init__(
         self,
         params: Mapping[str,int|str|float],
-        classifier_type:str
+        classifier_type:str,
+        model = None
     ):
         self.classifier_type = classifier_type
         self.params = params if params else {}
-        self.model = self.initialize_model()
+        self.model = model if model else self.initialize_model()
 
     def initialize_model(self):
-        classifiers = {'SVM':SVC(**self.params),
-                       'Random Forest': RandomForestClassifier(**self.params),
-                       'Logistic Regression': LogisticRegression(**self.params)}
+        classifiers = {'SVM':SVC(),
+                       'Random Forest': RandomForestClassifier(),
+                       'Logistic Regression': LogisticRegression()}
 
+        print(self.classifier_type,classifiers[self.classifier_type])
         if self.classifier_type in classifiers.keys():
-            return classifiers[self.classifier_type]
-        else:
-            raise ValueError(f'Unsupported Classifier')
+            return classifiers[self.classifier_type].set_params(**self.params)
     
     def train(self,X_train:np.ndarray,Y_train:np.ndarray):
         self.model.fit(X_train,Y_train)
@@ -38,4 +38,4 @@ class Classifier:
         joblib.dump(self.model,path+filename)
     
     def load_model(self,path:str,filename:str):
-        self.model = joblib.load(path+filename)
+        return joblib.load(path+filename)

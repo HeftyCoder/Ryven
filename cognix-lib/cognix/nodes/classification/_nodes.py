@@ -1,6 +1,10 @@
+from __future__ import annotations
+
+from cognix.flow import CognixFlow
 from ryvencore import Data,PortConfig
 from cognix.api import CognixNode
-from __future__ import annotations
+import os
+import joblib
 
 # from Orange.data import Table
 # from Orange.classification import SVMLearner, LogisticRegressionLearner
@@ -9,10 +13,8 @@ from cognix.config.traits import NodeTraitsConfig, NodeTraitsGroupConfig, Int, L
 from .utils_for_classification.core import Classifier
 from cognix.config.traits import *
 
-import traceback
-
-class SVMTrainingNode(CognixNode):
-    title = 'SVM Traning Clasifier'
+class SVMNode(CognixNode):
+    title = 'SVM Clasifier'
     version = '0.1'
 
     class Config(NodeTraitsConfig):
@@ -26,10 +28,17 @@ class SVMTrainingNode(CognixNode):
     init_inputs = [PortConfig(label = 'data'),PortConfig(label='class')]
     init_outputs = [PortConfig(label = 'model')]
 
+
     @property
-    def config(self) -> SVMTrainingNode.Config:
+    def config(self) -> SVMNode.Config:
         return self._config
     
+    def __init__(self, flow: CognixFlow):
+        super().__init__(flow)
+
+        self.data_ = []
+        self.data_class = []
+
     def on_start(self):
         self.params = {'C':self._config.C,
                        'degree':self._config.degree,
@@ -40,15 +49,99 @@ class SVMTrainingNode(CognixNode):
 
     def update_event(self, inp=-1):
 
-        x = self.input_payload(0)
-        y = self.input_payload(1)
-        self.classifier.train(X_train=x,Y_train=y)
+        if inp == 0: self.data_ = self.input_payload(0)
+        if inp == 1:self.data_class = self.input_payload(1)
+
+        if len(self.data_)!=0 and len(self.data_class)!=0:
+            self.classifier.train(X_train=self.data_,Y_train=self.data_class)
+            self.data_ = []
+            self.data_class = []
 
     def on_stop(self):
         self.set_output_val(0,Data(self.classifier.model))
     
+
+class SaveModelNode(CognixNode):
+    title = 'Saving Model'
+    version = '0.1'
+
+    init_inputs = [PortConfig(label='model',allowed_data=Classifier),PortConfig(label='path')]
+
+    class Config(NodeTraitsConfig):
+        filename: str = CX_String('file name',desc='the name of the model')
+
+    def config(self) -> SVMNode.Config:
+        return self._config
+
+    def __init__(self, flow: CognixFlow):
+        real_path = os.path.realpath(__file__)
+        dir_path = os.path.dirname(real_path).split('\\')
+        self.path = ""
+
+        for i in range(len(dir_path)-1):
+            self.path = self.path + dir_path[i] + "\\"
+
+        self.define_path = False
+        self.filename = self._config.filename
+
+    def update_event(self, inp=-1):
+
+        if inp==1 and (not self.define_path):
+            path = self.input_payload(inp)
+            if path:
+                self.path = path
+            self.define_path = True
+
+    def on_stop(self):
+        model = self.input_payload(0)
+        if model:
+            joblib.dump(model,self.path+self.filename)
         
+
+
+# class LoadModel(CognixNode):
+
+# class TestingClassifierNode(CognixNode):
+#     title = 'Testing Classifier'
+#     version = '0.1'
+
+#     init_inputs = [PortConfig(label='model',allowed_data=Classifier),PortConfig(label='test data')]
+#     init_outputs = [PortConfig(label='prediction')]
+
+#     def __init__(self, flow: CognixFlow):
+#         self.classifier = None
+
+#     def update_event(self, inp=-1):
+
+#         if not self.classifier:
+#             self.classifier = self.input_payload(0)
+        
+#         X_test = self.input_payload(1)
+
+#         print(self.classifier)
+        
+
+# class SVMTestingNode(CognixNode):
+#     title = 'SVM Testing Clasifier'
+#     version = '0.1'
+
+#     init_inputs = [PortConfig(label = 'model')]
+#     init_outputs = [PortConfig(label = 'prediction')]
     
+#     def __init__(self, flow: CognixFlow):
+#         self.classifier = None
+
+#     def update_event(self, inp=-1):
+
+#         if not self.classifier:
+#             self.classifier = Classifier(params=None,classifier_type='SVM')
+
+#         x = self.input_payload(0)
+#         y = self.input_payload(1)
+#         self.classifier.train(X_train=x,Y_train=y)
+
+#     def on_stop(self):
+#         self.set_output_val(0,Data(self.classifier.model)) 
 
 
 
