@@ -25,14 +25,15 @@ from .utility import node_types as util_node_types
 from .test import node_types as test_node_types
 from .preprocessing import node_types as preprocessing_node_types
 from .output import node_types as output_node_types
+from .feature_extraction import node_types as fs_node_types
 
 cognix_package: dict[str, list[type[CognixNode]]] = {
-    'classification': classification_node_types,
     'file': file_node_types,
     'input': input_node_types,
     'util': util_node_types,
     'test': test_node_types,
     'preprocessing': preprocessing_node_types,
-    'output':output_node_types,
-    
+    'feature_extration': fs_node_types,
+    'classification': classification_node_types,
+    'output':output_node_types
 }

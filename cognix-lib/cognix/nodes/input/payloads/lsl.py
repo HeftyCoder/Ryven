@@ -21,7 +21,7 @@ class LSLSignalInfo(SignalInfo):
             ch = ch.next_sibling("channel")
             
         channels =  {
-            chan_xml_list[c_index]: c_index 
+            chan_xml_list[c_index].child_value('label'): c_index 
             for c_index in range(len(chan_xml_list))
         }
         

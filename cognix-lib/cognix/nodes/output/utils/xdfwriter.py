@@ -66,6 +66,7 @@ class XDFWriter:
             raise RuntimeError("Timestamp and samples count are mismatched")
         else:##Generate [Samples] chunk contents...
             out = io.BytesIO()
+            print(self.stream_ids_formats)
             write_fixlen_int(out,0x0FFFFFFF)  
             for ts in range(len(timestamps)):
                 write_ts(out,timestamps[ts],"uint32_t")
@@ -96,7 +97,8 @@ class XDFWriter:
         if isinstance(chunk,list) : n_channels = len(chunk[0])
         ## generate [Samples] chunk contents...
         out = io.BytesIO()
-        write_fixlen_int(out,0x0FFFFFFF)      
+        write_fixlen_int(out,0x0FFFFFFF)    
+        print(self.stream_ids_formats)  
         for ts in range(len(timestamps)):
             chunk_new = chunk[ts]
             assert(n_channels == len(chunk_new))
@@ -123,15 +125,17 @@ class XDFWriter:
         if not fm:
             try:
                 header_data = xmltodict.parse(content)
+                print("HEADER",self.stream_ids_formats)
                 self.stream_ids_formats["{}".format(streamid)] = header_data['info']['channel_format']
-                # print(self.stream_ids_formats)
+                print("HEADER",self.stream_ids_formats)
                 self._write_chunk(ChunkTag.streamheader,content,streamid)
                 
             except Exception as e:
                 print("Channel format is missing in xml !!!!!!")
         else:
+            print("HEADER",self.stream_ids_formats)
             self.stream_ids_formats["{}".format(streamid)] = fm
-            # print(self.stream_ids_formats)
+            print("HEADER",self.stream_ids_formats)
             self._write_chunk(ChunkTag.streamheader,content,streamid)
         
     def write_stream_footer(self, streamid: int, content: str):

@@ -15,16 +15,14 @@ class TestStreamNode(FrameNode):
     def __init__(self, params):
         super().__init__(params)
         iris = datasets.load_iris()
-        X,y = iris.data,iris.target
+        self.X,self.y = iris.data,iris.target
 
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-        print(self.X_train.shape)
-
-        self.count = 0
+        # self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        # print(self.X_train.shape)
     
     def frame_update_event(self) -> bool:
-        self.set_output_val(0, Data(self.X_train))
-        self.set_output_val(1, Data(self.y_train))
+        self.set_output_val(0, Data(self.X))
+        self.set_output_val(1, Data(self.y))
         time.sleep(5)
 
             

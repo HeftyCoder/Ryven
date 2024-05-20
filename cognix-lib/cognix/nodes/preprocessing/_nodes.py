@@ -2,6 +2,7 @@ from __future__ import annotations
 from cognix.flow import CognixFlow
 from ryvencore.data.built_in import *
 from ryvencore import Data,PortConfig
+import mne
 
 from cognix.config.traits import *
 from cognix.api import CognixNode,FrameNode
@@ -15,7 +16,7 @@ from pylsl import local_clock
 from collections.abc import Sequence
 
 from ..input.payloads.core import Signal
-from .utils_for_preprocessing.segmentation_helper import CircularBuffer
+from .utils.segmentation_helper import CircularBuffer
 
 class SegmentationNode(CognixNode):
     title = 'Segmentation'
@@ -151,8 +152,111 @@ class SignalSelectionNode(CognixNode):
         self.set_output_val(0, Data(sub_signal))
             
             
+class FIRFilterNode(CognixNode):
+    title = 'FIR Filter'
+    version = '0.1'
+    
+    class Config(NodeTraitsConfig):
+        low_freq: float = CX_Float(desc='the low frequency of the filter')
+        high_freq: float = CX_Float(desc='the high frequency of the fitler')
+        filter_length_str: str = CX_String(desc='the length of the filterin ms')
+        filter_length_int: int = CX_Int(desc='the length of the filter in samples')
+        l_trans_bandwidth:float = CX_Float(0.0,desc='the width of the transition band at the low cut-off frequency in Hz')
+        h_trans_bandwidth:float = CX_Float(0.0,desc='the width of the transition band at the high cut-off frequency in Hz')
+        phase:str = Enum('zero','minimum','zero-double','minimum-half',desc='the phase of the filter')
+        fir_window:str = Enum('hamming','hann','blackman',desc='the window to use in the FIR filter')
+        fir_design:str = Enum('firwin','firwin2',desc='the design of the FIR filter')
             
+    init_inputs = [PortConfig(label='data',allowed_data=Signal)]
+    init_outputs = [PortConfig(label='filtered data',allowed_data=Signal)]
+    
+    @property
+    def config(self) -> FIRFilterNode.Config:
+        return self._config
+    
+    def on_start(self):
+        
+        self.filter_length = 'auto'
+        print(self._config.filter_length_str,self._config.filter_length_int)
+        if self._config.filter_length_str:
+            self.filter_length = self._config.filter_length_str
+        if self._config.filter_length_int:
+            self.filter_length = self._config.filter_length_int
+                
+    def update_event(self, inp=-1):
+        
+        signal:Signal = self.input_payload(inp)
+        if signal:
+            filtered_signal:Signal = signal.copy()
             
+            filtered_data = mne.filter.filter_data(
+                data = signal.data,
+                sfreq = signal.info.nominal_srate,
+                l_freq = self._config.low_freq,
+                h_freq = self._config.high_freq,
+                filter_length = self.filter_length,
+                l_trans_bandwidth = self._config.l_trans_bandwidth if self._config.l_trans_bandwidth!=0.0 else None,
+                h_trans_bandwidth = self._config.h_trans_bandwidth if self._config.h_trans_bandwidth!=0.0 else None,
+                n_jobs = -1,
+                method = 'fir',
+                phase = self._config.phase,
+                fir_window = self._config.fir_window,
+                fir_design = self._config.fir_design
+                )
+
+            filtered_signal.data = filtered_data
+            self.set_output_val(0,Data(filtered_signal))
+    
+          
+class IIRFilterNode(CognixNode):
+    title = 'IIR Filter'
+    version = '0.1'
+    
+    class Config(NodeTraitsConfig):
+        f_pass: float = CX_Float(desc='the low frequency of the filter')
+        f_stop: float = CX_Float(desc='the high frequency of the fitler')
+        phase:str = Enum('zero','zero-double','forward',desc='the phase of the filter')
+        btype: str = Enum('bandpass','lowpass','highpass','bandstop',desc='the type of filter')
+        order: int = CX_Int(desc='the order of the filter')
+        ftype: str = Enum('butter','cheby1','cheby2','ellip','bessel')
+        
+        
+    init_inputs = [PortConfig(label='data',allowed_data=Signal)]
+    init_outputs = [PortConfig(label='filtered data',allowed_data=Signal)]
+    
+    @property
+    def config(self) -> IIRFilterNode.Config:
+        return self._config
+    
+    def on_start(self):
+        self.params = dict(
+            order = self._config.order,
+            ftype = self._config.ftype
+            )
+                
+    def update_event(self, inp=-1):
+        
+        signal:Signal = self.input_payload(inp)
+        if signal:
+            filtered_signal:Signal = signal.copy()
+            
+            iir_params_dict = mne.filter.construct_iir_filter(
+                iir_params = self.params,
+                f_pass = self._config.f_pass,
+                f_stop =  self._config.f_stop,
+                sfreq = signal.info.nominal_srate,
+                type = self._config.btype,      
+            )
+            
+            filtered_data = mne.filter.filter_data(
+                data = signal.data,
+                sfreq = signal.info.nominal_srate,
+                method = 'iir',
+                iir_params = iir_params_dict
+                )
+
+            filtered_signal.data = filtered_data
+            self.set_output_val(0,Data(filtered_signal))
             
             
             

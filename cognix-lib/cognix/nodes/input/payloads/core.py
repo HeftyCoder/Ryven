@@ -43,6 +43,7 @@ class SignalInfo:
     
     @property
     def channels(self):
+        print(self._channels)
         return self._channels
     
     
