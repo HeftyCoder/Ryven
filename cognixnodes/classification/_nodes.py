@@ -271,9 +271,9 @@ class CrossValidationNode(Node):
 
     def update_event(self, inp=-1):
 
-        folds = self._config.folds
-        splitter = self._config.splitter_type
-        train_test_split = self._config.train_test_split
+        folds = self.config.folds
+        splitter = self.config.splitter_type
+        train_test_split = self.config.train_test_split
 
         if inp == 0:self.data_ = self.input(0)
         if inp == 1:self.data_class = self.input(1)
@@ -369,7 +369,7 @@ class LoadModel(Node):
 
         self.set_output(0, SciKitClassifier(self.model))
 
-class TestNode(CognixNode):
+class TestNode(Node):
     title = 'Test Classifier'
     version = '0.1'
 
