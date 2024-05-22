@@ -3,7 +3,6 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from .._nodes import CognixNode, PortConfig
 from abc import ABC
-
 import numpy as np
 
 ##### from .core import SignalInfo,Signal
@@ -26,3 +25,5 @@ class BasePredictor(ABC):
     @abstractmethod
     def load_model(self,path:str):
         pass
+    
+

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from ..input.payloads.core import Signal
+import mne
 
 from cognixcore.api import (
     Flow, 
@@ -63,6 +64,6 @@ class FBSCPNode(Node):
             
             self.set_output(0, features_extracted)
             
-            
-    
 
+            
+            
