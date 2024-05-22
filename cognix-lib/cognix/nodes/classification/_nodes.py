@@ -11,13 +11,26 @@ from sklearn.model_selection import (
     train_test_split
 )
 
+
+
 # from Orange.data import Table
 # from Orange.classification import SVMLearner, LogisticRegressionLearner
 # from Orange.evaluation import CrossValidation, CA, AUC
 from cognix.config.traits import NodeTraitsConfig, NodeTraitsGroupConfig, Int, List, Instance
-from .utils.scikit import SVMClassifier,SciKitClassifier,RandomForestClassifier,LogisticRegressionClassifier
+from .utils.scikit import (
+    SVMClassifier,
+    SciKitClassifier,
+    RandomForestClassifier,
+    LogisticRegressionClassifier,
+    CrossValidation,
+    KFoldClass,
+    LeaveOneOutClass,
+    ShuffleSplit,
+    StratifiedKFoldClass)
+
 from .utils.core import BasePredictor
 from cognix.config.traits import *
+
 
 class SVMNode(CognixNode):
     title = 'SVM Classifier'
@@ -235,7 +248,7 @@ class CrossValidationNode(CognixNode):
     
     class Config(NodeTraitsConfig):
         folds: int = CX_Int(5,desc='the number of folds to split data for cross validation')
-        splitter_type:str = Enum('standard','Stratified','Leave-One-Out','Shuffle Split')
+        splitter_type:str = Enum('KFold','Stratified','LeaveOneOut','ShuffleSplit')
         train_test_split:float= CX_Float(0.2,desc='split of data between train and test data')
         binary:bool = Bool(desc='if the classification is binary or multiclass')
 
@@ -257,19 +270,20 @@ class CrossValidationNode(CognixNode):
         self.model = None
         self.load_model = False
 
-    def update_event(self, inp=-1):
+    def on_start(self):
+        cv_class = next((cls for name, cls in CrossValidation.subclasses.items() if self._config.splitter_type in name), None)
+        self.cv_model:CrossValidation = cv_class(kfold=self._config.folds, train_test_split = self._config.train_test_split, binary_classification = self._config.binary)
+        self.cv_model.average_setting()
 
-        folds = self._config.folds
-        splitter = self._config.splitter_type
-        train_test_split = self._config.train_test_split
+    def update_event(self, inp=-1):
 
         if inp == 0:self.data_ = self.input_payload(0)
         if inp == 1:self.data_class = self.input_payload(1)
         if inp == 2:self.model:SciKitClassifier = self.input_payload(2)
 
         if len(self.data_)!=0 and len(self.data_class)!=0 and self.model:
-            cv_accuracy,cv_precision,cv_precision,cv_f1 = self.model.cross_validation(self.data_,self.data_class,folds,splitter,train_test_split,self._config.binary)
-            self.data_ = []
+            cv_accuracy,cv_precision,cv_precision,cv_f1 = self.cv_model.calculate_cv_score(model=self.model, X=self.data_, Y=self.data_class)
+            
             self.data_class = []
             self.set_output_val(0,Data(cv_accuracy))
             self.set_output_val(1,Data(cv_precision))

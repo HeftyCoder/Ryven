@@ -9,6 +9,7 @@ from cognix.config.traits import *
 from cognix.api import CognixNode,FrameNode
 from collections.abc import Sequence
 from ..input.payloads.core import Signal
+import mne
 
 from .utils.fbscp_func import FBCSP_binary
 
@@ -63,6 +64,6 @@ class FBSCPNode(CognixNode):
             
             self.set_output_val(0,Data(features_extracted))
             
-            
-    
 
+            
+            

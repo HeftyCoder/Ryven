@@ -1,7 +1,7 @@
 """Defines the base oof scikit classifiers and the classifiers themselves"""
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from .core import BasePredictor
+from .core import BasePredictor,CrossValidation
 import numpy as np
 from sklearn.metrics import (
     accuracy_score,
@@ -25,6 +25,8 @@ import joblib
 
 ##### from .core import SignalInfo,Signal
 ### X_train and Y_train are to change to just a Signal object
+
+
 
 class SciKitClassifier(BasePredictor):
     
@@ -59,26 +61,6 @@ class SciKitClassifier(BasePredictor):
         test_f1 = f1_score(Y_test,y_pred)
         print(test_accuracy,test_precision,test_recall,test_f1)
         return test_accuracy,test_precision,test_recall,test_f1
-    
-    def cross_validation(self,X:np.ndarray,Y:np.ndarray,kfold:int,cv_type:str,train_test_split:float,binary_classification:bool):
-        
-        average_setting = ''
-        if not binary_classification:
-            average_setting = '_macro'
-
-        cv_structures = {
-            'standard':KFold(n_splits=kfold,random_state=1),
-            'Stratified':StratifiedKFold(n_splits=kfold,random_state=1),
-            'Leave-One-Out':LeaveOneOut(random_state=1),
-            'Shuffle Split':ShuffleSplit(train_size=1-train_test_split,test_size=train_test_split,n_splits=kfold,random_state=1)
-        }
-
-        cv_accuracy = cross_val_score(self.model,X,Y,cv=cv_structures[cv_type],scoring='accuracy').mean()
-        cv_precision = cross_val_score(self.model,X,Y,cv=cv_structures[cv_type],scoring=f'precision{average_setting}').mean()
-        cv_recall = cross_val_score(self.model,X,Y,cv=cv_structures[cv_type],scoring=f'recall{average_setting}').mean()
-        cv_f1 = cross_val_score(self.model,X,Y,cv=cv_structures[cv_type],scoring=f'f1{average_setting}').mean()
-
-        return cv_accuracy,cv_precision,cv_recall,cv_f1
 
     def split_data(self,X:np.ndarray,Y:np.ndarray,test_size:float):
 
@@ -106,6 +88,57 @@ class LogisticRegressionClassifier(SciKitClassifier):
 
     def __init__(self,params:dict):
         super().__init__(model = LogisticRegression(**params))
-            
+   
+   
+class CrossValidation:
+    
+    subclasses = {}
+    
+    def __init_subclass__(cls,**kwargs):
+        super().__init_subclass__(**kwargs)
+        cls.subclasses[cls.__name__] = cls
 
+    def __init__(self,kfold:int,train_test_split:float,binary_classification:bool):
+        self.kfold = kfold
+        self.train_test_split = train_test_split
+        self.binary_classification = binary_classification
+        self.average_setting = ''
+        self.cv_model = None
 
+    def set_average_setting(self):
+        if not self.binary_classification:
+            self.average_setting = '_macro'
+        
+    def calculate_cv_score(self,model,X,Y):
+        cv_accuracy = cross_val_score(model,X,Y,cv=self.cv_model,scoring='accuracy').mean()
+        cv_precision = cross_val_score(model,X,Y,cv=self.cv_model,scoring=f'precision{self.average_setting}').mean()
+        cv_recall = cross_val_score(model,X,Y,cv=self.cv_model,scoring=f'recall{self.average_setting}').mean()
+        cv_f1 = cross_val_score(model,X,Y,cv=self.cv_model,scoring=f'f1{self.average_setting}').mean()
+
+        return cv_accuracy,cv_precision,cv_recall,cv_f1
+           
+
+class KFoldClass(CrossValidation):
+    
+    def __init__(self,kfold:int,train_test_split:float,binary_classification:bool):
+        super().__init__(kfold,train_test_split, binary_classification)
+        self.cv_model = KFold(n_splits=kfold)
+    
+class StratifiedKFoldClass(CrossValidation):
+    
+    def __init__(self,kfold:int,train_test_split:float,binary_classification:bool):
+        super().__init__(kfold,train_test_split, binary_classification)
+        self.cv_model = StratifiedKFold(n_splits=kfold)
+    
+class LeaveOneOutClass(CrossValidation):
+    
+    def __init__(self,kfold:int,train_test_split:float,binary_classification:bool):
+        super().__init__(kfold,train_test_split, binary_classification)
+        self.cv_model = LeaveOneOut()
+    
+class ShuffleSplitClass(CrossValidation):
+    
+    def __init__(self,kfold:int,train_test_split:float,binary_classification:bool):
+        super().__init__(kfold,train_test_split, binary_classification)
+        self.cv_model = ShuffleSplit(train_size=1-train_test_split,test_size=train_test_split,n_splits=kfold)
+    
