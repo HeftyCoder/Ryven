@@ -94,7 +94,7 @@ class XDFWriterNode(CognixNode):
                         return 
                 else:
                     self.inlets[inp] = {'stream_name':signal.info.name,'stream_type':signal.info.signal_type,'channel_count':signal.info.channel_count,\
-                        'nominal_srate':signal.info.nominal_srate,'channel_format':self.formats[signal.info.data_format],'time_created':self.start_time}
+                        'nominal_srate':signal.info.nominal_srate,'channel_format':self.formats[signal.info.data_format],'time_created':self.start_time,'channels':signal.info.channels}
                     creation_of_xdf(self.xdfile,inp,self.inlets[inp],None,None,True,False,False,0,0,0)
 
                 self.write_header[inp] = True

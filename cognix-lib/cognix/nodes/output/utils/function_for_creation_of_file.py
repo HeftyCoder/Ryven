@@ -8,30 +8,17 @@ def creation_of_xdf(xdfile:XDFWriter,streamid:int,stream_id_infos:dict,data_cont
     
     if write_header==True:
         # print("Write Header")
-        header = (f"<?xml version=\"1.0\"?>"
-                "<info>"
-                "<name>{}</name>"
-                "<type>{}</type>"
-                "<channel_count>{}</channel_count>"
-                "<nominal_srate>{}</nominal_srate>"
-                "<channel_format>{}</channel_format>"
-                "<created_at>{}</created_at>"
-                "</info>".format(stream_id_infos['stream_name'],stream_id_infos['stream_type'],stream_id_infos['channel_count'],\
-                    stream_id_infos['nominal_srate'],stream_id_infos['channel_format'],stream_id_infos['time_created']))
+        header = ("<?xml version=\"1.0\"?><info><name>{}</name><type>{}</type><channel_count>{}</channel_count><channels>{}</channels><nominal_srate>{}</nominal_srate> \
+                <channel_format>{}</channel_format><created_at>{}</created_at></info>".format(stream_id_infos['stream_name'],stream_id_infos['stream_type'],stream_id_infos['channel_count'],\
+                    stream_id_infos['channels'],stream_id_infos['nominal_srate'],stream_id_infos['channel_format'],stream_id_infos['time_created']))
         xdfile.write_stream_header(streamid,header)
         xdfile.write_boundary_chunk()
     
     elif write_footer == True:   
         # print("Write Footer")    
         footer = (
-                f"<?xml version=\"1.0\"?>"
-                "<info>"
-                "<first_timestamp>{}</first_timestamp>"
-                "<last_timestamp>{}</last_timestamp>"
-                "<sample_count>{}</sample_count>"
-                "<clock_offsets>"
-                "<offset><time>50979.7660030605</time><value>-3.436503902776167e-06</value></offset>"
-                "</clock_offsets></info>"
+                "<?xml version=\"1.0\"?><info><first_timestamp>{}</first_timestamp><last_timestamp>{}</last_timestamp><sample_count>{}</sample_count> \
+                <clock_offsets><offset><time>50979.7660030605</time><value>-3.436503902776167e-06</value></offset></clock_offsets></info>".format(first_time,last_time,samples_count)
             )
         xdfile.write_boundary_chunk()
         xdfile.write_stream_offset(streamid,local_clock(),-0.5)
