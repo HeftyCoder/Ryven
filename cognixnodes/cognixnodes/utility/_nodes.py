@@ -42,7 +42,7 @@ class GetVarNode(UtilNode):
             if self.var_name:
                 self.vars_addon.subscribe(self, self.var_name, self.var_val_changed)
 
-        self.set_output(0, self.var_val(self.var_name))
+        self.set_output(0, self.var_val_get(self.var_name))
 
     def var_val_changed(self, _):
         self.set_output(0, self.var_val(self.var_name))
