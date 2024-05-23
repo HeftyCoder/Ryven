@@ -68,11 +68,11 @@ def import_nodes_package(
     if package is None:
         package = NodesPackage(directory)
 
-    if 'RYVEN_MODE' not in os.environ:
+    if 'COGNIX_MODE' not in os.environ:
         raise Exception(
-            """Please specify the environment variable RYVEN_MODE ('gui' or 'no-gui') before loading any packages. 
-            For example, set os.environ['RYVEN_MODE'] = 'no-gui' for gui-less deployment.
-            Ryven and RyvenConsole should do this automatically.
+            """Please specify the environment variable COGNIX_MODE ('gui' or 'no-gui') before loading any packages. 
+            For example, set os.environ['COGNIX_MODE'] = 'no-gui' for gui-less deployment.
+            cognix and cognix-console should do this automatically.
             """
         )
 
@@ -90,7 +90,7 @@ def import_nodes_package(
     # load soruce codes
     if in_gui_mode():
         from ...gui.main_window import MainWindow
-        from ryven.main.config import instance
+        from ...main.config import instance
         for node_type in node_types:
             MainWindow.get_session_gui_instance() \
                 .cd_storage.register_node_type(node_type, defer_code_loading=instance.defer_code_loading)

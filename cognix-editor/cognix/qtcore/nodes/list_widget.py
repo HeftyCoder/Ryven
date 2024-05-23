@@ -40,7 +40,7 @@ from ..util_widgets import FilterTreeView, TreeViewSearcher
 from ..env import GUIEnv
 
 from cognixcore import Node
-from cognixcore.base import IdentifiableGroups
+from cognixcore.base import Identifiable, IdentifiableGroups
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -222,14 +222,15 @@ class NodeStandardItem(QStandardItem):
     def mimeData(self):
         return NodeListItemWidget._create_mime_data(self.node_type) 
         
-class NodeGroupsModel(IdentifiableGroupsModel[Node]):
+class NodeGroupsModel(IdentifiableGroupsModel[type[Node]]):
     
-    def __init__(self, list_widget: NodeListWidget, groups: IdentifiableGroups[Node], label="Packages", separator='.'):
+    def __init__(self, list_widget: NodeListWidget, groups: IdentifiableGroups[type[Node]], label="Packages", separator='.'):
         self.list_widget = list_widget
         super().__init__(groups, label, separator)
-       
-    def create_id_item(self, id: type[Node]):
-        return NodeStandardItem(id, id.title)
+    
+    def create_id_item(self, id: Identifiable[type[Node]]):
+        node_type = id.info
+        return NodeStandardItem(node_type, node_type.title)
      
     def create_subgroup(self, name: str, path: str) -> QStandardItem:
         item = QStandardItem(name)

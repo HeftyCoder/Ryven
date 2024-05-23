@@ -23,7 +23,7 @@ from ..main.packages.nodes_package import NodesPackage
 from ..gui.uic.ui_main_window import Ui_MainWindow
 from ..main.utils import (
     abs_path_from_package_dir,
-    abs_path_from_ryven_dir,
+    abs_path_from_dir,
     cognix_version,
 )
 from .. import import_nodes_package
@@ -33,14 +33,14 @@ from ..gui.dialogs import GetTextDialog, ChooseFlowDialog
 from ...qtcore import SessionGUI, NodeGUI
 from ...qtcore.flows.list_widget import FlowsListWidget
 from ...qtcore.nodes.list_widget import NodeListWidget
-from ...qtcore.addons.variables import DataTypeDialogue, DataGroupsModel
+from ...qtcore.addons.variables import VarTypeDialogue, VariableGroupsModel
 
 from cognixcore import InfoMsgs, Flow
 
     
 class MainWindow(QMainWindow):
 
-    __built_in_packages = ['built_in', 'cognix_library']
+    __built_in_packages = ['built_in', 'cognix_nodes']
     __session_gui_instance = None
     
     @classmethod
@@ -86,8 +86,7 @@ class MainWindow(QMainWindow):
         self.session_gui.flow_deleted.connect(self.flow_deleted)
         
         # Create data type dialogue
-        self.data_model = DataGroupsModel(self.core_session.inst_data_groups)
-        self.type_dialog = DataTypeDialogue(self.data_model, parent=self)
+        self.type_dialog = VarTypeDialogue(parent=self)
 
         # unused; default flow theme etc. are defined by Config
         # self.session_gui.design.load_from_config(abs_path_from_package_dir('gui/styling/design_config.json'))
@@ -389,7 +388,7 @@ CONTROLS
         file_path = QFileDialog.getOpenFileName(
             self,
             'select nodes file',
-            abs_path_from_ryven_dir('nodes'),
+            abs_path_from_dir('nodes'),
             'Python File (*.py)',
         )[0]
         if file_path != '':
@@ -447,7 +446,7 @@ CONTROLS
         file_name = QFileDialog.getSaveFileName(
             self,
             'select location and give file name',
-            abs_path_from_ryven_dir('saves'),
+            abs_path_from_dir('saves'),
             'JSON(*.json)',
         )[0]
         if not file_name.endswith('.json'):
@@ -535,7 +534,7 @@ CONTROLS
             return
 
         try:
-            nodes, data_types = import_nodes_package(p)
+            node_types = import_nodes_package(p)
         except ModuleNotFoundError as e:
             import traceback
             traceback.print_exc()
@@ -549,10 +548,9 @@ CONTROLS
             msg_box.exec_()
             sys.exit(e)
 
-        self.core_session.register_data_types(data_types)
-        self.core_session.register_node_types(nodes)
+        self.core_session.register_node_types(node_types)
 
-        for n in nodes:
+        for n in node_types:
             self.node_packages[n] = p
 
         self.nodes_list_widget.update_list(self.core_session.node_types)
@@ -606,8 +604,8 @@ CONTROLS
             return
 
         general_project_info_dict = {
-            'type': 'Ryven project file',
-            'ryven version': str(cognix_version()),
+            'type': 'Cognix project file',
+            'cognix version': str(cognix_version()),
         }
 
         flows_data = self.core_session.serialize()

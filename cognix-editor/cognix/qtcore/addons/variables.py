@@ -26,8 +26,10 @@ from qtpy.QtWidgets import (
     QTreeView,
     QPushButton,
 )
-from cognixcore.base import IdentifiableGroups
+
+from cognixcore.base import IdentifiableGroups, Identifiable
 from cognixcore.addons.variables import VarsAddon, Variable, VarSubscriber
+from cognixcore.addons.variables.builtin import VarType, variable_groups
 
 from ..utils import (
     create_tooltip, 
@@ -36,7 +38,6 @@ from ..utils import (
     IdentifiableGroupsModel
 )
 from ..util_widgets import EditVal_Dialog, FilterTreeView, TreeViewSearcher
-from ..data.widgets import DataInspector
 from ..flows.commands import DelegateCommand
 
 from json import dumps
@@ -45,41 +46,43 @@ from typing import TYPE_CHECKING, Callable, Any
 if TYPE_CHECKING:
     from ..flows.view import FlowView
 
-class DataGroupsModel(IdentifiableGroupsModel[Data]):
+class VariableGroupsModel(IdentifiableGroupsModel[VarType]):
     
-    item_clicked_signal = Signal(type(Data))
+    item_clicked_signal = Signal(type)
     
-    def __init__(self, groups: IdentifiableGroups[Data], label="Data Types", separator='.'):
+    def __init__(self, groups: IdentifiableGroups[VarType], label="Data Types", separator='.'):
         super().__init__(groups, label, separator)
-        self._selected: type[Data] = None
+        self._selected: type[Any] = None
     
     @property
     def selected(self):
         return self._selected
     
-    def create_id_item(self, id: type[Data]):
-        item = QStandardItem(id.name())
+    def create_id_item(self, id: Identifiable[VarType]):
+        item = QStandardItem(id.name)
         item.setEditable(False)
         item.setDragEnabled(False)
         def on_click():
             self._selected = id
-            self.item_clicked_signal.emit(id)
+            self.item_clicked_signal.emit(id.info.val_type)
             
         item.setData(on_click, Qt.UserRole + 1)
         return item
 
-class DataTypeDialogue(QDialog):
+class VarTypeDialogue(QDialog):
     
-    confirmed = Signal(type(Data))
+    confirmed = Signal(type)
     
-    def __init__(self, data_model: DataGroupsModel, parent: QWidget | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setLayout(QVBoxLayout())
         self.setWindowTitle("Select Data Type")
-        self.data_model = data_model
+        
+        # use the built in variable types for now
+        self.data_model = VariableGroupsModel(variable_groups)
         
         # create tree view and model
-        self.tree_view = FilterTreeView(data_model)
+        self.tree_view = FilterTreeView(self.data_model)
         self.tree_searcher = TreeViewSearcher(self.tree_view)
         self.tree_searcher.search_bar.setPlaceholderText('search datas...')
         self.layout().addWidget(self.tree_searcher)
@@ -96,7 +99,7 @@ class DataTypeDialogue(QDialog):
         
         self.confirm_func = None
     
-    def set_confirm_func(self, func: Callable[[type[Data]], None]):
+    def set_confirm_func(self, func: Callable[[type[Any]], None]):
         if self.confirm_func:
             self.confirmed.disconnect(self.confirm_func)
         self.confirmed.connect(func)
@@ -185,12 +188,12 @@ class VarsItemWidget(QWidget):
         self.name_type_widget.layout().addWidget(self.name_line_edit)
         
         # type edit
-        self.type_button = QPushButton(text=var.data.name())
+        self.type_button = QPushButton(text=var.name)
         self.type_button.setFixedWidth(125)
         def on_open_type_dial():
             # TODO adjust position here
-            def on_confirm(data_type: type[Data]):
-                self.var.set_data_type(data_type)
+            def on_confirm(val_type):
+                self.var.set_type(val_type)
                 
             self.type_dial.set_confirm_func(on_confirm)
             self.type_dial.exec()
@@ -201,17 +204,17 @@ class VarsItemWidget(QWidget):
         self.content_widget.layout().addWidget(self.name_type_widget)
         
         # Data options
-        self.data_container = QWidget()
-        self.data_container.setLayout(QVBoxLayout())
-        self.data_container.setVisible(False)
-        self.content_widget.layout().addWidget(self.data_container)
+        self.value_container = QWidget()
+        self.value_container.setLayout(QVBoxLayout())
+        self.value_container.setVisible(False)
+        self.content_widget.layout().addWidget(self.value_container)
         
         # connect config container to label
         def toggle_config(folded: bool):
-            self.data_container.setVisible(not folded)
+            self.value_container.setVisible(not folded)
         self.icon_label.fold_changed.connect(toggle_config)
         
-        self.data_inspector = None
+        self.value_field = None
         self.build_inspector()
         
     @property
@@ -219,12 +222,13 @@ class VarsItemWidget(QWidget):
         return self.vars_list_widget.type_dial
     
     def build_inspector(self):
-        if self.data_inspector:
-            self.data_container.layout().removeWidget(self.data_inspector)
+        if self.value_field:
+            self.value_container.layout().removeWidget(self.value_field)
         
-        self.data_inspector = DataInspector(self.var.data, self.vars_list_widget.flow_view)
-        self.data_container.layout().addWidget(self.data_inspector)
-        self.data_container.layout().setContentsMargins(0, 0, 0, 0)
+        session_gui = self.vars_list_widget.flow_view.session_gui
+        self.value_field = session_gui.gui_env.get_field_widget(self.var.var_type.val_type)
+        self.value_container.layout().addWidget(self.value_field)
+        self.value_container.layout().setContentsMargins(0, 0, 0, 0)
         
     def mouseDoubleClickEvent(self, event: QMouseEvent):
         if event.button() == Qt.LeftButton:
@@ -329,7 +333,7 @@ class VariablesListWidget(QWidget):
         self, 
         vars_addon: VarsAddon, 
         flow_view: FlowView,
-        data_type_dial: DataTypeDialogue,         
+        data_type_dial: VarTypeDialogue,         
     ):
         
         super(VariablesListWidget, self).__init__()
@@ -457,13 +461,13 @@ class VariablesListWidget(QWidget):
         )
     
     def on_var_value_changed(self, var: Variable, old_value: Any):
-        new_value = var.data.payload
+        new_value = var.value
         
         def undo_redo(val):
             def _undo_redo():
                 var.set(val, True)
                 w = self.widgets[var.name]
-                w.data_inspector.on_insp_changed(val)
+                w.value_field.value = val
             return _undo_redo
         
         self.push_undo(
@@ -472,23 +476,23 @@ class VariablesListWidget(QWidget):
             undo_redo(new_value)
         )
     
-    def on_var_type_changed(self, var: Variable, old_type):
-        new_type = var.data_type
+    def on_var_type_changed(self, var: Variable, old_type: VarType):
+        new_val_type = var.var_type.val_type
         
-        def undo_redo(val):
+        def undo_redo(val_type):
             def _undo_redo():
                 
-                var.set_data_type(val, silent=True)
+                var.set_type(val_type, silent=True)
                 widget = self.widgets[var.name]
-                widget.type_button.setText(var.data.name())
+                widget.type_button.setText(var.name)
                 widget.build_inspector()
             
             return _undo_redo
 
         self.push_undo(
-            f"Variable {var.name} Type Change: {old_type} -> {new_type}",
-            undo_redo(old_type),
-            undo_redo(new_type),
+            f"Variable {var.name} Type Change: {old_type} -> {new_val_type}",
+            undo_redo(old_type.val_type),
+            undo_redo(new_val_type),
         )
        
     def recreate_list(self):

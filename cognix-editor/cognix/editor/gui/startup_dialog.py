@@ -30,7 +30,7 @@ from ..main.args_parser import unparse_sys_args
 from ..main.config import Config
 from ..main.utils import (
     abs_path_from_package_dir,
-    abs_path_from_ryven_dir,
+    abs_path_from_dir,
     dir_path,
     is_package_available,
 )
@@ -499,7 +499,7 @@ class StartupDialog(QDialog):
     def on_load_project_button_clicked(self):
         """Call-back method, whenever the 'Load' button was clicked."""
         # Load a saved project, starting in the user's cognix directory
-        project_path = self.get_project(abs_path_from_ryven_dir('saves'))
+        project_path = self.get_project(abs_path_from_dir('saves'))
 
         if project_path is not None:
             self.load_project(project_path)
@@ -540,7 +540,7 @@ class StartupDialog(QDialog):
         file_name = QFileDialog.getOpenFileName(
             self,
             'Select',
-            abs_path_from_ryven_dir('packages'),
+            abs_path_from_dir('packages'),
             'ryven nodes package (nodes.py)',
         )[0]
 

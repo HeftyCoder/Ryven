@@ -12,14 +12,14 @@ import importlib.util
 from typing import Union, Optional, Tuple
 from packaging.version import Version
 
-from ryvencore import InfoMsgs
+from cognixcore import InfoMsgs
 
 def is_package_available(package_name:str ):
     return importlib.util.find_spec(package_name) is not None
 
 
 def in_gui_mode() -> bool:
-    return environ['RYVEN_MODE'] == 'gui'
+    return environ['COGNIX_MODE'] == 'gui'
 
 
 def load_from_file(file: str = None, components_list: list[str] = None) -> Tuple:
@@ -75,10 +75,10 @@ def read_project(project_path: Union[str, pathlib.Path]) -> dict:
             project_dict = json.load(f, strict=False)
 
     # backward compatibility: translate old project files to current version
-    if 'ryven version' not in project_dict['general info'] or \
-            Version(project_dict['general info']['ryven version']) <= Version('3.2'):
+    if 'cognix version' not in project_dict['general info'] or \
+            Version(project_dict['general info']['cognix version']) <= Version('1.0'):
         print(
-            'WARNING: project was created with an older version of Ryven.',
+            'WARNING: project was created with an older version of Cognix.',
             'Attempting to translate project to current version.'
         )
         project_dict = translate_project_v3_2_0(project_dict)
@@ -183,9 +183,9 @@ def translate_project_v3_2_0(p: dict):
 
 
 def find_project(project_path: Union[str, pathlib.Path]) -> Optional[pathlib.Path]:
-    """Resolves a possibly *~/.ryven/saves/*-relative path to a nodes package to an absolute path.
+    """Resolves a possibly *~/.cognix/saves/*-relative path to a nodes package to an absolute path.
 
-    :param project_path: The path to the project file or the subpath to :code:`ryven_dir_path()/saves`.
+    :param project_path: The path to the project file or the subpath to :code:`cognix()/saves`.
         The file extension '.json' can be omitted.
     :return: The absolute and resolved path to the project file, or `None` if it could not be found.
 
@@ -207,9 +207,9 @@ def find_project(project_path: Union[str, pathlib.Path]) -> Optional[pathlib.Pat
 
 
 def find_config_file(cfg_file_path: str) -> Optional[pathlib.Path]:
-    """Resolves a possibly *~/.ryven/*-relative path of a config file to an absolute path.
+    """Resolves a possibly *~/.cognix/*-relative path of a config file to an absolute path.
 
-    :param cfg_file_path: Either an absolute path, or relative to the *~/.ryven/* directory.
+    :param cfg_file_path: Either an absolute path, or relative to the *~/.cognix/* directory.
         The file extension '.cfg' can be omitted.
     :return: The full path to the config file or `None`, if it could not be found.
     """
@@ -238,11 +238,11 @@ def abs_path_from_package_dir(rel_path: str):
     :param rel_path: path relative to package folder (e.g. main/node_env.py)
     :return: absolute path
     """
-    ryven_path = dirname(dirname(__file__))
-    return abspath(join(ryven_path, rel_path))
+    cognix_path = dirname(dirname(__file__))
+    return abspath(join(cognix_path, rel_path))
 
 
-def abs_path_from_ryven_dir(rel_path: str):
+def abs_path_from_dir(rel_path: str):
     """
     :param rel_path: path relative to '~/.cognix/' dir (e.g. saves)
     :return: absolute path
@@ -267,4 +267,4 @@ def cognix_version() -> Version:
     else:
         # read the version from importlib.metadata
         from importlib.metadata import version
-        return Version(version('ryven'))
+        return Version(version('cognix'))

@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 def init_node_env():
     if os.environ['COGNIX_MODE'] == 'gui':
-        from .....cognix import qtcore
+        from .... import qtcore
         
 class NodesEnvRegistry:
     """

@@ -95,12 +95,12 @@ from ..design import Design
 
 from enum import Enum
 
-from cognix.graph_player import GraphStateEvent, GraphState
+from cognixcore.flow_player import GraphStateEvent, GraphState
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from ..session_gui import SessionGUI
-    from ryvencore import Node
+    from cognixcore import Node
     
 class _SelectionMode(Enum):
     """

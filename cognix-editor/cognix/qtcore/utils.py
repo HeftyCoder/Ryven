@@ -8,8 +8,8 @@ from qtpy.QtCore import (
     Signal,
 )
 from qtpy.QtGui import QStandardItem, QStandardItemModel
-from ryvencore.utils import serialize, deserialize
-from ryvencore.base import Event, IdentifiableGroups, IdType
+from cognixcore.utils import serialize, deserialize
+from cognixcore.base import Event, Identifiable, IdentifiableGroups, InfoType
 
 from typing import Generic, Callable, TYPE_CHECKING, Any
 if TYPE_CHECKING:
@@ -115,16 +115,16 @@ def change_svg_color(filepath: str, color_hex: str):
 
     return pix
     
-class IdentifiableGroupsModel(QStandardItemModel, Generic[IdType]):
+class IdentifiableGroupsModel(QStandardItemModel, Generic[InfoType]):
     """
     A nested model that works with identifiables.
     
     Useful for building tree views
     """
-    id_added_signal = Signal(type(IdType))
+    id_added_signal = Signal(Identifiable) # Identifiable[InfoType] doesn't work correctly
     group_added_signal = Signal(str)
     
-    def __init__(self, groups: IdentifiableGroups[IdType], label = "Something", separator = '.'):
+    def __init__(self, groups: IdentifiableGroups[InfoType], label = "Something", separator = '.'):
         super().__init__()
         self.setHorizontalHeaderLabels([label])
         self.groups = groups
@@ -141,14 +141,14 @@ class IdentifiableGroupsModel(QStandardItemModel, Generic[IdType]):
         connect_signal_event(self.group_added_signal, self.groups.group_added, self.create_subgroups)
         connect_signal_event(self.id_added_signal, self.groups.id_added, self.on_identifiable_added)
     
-    def on_identifiable_added(self, id: type[IdType]):
+    def on_identifiable_added(self, id: Identifiable[InfoType]):
         """Adds the item to its parent"""
-        if not self.has_subgroup_item(id.id_prefix):
+        if not self.has_subgroup_item(id.prefix):
             return
-        parent_item = self.model_nodes[id.id_prefix]
+        parent_item = self.model_nodes[id.prefix]
         parent_item.appendRow(self.create_id_item(id))
     
-    def create_id_item(self, id: type[IdType]):
+    def create_id_item(self, id: Identifiable[InfoType]):
         """
         VIRTUAL
         

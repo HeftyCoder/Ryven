@@ -157,12 +157,12 @@ class GUIEnv:
                 NodeTraitsGroupConfigInspector,
             )
             self._obj_insp_assoc.associate(
-                NodeTraitsConfig, 
                 NodeTraitsConfigInspector,
+                NodeTraitsConfig, 
             )
             self._obj_insp_assoc.associate(
-                NodeTraitsGroupConfig,
                 NodeTraitsGroupConfigInspector,
+                NodeTraitsGroupConfig,
             )
         except ImportError as e:
             print("traits and traitsui aren't installed. Skipping")
