@@ -553,7 +553,7 @@ CONTROLS
         for n in node_types:
             self.node_packages[n] = p
 
-        self.nodes_list_widget.update_list(self.core_session.node_types)
+        self.nodes_list_widget.update_list(list(self.core_session.node_types))
 
     def set_flow_ui_template(self, template: dict[str, str | QByteArray | dict] | None):
         if template is None:

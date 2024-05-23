@@ -109,7 +109,7 @@ class NodeListItemWidget(QWidget):
         mime_data.setData('application/json', bytes(json.dumps(
                 {
                     'type': 'node',
-                    'node identifier': node.id(),
+                    'node identifier': node.identifiable().id,
                 }
             ), encoding='utf-8'))
         return mime_data
@@ -242,7 +242,11 @@ class NodeGroupsModel(IdentifiableGroupsModel[type[Node]]):
         
         def on_item_clicked():
             group = self.groups.group(path)
-            node_types = list(group.values() if group else self.groups.id_set)
+            if group:
+                node_types = [identifiable.info for identifiable in group.values()]
+            else:
+                node_types = list(self.groups.infos)
+                
             self.list_widget.make_nodes_current(node_types, path)
         
         item.setData(on_item_clicked, Qt.UserRole + 1)

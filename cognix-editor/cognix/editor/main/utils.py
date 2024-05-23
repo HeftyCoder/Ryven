@@ -76,7 +76,7 @@ def read_project(project_path: Union[str, pathlib.Path]) -> dict:
 
     # backward compatibility: translate old project files to current version
     if 'cognix version' not in project_dict['general info'] or \
-            Version(project_dict['general info']['cognix version']) <= Version('1.0'):
+            Version(project_dict['general info']['cognix version']) < Version('1.0'):
         print(
             'WARNING: project was created with an older version of Cognix.',
             'Attempting to translate project to current version.'

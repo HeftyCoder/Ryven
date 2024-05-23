@@ -39,6 +39,7 @@ from ..utils import (
 )
 from ..util_widgets import EditVal_Dialog, FilterTreeView, TreeViewSearcher
 from ..flows.commands import DelegateCommand
+from ..fields.core import FieldInspectorWidget
 
 from json import dumps
 
@@ -63,7 +64,7 @@ class VariableGroupsModel(IdentifiableGroupsModel[VarType]):
         item.setEditable(False)
         item.setDragEnabled(False)
         def on_click():
-            self._selected = id
+            self._selected = id.info.val_type
             self.item_clicked_signal.emit(id.info.val_type)
             
         item.setData(on_click, Qt.UserRole + 1)
@@ -154,8 +155,6 @@ class VarsItemWidget(QWidget):
         self.previous_var_name = ''  # for editing
 
         self.ignore_name_line_edit_signal = False
-
-
         # UI
 
         self.main_layout = main_layout = QHBoxLayout()
@@ -188,7 +187,7 @@ class VarsItemWidget(QWidget):
         self.name_type_widget.layout().addWidget(self.name_line_edit)
         
         # type edit
-        self.type_button = QPushButton(text=var.name)
+        self.type_button = QPushButton(text=str(var.var_type.name))
         self.type_button.setFixedWidth(125)
         def on_open_type_dial():
             # TODO adjust position here
@@ -214,7 +213,7 @@ class VarsItemWidget(QWidget):
             self.value_container.setVisible(not folded)
         self.icon_label.fold_changed.connect(toggle_config)
         
-        self.value_field = None
+        self.field_inspector = None
         self.build_inspector()
         
     @property
@@ -222,12 +221,17 @@ class VarsItemWidget(QWidget):
         return self.vars_list_widget.type_dial
     
     def build_inspector(self):
-        if self.value_field:
-            self.value_container.layout().removeWidget(self.value_field)
+        if self.field_inspector:
+            self.value_container.layout().removeWidget(self.field_inspector)
         
         session_gui = self.vars_list_widget.flow_view.session_gui
-        self.value_field = session_gui.gui_env.get_field_widget(self.var.var_type.val_type)
-        self.value_container.layout().addWidget(self.value_field)
+        self.field_inspector = FieldInspectorWidget(
+            self.var,
+            self.vars_list_widget.flow_view,
+            self.var.var_type.val_type,
+            '_value'
+        )
+        self.value_container.layout().addWidget(self.field_inspector)
         self.value_container.layout().setContentsMargins(0, 0, 0, 0)
         
     def mouseDoubleClickEvent(self, event: QMouseEvent):
@@ -255,8 +259,8 @@ class VarsItemWidget(QWidget):
     def event(self, event):
         if event.type() == QEvent.ToolTip:
             try:
-                tooltip_str = create_tooltip(self.var.get())
-                tooltip_str = f"val:type {str(type(self.var.get()))}\n{tooltip_str}"
+                tooltip_str = create_tooltip(self.var.value)
+                tooltip_str = f"val:type {str(type(self.var.value))}\n{tooltip_str}"
             except Exception as e:
                 tooltip_str = "couldn't stringify value"
             self.setToolTip(tooltip_str)
@@ -295,7 +299,7 @@ class VarsItemWidget(QWidget):
     def get_drag_data(self):
         data = {'type': 'variable',
                 'name': self.var.name,
-                'value': self.var.get()}  # value is probably unnecessary
+                'value': self.var.value}  # value is probably unnecessary
         data_text = dumps(data)
         return data_text
 
@@ -416,7 +420,7 @@ class VariablesListWidget(QWidget):
                 var.addon.remove_var(self.flow, var)
             
             self.push_undo(
-                f"Created Variable: {var.name} : {var.val_str()}",
+                f"Created Variable: {var.name} : {var.value}",
                 undo,
                 redo
             )
@@ -484,7 +488,7 @@ class VariablesListWidget(QWidget):
                 
                 var.set_type(val_type, silent=True)
                 widget = self.widgets[var.name]
-                widget.type_button.setText(var.name)
+                widget.type_button.setText(var.var_type.val_type.__name__)
                 widget.build_inspector()
             
             return _undo_redo

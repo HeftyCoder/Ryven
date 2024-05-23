@@ -3,6 +3,7 @@ Core definitions of widgets for changing fields and attributes of an object
 
 This is meant as a replacement for the older std_inp_widgets in Ryven.
 """
+from __future__ import annotations
 
 from qtpy.QtWidgets import (
     QWidget,
@@ -17,12 +18,16 @@ from qtpy.QtGui import (
     QValidator,
 )
 
-from ..inspector import InspectorWidget
+
+from ..inspector import InspectorWidget, InspectedChangedEvent
 from cognixcore import Event
 
-from typing import Generic, TypeVar
 from json import dumps, loads
 from types import MappingProxyType
+
+from typing import Generic, TypeVar, TYPE_CHECKING
+if TYPE_CHECKING:
+    from ..flows.view import FlowView
 
 FieldType = TypeVar('FieldType')
 
@@ -162,3 +167,27 @@ class TextField(FieldWidget[FieldType], SingleLineWidget):
         # for most types, this should be ok
         val = loads(self.edit_field.text())
         self.set_value(val)
+
+class FieldInspectorWidget(InspectorWidget, QWidget):
+    """An inspector for any kind kind of value that has a FieldWidget assigned to it"""
+    
+    def __init__(self, inspected_obj, flow_view: FlowView, val_type: type, path: str, label: str = "value"):
+        QWidget.__init__(self)
+        self.path = path
+        self.label = label
+        self.val_type = val_type
+        InspectorWidget.__init__(self, inspected_obj, flow_view)
+    
+    def on_insp_changed(self, change_event: InspectedChangedEvent):
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(layout)
+        
+        old_inspected, new_inspected = change_event.old, change_event.new
+        field_widget_type = self.gui_env.get_field_widget(self.val_type)
+        field_widget = (
+            field_widget_type(self, self.path, self.label)
+            if field_widget_type
+            else TextField(self, self.path, self.label)
+        )
+        layout.addWidget(field_widget)

@@ -1173,7 +1173,7 @@ class FlowView(GUIBase, QGraphicsView):
         # open nodes dialog
         # the dialog emits 'node_chosen' which is connected to self.place_node__cmd
         self._node_list_widget.update_list(
-            nodes if nodes is not None else self.session_gui.core_session.nodes
+            nodes if nodes is not None else list(self.session_gui.core_session.node_types)
         )
         self._node_list_widget_proxy.setPos(dialog_pos)
         self._node_list_widget_proxy.show()

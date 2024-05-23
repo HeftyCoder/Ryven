@@ -33,11 +33,11 @@ class LSLInputNode(FrameNode):
     class Config(NodeTraitsConfig):
         
         f: str = File('Some path')
-        stream_name: str = CX_Str('stream_name',desc='Stream name')
-        stream_type: str = CX_Str('stream_type',desc = 'Stream type')
-        search_action: str = Enum('name','type',desc='Filtering of streams based of specific value')    
-        define_buffer:bool = Bool('define buffer',desc='the creation of a buffer for the saving of the data samples')
-        buffer_size: int = CX_Int(3276,desc='the size of the buffer in which the data samples are stored')
+        stream_name: str = CX_Str('stream_name', desc='Stream name')
+        stream_type: str = CX_Str('stream_type', desc = 'Stream type')
+        search_action: str = Enum('name','type', desc='Filtering of streams based of specific value')    
+        define_buffer:bool = Bool(True, desc='the creation of a buffer for the saving of the data samples')
+        buffer_size: int = CX_Int(3276, desc='the size of the buffer in which the data samples are stored')
 
         #### configuration for buffer size of data received
         #### (define buffer) Boolean for transformation from list to np.array (if False transform else keep)
@@ -59,7 +59,7 @@ class LSLInputNode(FrameNode):
     
     title = 'LSL Input'
     version = '0.0.1'
-    init_outputs = [PortConfig(label='data')]
+    init_outputs = [PortConfig(label='data', allowed_data=Signal)]
     
     def __init__(self, params):
         super().__init__(params)
