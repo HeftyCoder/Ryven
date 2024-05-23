@@ -86,6 +86,7 @@ class NodeGUI(QObject):
         self._next_input_widgets = Queue()
 
         self.error_during_update = False
+        self.config_changed_func = None
 
         # turn ryvencore signals into Qt signals
         self.node.updating.sub(self._on_updating)

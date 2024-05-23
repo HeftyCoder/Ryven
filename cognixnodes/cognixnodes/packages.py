@@ -1,5 +1,10 @@
 """Contains utilities and structures for loading all the nodes as a package hierarchy"""
 from cognixcore.api import Node
+from cognixcore.node import get_versioned_nodes
+
+def get_package_nodes(module) -> list[Node]:
+    """Returns all the versioned nodes defined in the module given by the parameter"""
+    return get_versioned_nodes(module.__name__)
 
 cognix_package: dict[str, list[Node]]
 """
@@ -16,24 +21,27 @@ Example:
 """
 
 # We will import the packages manually here and create the package structure
-# An extension could be to dynamically search the files
+# The process is pretty much automated up this point, so we prefer to add them
+# manually to have a specific injection point
 
-from .classification import node_types as classification_node_types
-from .file import node_types as file_node_types
-from .input import node_types as input_node_types
-from .utility import node_types as util_node_types
-from .test import node_types as test_node_types
-from .preprocessing import node_types as preprocessing_node_types
-from .output import node_types as output_node_types
-from .feature_extraction import node_types as fs_node_types
+# Perhaps we'll take a look at automating it even futher later
+
+from .classification import _nodes as classification
+from .file import _nodes as file
+from .input import _nodes as input
+from .utility import _nodes as utility
+from .test import _nodes as test
+from .preprocessing import _nodes as preprocessing
+from .output import _nodes as output
+from .feature_extraction import _nodes as feature_extraction
 
 cognix_package: dict[str, list[type[Node]]] = {
-    'file': file_node_types,
-    'input': input_node_types,
-    'util': util_node_types,
-    'test': test_node_types,
-    'preprocessing': preprocessing_node_types,
-    'feature_extration': fs_node_types,
-    'classification': classification_node_types,
-    'output':output_node_types
+    'file': get_package_nodes(file),
+    'input': get_package_nodes(input),
+    'util': get_package_nodes(utility),
+    'test': get_package_nodes(test),
+    'preprocessing': get_package_nodes(preprocessing),
+    'feature_extration': get_package_nodes(feature_extraction),
+    'classification': get_package_nodes(classification),
+    'output': get_package_nodes(output)
 }
