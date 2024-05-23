@@ -426,11 +426,15 @@ class FlowView(GUIBase, QGraphicsView):
         menu_layout_widget.layout().addWidget(play_button)
         
         def play_button_clicked():
-            player = self.flow.player
-            if player.state == GraphState.STOPPED:
-                self.flow.session.play_flow(self.flow.title, True)
-            else:
-                self.flow.session.stop_flow(self.flow.title)
+            try:
+                player = self.flow.player
+                if player.state == GraphState.STOPPED:
+                    self.flow.session.play_flow(self.flow.title, True)
+                else:
+                    self.flow.session.stop_flow(self.flow.title)
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
                 
         play_button.clicked.connect(play_button_clicked)
         

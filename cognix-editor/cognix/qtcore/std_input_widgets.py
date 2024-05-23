@@ -194,7 +194,7 @@ class Builder:
 
             @property
             def val(self):
-                return val_type(self.text())
+                return val_type(self.text()) if val_type else self.text()
 
             def load_from(self, val):
                 with self._prevent_update:

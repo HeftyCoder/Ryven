@@ -27,19 +27,19 @@ class GetVarNode(UtilNode):
         if self.input(0) is not None:
             self.var_name = self.input(0)
 
-    def on_start(self):
+    def start(self):
         if not self.input_connected(0):
             self.update_event(0)
     
     def update_event(self, input_called=-1):
         if self.input(0) != self.var_name:
-            if self.var_name != '':  # disconnect old var val update connection
+            if self.vars_addon.var_exists(self.flow, self.var_name):
                 self.vars_addon.unsubscribe(self, self.var_name, self.var_val_changed)
 
             self.var_name = self.input(0)
 
             # create new var update connection
-            if self.var_name:
+            if self.var_name and self.vars_addon.var_exists(self.flow, self.var_name):
                 self.vars_addon.subscribe(self, self.var_name, self.var_val_changed)
 
         self.set_output(0, self.var_val_get(self.var_name))
@@ -91,7 +91,7 @@ class ValNode(UtilNode):
     def place_event(self):
         self.update()
     
-    def on_start(self):
+    def start(self):
         self.update_event(0)
         
     def update_event(self, input_called=-1):
