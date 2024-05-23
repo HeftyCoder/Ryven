@@ -24,7 +24,7 @@ Example:
 # The process is pretty much automated up this point, so we prefer to add them
 # manually to have a specific injection point
 
-# Perhaps we'll take a look at automating it even futher later
+# Perhaps we'll take a look at automating it even further later
 
 from .classification import _nodes as classification
 from .file import _nodes as file
