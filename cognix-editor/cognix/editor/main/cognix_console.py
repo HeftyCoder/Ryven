@@ -10,12 +10,12 @@ from os.path import join, dirname
 import sys
 import code
 
-from ryvencore import *
+from cognixcore import *
 
 # import ryven utils to load node packages and parse projects
-from ryven.main.packages.nodes_package  import NodesPackage, process_nodes_packages, import_nodes_package
-from ryven.main.packages.node_env       import init_node_env
-from ryven.main.utils                   import find_project
+from ..main.packages.nodes_package  import NodesPackage, process_nodes_packages, import_nodes_package
+from ..main.packages.node_env       import init_node_env
+from ..main.utils                   import find_project
 
 
 def parse_args() -> argparse.Namespace:

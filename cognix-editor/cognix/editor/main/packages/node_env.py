@@ -4,29 +4,29 @@ This module automatically imports all requirements for custom nodes.
 from __future__ import annotations
 import os
 from ...main.utils import in_gui_mode
-from ryvencore import Node, Data
+from cognixcore import Node
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ...main.packages.nodes_package import NodesPackage
 
 def init_node_env():
-    if os.environ['RYVEN_MODE'] == 'gui':
-        import ryvencore_qt
+    if os.environ['COGNIX_MODE'] == 'gui':
+        from .....cognix import qtcore
         
 class NodesEnvRegistry:
     """
-    Statically stores custom `ryvencore.Node` and `ryvencore.Data` subclasses
+    Statically stores custom `cognixcore.Node` subclasses
     exported via export_nodes on import of a nodes package.
     After running the imported nodes.py module (which needs to call
-    `export_nodes()` to run), Ryven can then retrieve the exported types from
-    this class.
+    `export_nodes()` to run), the exported types from this class
+    are available for retrieval.
     """
 
-    exported_package_metadata: dict[str, tuple[list[type[Node]], list[type[Data]]]] = {}
-    """Stores, for each nodes package or subpackage a tuple of exported node types and data"""
+    exported_package_metadata: dict[str, list[type[Node]]] = {}
+    """Stores, for each nodes package or subpackage a list of exported node types"""
     
-    last_exported_package: list[tuple[list[type[Node]], list[type[Data]]]] = []
+    last_exported_package: list[list[type[Node]]] = []
     """The last exported package to be consumed for loading"""
     
     current_package: NodesPackage = None
@@ -42,29 +42,23 @@ class NodesEnvRegistry:
         return cls.current_package.name
 
     @classmethod
-    def consume_last_exported_package(cls) -> tuple[list[type[Node]], list[type[Data]]]:
+    def consume_last_exported_package(cls) -> list[type[Node]]:
         """Consumes the last exported package"""
-        result: tuple[list[type[Node]], list[type[Data]]] = ([], [])
-        node_types, data_types = result
-        for nodes, data in cls.last_exported_package:
-            node_types.extend(nodes)
-            data_types.extend(data)
+        result: list[type[Node]] = []
+        for nodes in cls.last_exported_package:
+            result.extend(nodes)
         cls.last_exported_package.clear()
         return result
 
 
 def export_nodes(
-    node_types: list[type[Node]], 
-    data_types: list[type[Data]] = None,
+    node_types: list[type[Node]],
     sub_pkg_name: str = None
 ):
     """
-    Exports/exposes the specified nodes to Ryven for use in flows. Nodes will have the same identifier, since they come as a package.
+    Exports/exposes the specified nodes for use in flows. Nodes will have the same identifier, since they come as a package.
     This function will fail if the NodesEnvRegistry package is not set.
     """
-
-    if data_types is None:
-        data_types = []
 
     pkg_name = NodesEnvRegistry.current_package_id()
     if sub_pkg_name is not None:
@@ -81,15 +75,10 @@ def export_nodes(
             *n_cls.legacy_ids,
             n_cls.id_name if n_cls.id_name else n_cls.__name__,
         ]
-    
-    # same for data types
-    for d_cls in data_types:
-        d_cls.id_prefix = pkg_name
         
     metadata = NodesEnvRegistry.exported_package_metadata
-    nodes_datas = (node_types, data_types)
-    metadata[pkg_name] = nodes_datas
-    NodesEnvRegistry.last_exported_package.append(nodes_datas)
+    metadata[pkg_name] = node_types
+    NodesEnvRegistry.last_exported_package.append(node_types)
 
 
 __gui_loaders: list = []
@@ -106,12 +95,11 @@ def on_gui_load(func):
     Example:
     `nodes.py`:
     ```
-    from ryven.node_env import *
+    from cognix.node_env import *
 
     # <node types> definitions
-    # <data types> definitions
 
-    export_nodes(<node types>, <data types>)
+    export_nodes(<node types>)
 
     @on_gui_load
     def load_guis():
@@ -123,7 +111,7 @@ def on_gui_load(func):
 
 def load_current_guis():
     """
-    Calls the functions registered via `~ryven.main.gui_env.on_gui_load`.
+    Calls the functions registered via `~cognix.main.gui_env.on_gui_load`.
     """
     if not in_gui_mode():
         return

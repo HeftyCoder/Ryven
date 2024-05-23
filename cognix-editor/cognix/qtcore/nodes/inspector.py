@@ -166,5 +166,36 @@ class NodeInspectorDefaultWidget(NodeInspectorWidget, QWidget):
         
     </body>
 </html>
-        """)       
+        """)
+
+
+class ConfigNodeInspectorWidget(NodeInspectorWidget, QWidget):
+    """A basic Node Inspector which handles GUI config"""  
+    
+    def __init__(self, params: tuple[Node, NodeGUI]):
+        QWidget.__init__(self)
+        self.node, self.node_gui = params
+        self.config_gui: InspectorWidget = None
+        NodeInspectorWidget.__init__(self, params)
         
+    def on_insp_changed(self, val: Node):
+        self.setLayout(QVBoxLayout())
+        config_gui_cls = self.gui_env.get_inspector(type(self.node.config))
+        self.config_gui = config_gui_cls((self.node.config, self.node_gui)) if config_gui_cls else None
+        if self.config_gui:
+            self.layout().addWidget(self.config_gui)
+        
+    def load(self):
+        
+        if self.config_gui:
+            self.config_gui.load()
+    
+    def unload(self):
+        
+        if self.config_gui:
+            self.config_gui.unload()
+            
+    def on_node_deleted(self):
+        
+        if self.config_gui:
+            self.config_gui.on_node_deleted(self.node)

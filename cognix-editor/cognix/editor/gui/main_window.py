@@ -24,7 +24,7 @@ from ..gui.uic.ui_main_window import Ui_MainWindow
 from ..main.utils import (
     abs_path_from_package_dir,
     abs_path_from_ryven_dir,
-    ryven_version,
+    cognix_version,
 )
 from .. import import_nodes_package
 from ..gui.dialogs import GetTextDialog, ChooseFlowDialog
@@ -607,7 +607,7 @@ CONTROLS
 
         general_project_info_dict = {
             'type': 'Ryven project file',
-            'ryven version': str(ryven_version()),
+            'ryven version': str(cognix_version()),
         }
 
         flows_data = self.core_session.serialize()

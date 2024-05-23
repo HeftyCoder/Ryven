@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 class SessionGUI(GUIBase, QObject):
     """
-    ryvencore-qt's Session wrapper class, implementing the GUI.
+    Session wrapper class, implementing the GUI.
     Any session with a GUI must be created through this class.
     Access the ryvencore session through the :code:`session`
     attribute, and the GUI from the ryvencore session through the

@@ -17,7 +17,7 @@ def run(*args_,
     Optional keyword arguments are specified without the leading double hyphens
     '--'. As a name, the corresponding 'dest' value of `add_argument` has to
     be used. E.g. the command line:
-        ryven --window-theme=light --nodes=std --nodes=linalg myproject.json
+        cognix --window-theme=light --nodes=std --nodes=linalg myproject.json
     becomes:
         run('myproject.json', window_theme='light', nodes=['std', 'linalg'])
 
@@ -32,7 +32,7 @@ def run(*args_,
     Note 2
     ------
     The positional command line argument to specify the project file also
-    checks `utils.ryven_dir_path()/saves`, if it can find the project file.
+    checks `utils.dir_path()/saves`, if it can find the project file.
     The `*args_` does not perform this check. This is up to the developer
     calling `run()`. The developer can always use `utils.find_project()` to
     find projects in this additional directory.
@@ -72,7 +72,7 @@ def run(*args_,
     #
 
     # Init environment
-    os.environ['RYVEN_MODE'] = 'gui'
+    os.environ['COGNIX_MODE'] = 'gui'
     os.environ['QT_API'] = conf.qt_api
     from ..node_env import init_node_env
     init_node_env()
@@ -112,7 +112,7 @@ def run(*args_,
 
     # Startup dialog
     if conf.show_dialog:
-        from ..gui.startup_dialog.StartupDialog import StartupDialog
+        from ..gui.startup_dialog import StartupDialog
 
         # Get packages and project file interactively and update arguments accordingly
 

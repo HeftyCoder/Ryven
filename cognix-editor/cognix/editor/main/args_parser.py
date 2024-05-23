@@ -2,11 +2,14 @@ import argparse
 import pathlib
 import sys
 
-from ryven.main.utils import find_config_file
-
-from ryven.main.utils import ryven_version
-from ryven.main import utils
-from ryven.main.config import Config
+from .utils import (
+    find_config_file, 
+    cognix_version, 
+    abs_path_from_package_dir, 
+    dir_path, 
+    find_project
+)
+from ..main.config import Config
 
 
 class CustomHelpFormatter(argparse.HelpFormatter):
@@ -146,7 +149,7 @@ def parse_sys_args(just_defaults=False) -> Config:
     """
 
     # Get available examples
-    exampledir = utils.abs_path_from_package_dir('examples_projects')
+    exampledir = abs_path_from_package_dir('examples_projects')
     examples = [e.stem for e in pathlib.Path(exampledir).glob('*.json')]
 
     #
@@ -170,7 +173,7 @@ def parse_sys_args(just_defaults=False) -> Config:
         help=f'''
             the project file to be loaded (the suffix ".json" can be omitted)\\
             • If the project file cannot be found, it is searched for under the
-            directory "{pathlib.PurePath(utils.ryven_dir_path(), "saves")}".\\
+            directory "{pathlib.PurePath(dir_path(), "saves")}".\\
             • use "-" for standard input.
             ''')
 
@@ -187,7 +190,7 @@ def parse_sys_args(just_defaults=False) -> Config:
     parser.add_argument(
         '-V', '--version',
         action='version',
-        version=f'%(prog)s {ryven_version()}')
+        version=f'%(prog)s {cognix_version()}')
 
     parser.add_argument(
         '-v', '--verbose',
@@ -340,7 +343,7 @@ def parse_sys_args(just_defaults=False) -> Config:
             One or more configuration files for automatically loading optional
             arguments can be used at any position.\\
             • If the file
-            "{pathlib.Path(utils.ryven_dir_path()).joinpath("ryven.cfg")}"
+            "{pathlib.Path(dir_path()).joinpath("ryven.cfg")}"
             exists, it will always be read as the very first configuration
             file.\\
             • This default configuration file is created with an example during 
@@ -375,7 +378,7 @@ def parse_sys_args(just_defaults=False) -> Config:
         if args.project == '-':
             args.project = sys.stdin
         else:
-            project = utils.find_project(args.project)
+            project = find_project(args.project)
             if project is None:
                 parser.error(
                     'project file does not exist')
@@ -501,7 +504,7 @@ def process_args(use_sysargs, *args_, **kwargs) -> Config:
     """
 
     # Inject default configuration file in user's directory as first argument
-    config_file = pathlib.Path(utils.ryven_dir_path()).joinpath('ryven.cfg')
+    config_file = pathlib.Path(dir_path()).joinpath('cognix.cfg')
     if config_file.exists():
         sys.argv.insert(1, f'@{config_file}')
 
@@ -542,7 +545,7 @@ def process_args(use_sysargs, *args_, **kwargs) -> Config:
         # Update the 'project' argument with the positional arguments to run()
         # Note, this is intentionally generic, so that changes in `parse_args`
         # does not require changes here!
-        project = utils.find_project(args_[0])
+        project = find_project(args_[0])
         if project is None:
             raise IOError(f'project "{args_[0]}" not found')
         else:

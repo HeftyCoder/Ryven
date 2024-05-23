@@ -6,12 +6,22 @@ from qtpy.QtWidgets import QWidget
 from qtpy.QtGui import Qt
 
 from .base_widgets import NodeMainWidget, NodeInputWidget
-from ..nodes.inspector import NodeInspectorWidget
+from ..nodes.inspector import NodeInspectorWidget, ConfigNodeInspectorWidget
 from .viewer import NodeViewerWidget, NodeViewerDefault
-from .inspector import NodeInspectorDefaultWidget
 from .viewer import NodeViewerDefault
+from ..config.abc import NodeConfigInspector
+from .inspector import (
+    NodeInspectorDefaultWidget, 
+    InspectedChangedEvent, 
+    ConfigNodeInspectorWidget
+)
+from ..flows.commands import DelegateCommand, undo_text_multi
 
-from cognixcore import Node, ProgressState
+from cognixcore import (
+    Node,
+    NodeConfig, 
+    ProgressState,
+)
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -35,8 +45,8 @@ class NodeGUI(QObject):
     main_widget_class: type[NodeMainWidget | QWidget] = None
     main_widget_pos: str = 'below ports'
     input_widget_classes: dict[str, type[NodeInputWidget | QWidget]] = {}
-    inspector_widget_class: type[NodeInspectorWidget | QWidget] = NodeInspectorDefaultWidget
-    wrap_inspector_in_default: bool = False
+    inspector_widget_class: type[NodeInspectorWidget | QWidget] = ConfigNodeInspectorWidget
+    wrap_inspector_in_default: bool = True
     viewer_widget_class: type[NodeViewerWidget | QWidget] = NodeViewerDefault
     
     init_input_widgets: dict = {}
@@ -46,6 +56,7 @@ class NodeGUI(QObject):
     icon: str = None
 
     # qt signals
+    config_changed_signal = Signal(NodeConfig, NodeConfig)
     updating = Signal()
     update_error = Signal(object)
     input_added = Signal(int, object)
@@ -84,6 +95,7 @@ class NodeGUI(QObject):
         self.node.input_removed.sub(self._on_input_removed)
         self.node.output_removed.sub(self._on_output_removed)
         self.node.progress_updated.sub(self._on_progress_updated)
+        self.config_changed_signal.connect(self._on_config_changed)
 
         # create the inspector widget
         self.inspector_widget = self.create_inspector()
@@ -126,8 +138,38 @@ class NodeGUI(QObject):
         The Node has been created already (including all ports) and loaded.
         No connections have been made to ports of the node yet.
         """
-        pass
+        self.apply_conf_events()
 
+    def apply_conf_events(self):
+        """Creates the config changed GUI event based on config GUI class"""
+        
+        cognix_n = self.node
+        # apply config changed event
+        cognix_n.config_changed.sub(self.config_changed_signal.emit)
+        
+        # appl config param change events
+        config = cognix_n.config
+        if not config:
+            return None
+        
+        config_gui_cls: NodeConfigInspector = self.gui_env.get_inspector(type(config))
+        if not config_gui_cls:
+            return None
+        
+        e = config_gui_cls.create_config_changed_event(cognix_n, self)
+        if e:
+            cognix_n.config.add_changed_event(e)
+        
+        self.config_changed_func = e
+    
+    def remove_conf_events(self):
+        
+        self.node.config_changed.unsub(self.config_changed_signal.emit)
+        
+        # config params
+        if self.config_changed_func:
+            self.node.config.remove_changed_event(self.config_changed_func)
+            self.config_changed_func = None
     """
     slots
     """
@@ -162,17 +204,41 @@ class NodeGUI(QObject):
     
     def _on_restored(self):
         """Called when a node is restored from being deleted"""
-        pass
+        self.config_changed_func = self.apply_conf_events()
     
     def _on_deleted(self):
         """Called when a node is deleted"""
+        self.remove_conf_events()
         if self.inspector_widget:
             self.inspector_widget.on_node_deleted()
             
         if self.viewer_widget:
             self.viewer_widget.on_node_deleted()
             self.hide_viewer()
+    
+    def _on_config_changed(self, old_conf: NodeConfig, new_conf: NodeConfig):
+        """Invoked when a configuration changes"""
         
+        def redo_undo(old_conf: NodeConfig, new_conf: NodeConfig):
+            changed_event = InspectedChangedEvent(old_conf, new_conf, False)
+            insp_widget: ConfigNodeInspectorWidget = self.inspector_widget
+            insp_widget.config_gui.on_insp_changed(changed_event)
+            
+            viewer_insp: ConfigNodeInspectorWidget = self.viewer_widget.inspector_widget
+            if viewer_insp:
+                viewer_insp.on_insp_changed(changed_event)
+                    
+        self.flow_view.push_undo(
+            DelegateCommand(
+                self.flow_view,
+                undo_text_multi(
+                    [self.node], 
+                    f"Config changed: {old_conf.__class__.__name__} -> {new_conf.__class__.__name__}"
+                ),
+                redo_undo(new_conf, old_conf),
+                redo_undo(old_conf, new_conf),
+            )
+        )
     """
     actions
     

@@ -197,7 +197,7 @@ def find_project(project_path: Union[str, pathlib.Path]) -> Optional[pathlib.Pat
     elif project_path.with_suffix('.json').exists():
         return project_path.with_suffix('.json').resolve()
     else:
-        project_path = pathlib.Path(ryven_dir_path(), 'saves', project_path)
+        project_path = pathlib.Path(dir_path(), 'saves', project_path)
         if project_path.exists():
             return project_path.resolve()
         elif project_path.with_suffix('.json').exists():
@@ -219,41 +219,41 @@ def find_config_file(cfg_file_path: str) -> Optional[pathlib.Path]:
     if config_file_path.exists():
         return config_file_path.resolve()
     else:
-        config_file_path = pathlib.Path(ryven_dir_path(), cfg_file_path)
+        config_file_path = pathlib.Path(dir_path(), cfg_file_path)
         if config_file_path.exists():
             return config_file_path.resolve()
         else:
             return None
 
 
-def ryven_dir_path() -> str:
+def dir_path() -> str:
     """
-    :return: absolute path the (OS-specific) '~/.ryven/' folder
+    :return: absolute path to the (OS-specific) '~/.cognix/' folder
     """
-    return abspath(normpath(join(expanduser('~'), '.ryven/')))
+    return abspath(normpath(join(expanduser('~'), '.cognix/')))
 
 
-def abs_path_from_package_dir(ryven_rel_path: str):
+def abs_path_from_package_dir(rel_path: str):
     """
-    :param ryven_rel_path: path relative to ryven package folder (e.g. main/node_env.py)
+    :param rel_path: path relative to package folder (e.g. main/node_env.py)
     :return: absolute path
     """
     ryven_path = dirname(dirname(__file__))
-    return abspath(join(ryven_path, ryven_rel_path))
+    return abspath(join(ryven_path, rel_path))
 
 
-def abs_path_from_ryven_dir(ryven_rel_path: str):
+def abs_path_from_ryven_dir(rel_path: str):
     """
-    :param ryven_rel_path: path relative to '~/.ryven/' dir (e.g. saves)
+    :param rel_path: path relative to '~/.cognix/' dir (e.g. saves)
     :return: absolute path
     """
 
-    return abspath(join(ryven_dir_path(), ryven_rel_path))
+    return abspath(join(dir_path(), rel_path))
 
 
-def ryven_version() -> Version:
+def cognix_version() -> Version:
     """
-    :return: the version of Ryven
+    :return: the version of Cognix
     """
 
     # if we are in a development environment, we can't use importlib.metadata

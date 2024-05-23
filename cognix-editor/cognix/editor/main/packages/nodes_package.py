@@ -7,16 +7,16 @@ import os
 import pathlib
 from os.path import basename, normpath, join
 
-from ryvencore import Node, Data
-
-from ryven.main.utils import (
+from ...main.utils import (
     read_project, 
-    ryven_dir_path, 
+    dir_path, 
     abs_path_from_package_dir, 
     in_gui_mode,
     load_from_file,
 )
-from ryven.main.packages.node_env import load_current_guis
+from ...main.packages.node_env import load_current_guis
+
+from cognixcore import Node
 
 class NodesPackage:
     """
@@ -54,7 +54,7 @@ class NodesPackage:
 # should be Tuple[list[Type[Node]], list[Type[Data]] in 3.9+
 def import_nodes_package(
     package: NodesPackage = None, directory: str = None
-) -> tuple[list[type[Node]], list[type[Data]]]:
+) -> list[type[Node]]:
     """Loads node and data classes from a Ryven nodes package and returns both in separate lists.
 
     Can be used without a running Ryven instance, but you need to specify in which mode nodes should be loaded
@@ -81,7 +81,7 @@ def import_nodes_package(
     NodesEnvRegistry.current_package = package
     load_from_file(package.file_path)
 
-    node_types, data_types = NodesEnvRegistry.consume_last_exported_package()
+    node_types = NodesEnvRegistry.consume_last_exported_package()
     
     # load guis
     if in_gui_mode():
@@ -95,7 +95,7 @@ def import_nodes_package(
             MainWindow.get_session_gui_instance() \
                 .cd_storage.register_node_type(node_type, defer_code_loading=instance.defer_code_loading)
     
-    return node_types, data_types
+    return node_types
 
 def process_nodes_packages(
     project_or_nodes: str | pathlib.Path | list[str | pathlib.Path | NodesPackage],
@@ -128,7 +128,6 @@ def process_nodes_packages(
             - Set of nodes required by the project or from list of nodes, which could not be found.
             - Dictionary with the contents of the project or `None`.
     """
-    # from ryven.main.packages.nodes_package import NodesPackage
 
     if requested_packages is None:
         requested_packages = []
@@ -164,7 +163,7 @@ def process_nodes_packages(
                 continue
 
             # Try to find the nodes package in Ryven's custom nodes dir
-            pkg_custom_path = pathlib.Path(ryven_dir_path(), 'nodes', pkg)
+            pkg_custom_path = pathlib.Path(dir_path(), 'nodes', pkg)
             if pkg_custom_path.joinpath('nodes.py').exists():
                 pkgs.add(NodesPackage(str(pkg_custom_path)))
                 continue

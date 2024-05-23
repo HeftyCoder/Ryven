@@ -1,6 +1,3 @@
-from ryvencore import Data
-
-from ryven.gui_env import *
 from qtpy.QtGui import QKeySequence
 from qtpy.QtCore import Signal
 from qtpy.QtWidgets import (
@@ -13,8 +10,15 @@ from qtpy.QtWidgets import (
     QVBoxLayout
 )
 
-from ryvencore_qt import NodeMainWidget
-from cognix.nodes.utility import *
+# Absolute terms cause importing packages doesn't work with relative currently
+from cognix.qtcore import (
+    NodeGUI,
+    NodeMainWidget,
+    node_gui,
+)
+from cognix.qtcore import std_input_widgets as inp_widgets
+
+from cognixnodes.utility import *
 
 class Result_Node_MainWidget(NodeMainWidget, QLineEdit):
     
@@ -138,7 +142,7 @@ class ValGui(NodeGUI):
         self.actions['edit val via dialog'] = {'method': self.action_edit_via_dialog}
 
     def widget_val_updated(self):
-        self.node.val = Data(self.main_widget().get_val())
+        self.node.val = self.main_widget().get_val()
         self.node.update()
 
     def action_edit_via_dialog(self):

@@ -146,6 +146,26 @@ class GUIEnv:
         to register built_in types
         """
         from .fields import built_in
+        # attempt to include traits configs
+        try:
+            from cognixcore.config.traits import (
+                NodeTraitsConfig, 
+                NodeTraitsGroupConfig,
+            )
+            from .config.traits import (
+                NodeTraitsConfigInspector,
+                NodeTraitsGroupConfigInspector,
+            )
+            self._obj_insp_assoc.associate(
+                NodeTraitsConfig, 
+                NodeTraitsConfigInspector,
+            )
+            self._obj_insp_assoc.associate(
+                NodeTraitsGroupConfig,
+                NodeTraitsGroupConfigInspector,
+            )
+        except ImportError as e:
+            print("traits and traitsui aren't installed. Skipping")
 
 _gui_env = GUIEnv()
 

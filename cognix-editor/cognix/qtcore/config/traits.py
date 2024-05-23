@@ -3,12 +3,20 @@ Implementations for a node config based on the
 built-in traits and traitsui implementation
 """
 from __future__ import annotations
-from cognix.api import NodeConfig, CognixNode
-from cognix.config.traits import NodeTraitsConfig, NodeTraitsGroupConfig
-from ryvencore_qt.nodes.inspector import InspectedChangedEvent
+from cognixcore import (
+    Node,
+    NodeConfig,
+)
 
+from cognixcore.config.traits import (
+    NodeTraitsConfig,
+    NodeTraitsGroupConfig,
+)
+
+from ..nodes.inspector import InspectedChangedEvent
+from ..nodes.gui import NodeGUI
+from ..flows.commands import DelegateCommand
 from .abc import NodeConfigInspector
-from ryvencore_qt.env import inspector
 
 from traitsui.api import View, Group, Item
 from traits.observation.events import (
@@ -18,18 +26,15 @@ from traits.observation.events import (
     SetChangeEvent
 )
 from qtpy.QtWidgets import QVBoxLayout, QWidget
-from ryven.gui_env import NodeGUI
-from ryvencore_qt.flows.commands import DelegateCommand
 from typing import TypeVar
 
 
-@inspector(NodeTraitsConfig)
 class NodeTraitsConfigInspector(NodeConfigInspector[NodeTraitsConfig], QWidget):
     """Basic config inspector"""
     
     #   CLASS
     @classmethod
-    def create_config_changed_event(cls, node: CognixNode, gui: NodeGUI):
+    def create_config_changed_event(cls, node: Node, gui: NodeGUI):
         
         def on_trait_changed(event):
             
@@ -158,7 +163,6 @@ class NodeTraitsConfigInspector(NodeConfigInspector[NodeTraitsConfig], QWidget):
             self.ui = None
                           
         
-@inspector(NodeTraitsGroupConfig)
 class NodeTraitsGroupConfigInspector(NodeTraitsConfigInspector):
     
     traits_view = None

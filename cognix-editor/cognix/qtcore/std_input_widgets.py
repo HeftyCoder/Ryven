@@ -6,7 +6,7 @@ It replaces what was previously the dtypes system.
 from qtpy.QtWidgets import QLineEdit, QSpinBox, QCheckBox, QSlider
 from qtpy.QtGui import QFont, QFontMetrics, Qt
 
-from ...qtcore import NodeInputWidget
+from ..qtcore import NodeInputWidget
 
 class StdInputWidgetBase(NodeInputWidget):
     def __init__(self, params):

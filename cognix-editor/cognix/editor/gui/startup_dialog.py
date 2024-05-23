@@ -31,7 +31,7 @@ from ..main.config import Config
 from ..main.utils import (
     abs_path_from_package_dir,
     abs_path_from_ryven_dir,
-    ryven_dir_path,
+    dir_path,
     is_package_available,
 )
 from ..main.packages.nodes_package import process_nodes_packages
@@ -129,7 +129,7 @@ class ShowCommandDialog(QDialog):
         file = QFileDialog.getSaveFileName(
             self,
             'select config file',
-            ryven_dir_path(),
+            dir_path(),
             'cognix config files (*.cfg)',
         )[0]
 
@@ -527,7 +527,7 @@ class StartupDialog(QDialog):
     def on_autodiscover_package_clicked(self):
         """Call-back method, whenever the 'Find' button was clicked."""
         # Search in user packages
-        self.auto_discover(pathlib.Path(ryven_dir_path(), 'nodes'))
+        self.auto_discover(pathlib.Path(dir_path(), 'nodes'))
         self.update_packages_lists()
 
         # Search in example packages
