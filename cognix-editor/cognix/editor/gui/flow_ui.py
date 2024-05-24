@@ -13,7 +13,7 @@ from qtpy.QtWidgets import (
     QUndoView,
     QAction
 )
-from qtpy.QtCore import Qt, QByteArray
+from qtpy.QtCore import Qt, QByteArray, Signal
 
 from ...qtcore.addons.variables import VariablesListWidget
 from ...qtcore.addons.logging import LogWidget
@@ -22,8 +22,9 @@ from ...qtcore.flows.view import FlowView
 from ...qtcore.nodes.inspector import InspectorView
 from ..gui.uic.ui_flow_window import Ui_FlowWindow
 
+from logging import Logger
 from cognixcore import Flow, FlowAlg
-from cognixcore.addons.variables import VarsAddon
+from cognixcore.addons.builtin import VarsAddon, LoggingAddon
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -37,6 +38,8 @@ class FlowUI(QMainWindow):
         FlowAlg.EXEC: 'exec-flow',
     }
 
+    logger_created_signal = Signal(Logger)
+    
     def __init__(self, main_window: MainWindow, flow: Flow, flow_view: FlowView):
         super().__init__(main_window)
 
@@ -86,8 +89,12 @@ class FlowUI(QMainWindow):
         self.flow.algorithm_mode_changed.sub(self.flow_alg_mode_changed)
 
         self.flow_alg_mode_dropdown = QComboBox()
+        
+        # TODO: Decide if exec-flow is needed
         for mode, title in self.flow_alg_mode_display_titles.items():
-            self.flow_alg_mode_dropdown.addItem(title)
+            if mode != FlowAlg.EXEC:
+                self.flow_alg_mode_dropdown.addItem(title)
+        
         self.ui.settings_dock.setWidget(self.flow_alg_mode_dropdown)
         self.flow_alg_mode_dropdown.currentTextChanged.connect(self.flow_algorithm_mode_toggled)
 
@@ -122,14 +129,10 @@ class FlowUI(QMainWindow):
         # logs
         self.ui.logs_scrollArea.setWidget(self.create_loggers_widget())
 
-        # TODO: need to connect to logging event but seems it isn't implemented yet
-        # self.flow.session.addons.get('Logging').logs_manager.new_logger_created.connect(self.add_logger_widget)
-
-        # catch up on logs which might have been loaded from a project already
-        logging = self.flow.session.addons.get('Logging')
-        for logger in logging.loggers:
-            self.add_logger_widget(logger)
-        logging.log_created.sub(self.add_logger_widget)
+        # the flow logger already exists here
+        self.flow_logger = self.flow.logger
+        self.logger_widget = LogWidget(self.flow_logger)
+        self.ui.logs_scrollArea.widget().layout().addWidget(self.logger_widget)
 
     def open_docks(self, docks):
         for dock in self.findChildren(QDockWidget):
@@ -161,9 +164,6 @@ class FlowUI(QMainWindow):
         w.setLayout(QHBoxLayout())
         # w.setStyleSheet('')
         return w
-
-    def add_logger_widget(self, logger):
-        self.ui.logs_scrollArea.widget().layout().addWidget(LogWidget(logger))
 
     def flow_alg_mode_changed(self, mode: str):
         self.flow_alg_mode_dropdown.setCurrentText(

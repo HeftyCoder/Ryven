@@ -15,6 +15,7 @@ from qtpy.QtWidgets import (
     QSplitter,
     QAbstractItemView,
     QLabel,
+    QListView,
 )
 from qtpy.QtGui import (
     QStandardItem, 
@@ -23,6 +24,7 @@ from qtpy.QtGui import (
     QColor,
     QDrag,
     QFont,
+    QStandardItemModel,
 )
 
 from qtpy.QtCore import (
@@ -97,116 +99,15 @@ __text_font.setPointSizeF(__text_font.pointSizeF() * 1.15)
 def text_font():
     return __text_font
 
-
-class NodeListItemWidget(QWidget):
-
-    chosen = Signal()
-    custom_focused_from_inside = Signal()
-
-    @staticmethod
-    def _create_mime_data(node: type[Node]) -> QMimeData:
-        mime_data = QMimeData()
-        mime_data.setData('application/json', bytes(json.dumps(
-                {
-                    'type': 'node',
-                    'node identifier': node.identifiable().id,
-                }
-            ), encoding='utf-8'))
-        return mime_data
-    
-    def __init__(self, parent, node_type: type[Node], gui_env: GUIEnv):
-        super(NodeListItemWidget, self).__init__(parent)
-
-        self.custom_focused = False
-        self.node_type = node_type
-        self.gui_env = gui_env
-
-        self.left_mouse_pressed_on_me = False
-
-        # UI
-        main_layout = QGridLayout()
-        main_layout.setContentsMargins(0, 0, 0, 0)
-
-        self_ = self
-        
-        class NameLabel(QLineEdit):
-            def __init__(self, text):
-                super().__init__(text)
-
-                self.setReadOnly(True)
-                self.setFont(text_font())
-            def mouseMoveEvent(self, ev):
-                self_.custom_focused_from_inside.emit()
-                ev.ignore()
-            def mousePressEvent(self, ev):
-                ev.ignore()
-            def mouseReleaseEvent(self, ev):
-                ev.ignore()
-
-        name_label = NameLabel(node_type.title)
-        main_layout.addWidget(name_label, 0, 0)
-        
-        self.setLayout(main_layout)
-        self.setContentsMargins(0, 0, 0, 0)
-        self.setMaximumWidth(250)
-
-        self.setToolTip(node_type.__doc__)
-        self.update_stylesheet()
-
-
-    def mousePressEvent(self, event):
-        self.custom_focused_from_inside.emit()
-        if event.button() == Qt.LeftButton:
-            self.left_mouse_pressed_on_me = True
-
-    def mouseMoveEvent(self, event):
-        if self.left_mouse_pressed_on_me:
-            drag = QDrag(self)
-            mime_data = NodeListItemWidget._create_mime_data(self.node_type)
-            drag.setMimeData(mime_data)
-            drag.exec_()
-
-    def mouseReleaseEvent(self, event):
-        self.left_mouse_pressed_on_me = False
-        if self.geometry().contains(self.mapToParent(event.pos())):
-            self.chosen.emit()
-
-    def set_custom_focus(self, new_focus):
-        self.custom_focused = new_focus
-        self.update_stylesheet()
-
-    def update_stylesheet(self):
-        gui = self.gui_env.get_node_gui(self.node_type)
-        color = gui.color if gui else '#888888'
-
-        r, g, b = QColor(color).red(), QColor(color).green(), QColor(color).blue()
-
-        new_style_sheet = f'''
-NodeListItemWidget {{
-    border: 1px solid rgba(255,255,255,150);
-    border-radius: 2px;
-    {(
-        f'background-color: rgba(255,255,255,80);'
-    ) if self.custom_focused else ''}
-}}
-QLabel {{
-    background: transparent;
-}}
-QLineEdit {{
-    background: transparent;
-    border: none;
-    padding: 2px;
-}}
-        '''
-
-        self.setStyleSheet(new_style_sheet)
-
-    def paintEvent(self, event):  # just to enable stylesheets
-        o = QStyleOption()
-        o.initFrom(self)
-        p = QPainter(self)
-        self.style().drawPrimitive(QStyle.PE_Widget, o, p, self)
-
+def create_node_mime(node: type[Node]) -> QMimeData:
+    mime_data = QMimeData()
+    mime_data.setData('application/json', bytes(json.dumps(
+            {
+                'type': 'node',
+                'node identifier': node.identifiable().id,
+            }
+        ), encoding='utf-8'))
+    return mime_data
 
 #   LIST WIDGET
     
@@ -220,7 +121,7 @@ class NodeStandardItem(QStandardItem):
         self.node_type = node_type
     
     def mimeData(self):
-        return NodeListItemWidget._create_mime_data(self.node_type) 
+        return create_node_mime(self.node_type) 
         
 class NodeGroupsModel(IdentifiableGroupsModel[type[Node]]):
     
@@ -288,6 +189,7 @@ class NodeListWidget(QWidget):
         self.layout().addWidget(splitter)
 
         # searchable tree view
+        
         self.pack_tree = FilterTreeView(self.node_model)
         self.pack_tree.setDragDropMode(QAbstractItemView.DragDropMode.DragOnly)
         self.pack_tree.setDragEnabled(True)
@@ -425,37 +327,3 @@ class NodeListWidget(QWidget):
         # focus on first result
         if len(self.current_nodes) > 0:
             self._set_active_node_widget_index(0)
-
-    def _create_node_widget(self, node):
-        node_widget = NodeListItemWidget(self, node, self.session_gui.gui_env)
-        node_widget.custom_focused_from_inside.connect(self._node_widget_focused_from_inside)
-        node_widget.setObjectName('node_widget_' + str(self._node_widget_index_counter))
-        self._node_widget_index_counter += 1
-        node_widget.chosen.connect(self._node_widget_chosen)
-
-        return node_widget
-
-    def _node_widget_focused_from_inside(self):
-        index = self.list_layout.indexOf(self.sender())
-        self._set_active_node_widget_index(index)
-
-    def _set_active_node_widget_index(self, index):
-        self.active_node_widget_index = index
-        node_widget = self.list_layout.itemAt(index).widget()
-
-        if self.active_node_widget:
-            self.active_node_widget.set_custom_focus(False)
-
-        node_widget.set_custom_focus(True)
-        self.active_node_widget = node_widget
-        self.list_scroll_area.ensureWidgetVisible(self.active_node_widget)
-
-    def _node_widget_chosen(self):
-        index = int(self.sender().objectName()[self.sender().objectName().rindex('_') + 1 :])
-        self._place_node(index)
-
-    def _place_node(self, index):
-        node_index = index
-        node = self.current_nodes[node_index]
-        self.node_chosen.emit(node)
-        self.escaped.emit()

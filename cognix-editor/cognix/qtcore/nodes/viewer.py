@@ -127,7 +127,8 @@ class NodeViewerDefault(NodeViewerWidget, QDialog):
             
             self.content.addWidget(self.inspect_tab_widget)
         
-        self.setWindowTitle(f'{self.node_gui.display_title} Viewer')
+        self.setWindowTitle(f'{self.node_gui.display_title} Viewer @GID{self.node.global_id}')
+        self.setMinimumHeight(650)
         
     # Connect Viewer functons to QT events
     

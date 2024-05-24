@@ -18,7 +18,7 @@ from ..nodes.gui import NodeGUI
 from ..flows.commands import DelegateCommand
 from .abc import NodeConfigInspector
 
-from traitsui.api import View, Group, Item
+from traitsui.api import View, Group, Item, VGroup
 from traits.observation.events import (
     TraitChangeEvent, 
     ListChangeEvent, 
@@ -26,7 +26,6 @@ from traits.observation.events import (
     SetChangeEvent
 )
 from qtpy.QtWidgets import QVBoxLayout, QWidget
-from typing import TypeVar
 
 
 class NodeTraitsConfigInspector(NodeConfigInspector[NodeTraitsConfig], QWidget):
@@ -115,34 +114,35 @@ class NodeTraitsConfigInspector(NodeConfigInspector[NodeTraitsConfig], QWidget):
         self.setLayout(QVBoxLayout())
         self.delete_ui()
         
-        inspected_obj = change_event.new
-        
+        self.inspected = inspected_obj = change_event.new
         if not inspected_obj:
             return
-        
-        self.inspected = inspected_obj
         
         gr_label = self.inspected_label()
         
         insp_traits = inspected_obj.serializable_traits()
         
-        items: list[Item] = []
-        for tr in insp_traits:
-            internal_tr = inspected_obj.trait(tr)
-            style = getattr(internal_tr, 'style', None)
-            item = Item(tr, style=style) if style else Item(tr)
-            items.append(item)
+        # custom user view
+        if self.inspected.traits_view:
+            self.view = self.inspected.traits_view
+        else:
+            items: list[Item] = []
+            for tr in insp_traits:
+                internal_tr = inspected_obj.trait(tr)
+                style = getattr(internal_tr, 'style', None)
+                item = Item(tr, style=style) if style else Item(tr)
+                items.append(item)
+                
+            config_group = VGroup (
+                *items,
+                label=gr_label,
+                scrollable=True,
+                springy=True,
+            )
             
-        config_group = Group (
-            *items,
-            label=gr_label,
-            scrollable=True,
-            springy=True,
-        )
-        
-        self.view = View (
-            config_group
-        )
+            self.view = View (
+                config_group
+            )
         
         if not change_event.created:
             self.load()

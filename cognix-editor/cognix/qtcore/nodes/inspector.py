@@ -86,7 +86,7 @@ class NodeInspectorDefaultWidget(NodeInspectorWidget, QWidget):
     def _big_bold_text(txt: str):
         return f'<b><bold>{txt}</bold></b>'
     
-    def __init__(self, params, child: NodeInspectorWidget | None = None):
+    def __init__(self, params, child: NodeInspectorWidget | QWidget | None = None):
         self.child = child
         QWidget.__init__(self)
         NodeInspectorWidget.__init__(self, params)
@@ -107,35 +107,42 @@ class NodeInspectorDefaultWidget(NodeInspectorWidget, QWidget):
         self.content_splitter.setOrientation(Qt.Orientation.Vertical)
         self.layout().addWidget(self.content_splitter)
         
+        # we want to add the child only if it has any children
+
+        self.valid_child = False
         if self.child:
             # passing created as False here because we only want the main Inspector
             # to know that it's created to avoid multiple Undo commands
             child_change_event = InspectedChangedEvent(change_event._old, change_event._new, False)
             self.child.on_insp_changed(child_change_event)
-            self.content_splitter.addWidget(self.child)
+            self.valid_child = self.child.layout() is not None
+            if self.valid_child:
+                self.content_splitter.addWidget(self.child)
+            self.layout().setContentsMargins(0, 0, 0, 0)
         
         self.description_area: QTextEdit = QTextEdit()
         self.description_area.setReadOnly(True)
     
         self.content_splitter.addWidget(self.description_area)
         
-        if self.child:
-            # not going to search why random values I put work :D
-            self.content_splitter.setSizes([75, 5])
+        if self.valid_child:
+            # the minimum height needs to be set otherwise setSizes works incorrectly
+            self.description_area.setMinimumHeight(25)
+            self.content_splitter.setSizes([75, 25])
         
     def load(self):
         self.process_description()
         super().load()
-        if self.child:
+        if self.valid_child:
             self.child.load()
     
     def unload(self):
-        if self.child:
+        if self.valid_child:
             self.child.unload()
         super().unload()
     
     def on_node_deleted(self):
-        if self.child:
+        if self.valid_child:
             self.child.on_node_deleted()
         return super().on_node_deleted()
     
@@ -170,7 +177,10 @@ class NodeInspectorDefaultWidget(NodeInspectorWidget, QWidget):
 
 
 class ConfigNodeInspectorWidget(NodeInspectorWidget, QWidget):
-    """A basic Node Inspector which handles GUI config"""  
+    """
+    A basic Node Inspector which handles GUI config by searching
+    for the config type's subscripted InspectorWidget.
+    """  
     
     def __init__(self, params: tuple[Node, NodeGUI]):
         QWidget.__init__(self)
@@ -179,12 +189,16 @@ class ConfigNodeInspectorWidget(NodeInspectorWidget, QWidget):
         NodeInspectorWidget.__init__(self, params)
         
     def on_insp_changed(self, val: Node):
-        self.setLayout(QVBoxLayout())
+        
         config_gui_cls = self.gui_env.get_inspector(type(self.node.config))
         self.config_gui = config_gui_cls((self.node.config, self.node_gui)) if config_gui_cls else None
         if self.config_gui:
+            self.setLayout(QVBoxLayout())
             self.layout().addWidget(self.config_gui)
-        
+            self.layout().setContentsMargins(0, 0, 0, 0)
+        else:
+            self.setLayout(None)
+            
     def load(self):
         
         if self.config_gui:

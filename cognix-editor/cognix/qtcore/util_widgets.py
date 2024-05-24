@@ -347,17 +347,23 @@ class FilterTreeView(QTreeView):
         model.setFilterCaseSensitivity(Qt.CaseInsensitive)
         self.setModel(model)
         model.setSourceModel(item_model)
+        self._wrapped_model = item_model
         self._proxy_model = model
 
         self.click_func = None
         def on_select(index: QModelIndex):
-            source_index = index.model().mapToSource(index)
-            item: QStandardItem = index.model().sourceModel().itemFromIndex(source_index)
+    
+            source_index = self.proxy_model.mapToSource(index)
+            item: QStandardItem = self.wrapped_model.itemFromIndex(source_index)
             func = item.data(Qt.UserRole + click_user_data)
             if func:
                 func()
         
         self.clicked.connect(on_select)
+    
+    @property
+    def wrapped_model(self):
+        return self._wrapped_model
     
     @property
     def proxy_model(self):
