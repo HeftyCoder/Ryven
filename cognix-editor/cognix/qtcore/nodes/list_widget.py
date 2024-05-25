@@ -33,7 +33,7 @@ from qtpy.QtCore import (
     QMimeData,
 )
 
-
+from collections.abc import Sequence
 from statistics import median
 from re import escape
 
@@ -124,7 +124,11 @@ class NodeStandardItem(QStandardItem):
         return create_node_mime(self.node_type) 
         
 class NodeGroupsModel(IdentifiableGroupsModel[type[Node]]):
+    """
+    A model that represents a nodes package as a tree structure
     
+    Designed to be combined with tree views.
+    """
     def __init__(self, list_widget: NodeListWidget, groups: IdentifiableGroups[type[Node]], label="Packages", separator='.'):
         self.list_widget = list_widget
         super().__init__(groups, label, separator)
@@ -156,6 +160,27 @@ class NodeGroupsModel(IdentifiableGroupsModel[type[Node]]):
     def mimeData(self, indexes):
         item: NodeStandardItem = self.itemFromIndex(indexes[0])
         return item.mimeData()
+
+class NodesPackageModel(QStandardItemModel):
+    """
+    A model that represents the nodes given to it.
+    
+    Designed to be combined with a list view.
+    """
+    def __init__(self, node_types: Sequence[type[Node]]):
+        super().__init__()
+        self.node_types = node_types
+    
+    def update_model(self, node_types: Sequence[type[Node]]):
+        self.node_types = node_types
+        self.clear()
+        for node_type in self.node_types:
+            item = NodeStandardItem(node_type, node_type.title)
+            self.appendRow(item)
+        
+    def mimeData(self, indexes):
+        item: NodeStandardItem = self.itemFromIndex(indexes[0])
+        return item.mimeData()
         
 class NodeListWidget(QWidget):
     # SIGNALS
@@ -174,8 +199,6 @@ class NodeListWidget(QWidget):
         self.node_widgets = {}  # Node-NodeWidget assignments
         self._node_widget_index_counter = 0
 
-        # holds the path to the tree item
-        self.node_model = NodeGroupsModel(self, self.session_gui.core_session.node_groups)
         self.show_packages: bool = show_packages
         self._setup_UI()
 
@@ -189,8 +212,8 @@ class NodeListWidget(QWidget):
         self.layout().addWidget(splitter)
 
         # searchable tree view
-        
-        self.pack_tree = FilterTreeView(self.node_model)
+        self.nodes_group_model = NodeGroupsModel(self, self.session_gui.core_session.node_groups)
+        self.pack_tree = FilterTreeView(self.nodes_group_model)
         self.pack_tree.setDragDropMode(QAbstractItemView.DragDropMode.DragOnly)
         self.pack_tree.setDragEnabled(True)
         
@@ -202,37 +225,23 @@ class NodeListWidget(QWidget):
         
         splitter.setSizes([30])
         
-        # nodes widget
+        # searchable nodes list view
+        
         nodes_widget = QWidget()
         nodes_widget.setLayout(QVBoxLayout())
         splitter.addWidget(nodes_widget)
 
-        # adding all stuff to the layout
+        # text edit for searching the nodes
         self.search_line_edit = QLineEdit(self)
         self.search_line_edit.setPlaceholderText('search for node...')
         self.search_line_edit.textChanged.connect(self._update_view)
         nodes_widget.layout().addWidget(self.search_line_edit)
         
-        self.current_pack_label = QLabel('Package: None')
-        self.current_pack_label.setFont(text_font())
-        nodes_widget.layout().addWidget(self.current_pack_label)
-        
-        self.list_scroll_area = QScrollArea(self)
-        self.list_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        self.list_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        self.list_scroll_area.setWidgetResizable(True)
-        self.list_scroll_area.setContentsMargins(0, 0, 0, 0)
-
-        self.list_scroll_area_widget = QWidget()
-        self.list_scroll_area_widget.setContentsMargins(15, 10, 15, 10)
-        self.list_scroll_area.setWidget(self.list_scroll_area_widget)
-
-        self.list_layout = QVBoxLayout()
-        self.list_layout.setContentsMargins(0, 0, 0, 0)
-        self.list_layout.setAlignment(Qt.AlignTop)
-        self.list_scroll_area_widget.setLayout(self.list_layout)
-
-        nodes_widget.layout().addWidget(self.list_scroll_area)
+        self.nodes_list_model = NodesPackageModel(self.nodes)
+        self.nodes_list = QListView()
+        self.nodes_list.setDragEnabled(True)
+        self.nodes_list.setModel(self.nodes_list_model)
+        nodes_widget.layout().addWidget(self.nodes_list)
 
         self._update_view('')
 
@@ -240,11 +249,11 @@ class NodeListWidget(QWidget):
 
         self.search_line_edit.setFocus()
 
-    def make_nodes_current(self, pack_nodes, pkg_name: str):
+    def make_nodes_current(self, pack_nodes: Sequence[type[Node]], pkg_name: str):
         if not pack_nodes or self.package_nodes == pack_nodes:
             return
         self.package_nodes = pack_nodes
-        self.current_pack_label.setText(f'Package: {pkg_name}')
+        self.nodes_list_model.setHorizontalHeaderLabels([f'package: {pkg_name}'])
         self._update_view()
 
     def mousePressEvent(self, event):
@@ -260,14 +269,9 @@ class NodeListWidget(QWidget):
         if event.key() == Qt.Key_Escape:
             self.escaped.emit()
 
-        elif event.key() == Qt.Key_Down:
-            self._set_active_node_widget_index(inc(self.active_node_widget_index, length=num_items))
-        elif event.key() == Qt.Key_Up:
-            self._set_active_node_widget_index(dec(self.active_node_widget_index, num_items))
-
         elif event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter:
             if len(self.current_nodes) > 0:
-                self._place_node(self.active_node_widget_index)
+                pass # place the node here
         else:
             event.setAccepted(False)
 
@@ -297,11 +301,6 @@ class NodeListWidget(QWidget):
 
         search_text = search_text.lower()
 
-        # remove all node widgets
-
-        for i in reversed(range(self.list_layout.count())):
-            self.list_layout.itemAt(i).widget().setParent(None)
-
         self.current_nodes.clear()
 
         self._node_widget_index_counter = 0
@@ -319,11 +318,4 @@ class NodeListWidget(QWidget):
 
             self.current_nodes.append(n)
 
-            if self.node_widgets.get(n) is None:
-                self.node_widgets[n] = self._create_node_widget(n)
-
-            self.list_layout.addWidget(self.node_widgets[n])
-
-        # focus on first result
-        if len(self.current_nodes) > 0:
-            self._set_active_node_widget_index(0)
+        self.nodes_list_model.update_model(self.current_nodes)
