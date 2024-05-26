@@ -33,7 +33,11 @@ from qtpy.QtWidgets import (
 from qtpy.QtCore import Signal
 from cognixcore.addons.logging import Logger
 from enum import StrEnum
+
+from cognixcore import Node, Flow
+
 import logging
+
 
 class LogLevelColors(StrEnum):
     DEBUG = "#808080" # Gray
@@ -137,11 +141,18 @@ class LogItemDelegate(QStyledItemDelegate):
         return QSize(text_document.idealWidth(), 2.5*h)
 
 class LogWidget(QWidget):
-    """Convenience class for a QWidget representing a log."""
+    """
+    A widget representing a log.
+    
+    The logger can be any python logger, but the title is
+    drawn differently if an associated object is given that
+    is either a Node or a Flow.
+    """
 
     on_log_signal = Signal(logging.LogRecord, logging.Formatter)
+    on_flow_rename_signal = Signal(str, str)
     
-    def __init__(self, logger: Logger):
+    def __init__(self, logger: Logger, assoc_obj: Node | Flow | None ):
         super().__init__()
 
         self.logger = logger
@@ -154,8 +165,21 @@ class LogWidget(QWidget):
         self.header_layout = QHBoxLayout()
         self.main_layout.addLayout(self.header_layout)
         
-        title_label = QLabel(self.logger.name)
-        title_label.setFont(QFont('Poppins', 12))
+        title_label = QLabel()
+        title_label.setFont(QFont('Poppins', 10))
+        
+        if not assoc_obj:
+            title_label.setText(f'{self.logger.name} Logger')
+        elif isinstance(assoc_obj, Node):
+            title_label.setText(f'Node Logger\n{assoc_obj.title}@{assoc_obj.global_id}')
+        elif isinstance(assoc_obj, Flow):
+            title_label.setText(f'Flow Logger: {assoc_obj.title}@{assoc_obj.global_id}')
+            def flow_renamed(old: str, new: str):
+                title_label.setText(f'Flow Logger: {new}@{assoc_obj.global_id}')
+            
+            self.on_flow_rename_signal.connect(flow_renamed)
+            assoc_obj.renamed.sub(self.on_flow_rename_signal.emit)
+            
         self.header_layout.addWidget(title_label)
 
         # for messages + big message

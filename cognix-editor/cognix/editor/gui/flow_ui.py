@@ -131,7 +131,7 @@ class FlowUI(QMainWindow):
 
         # the flow logger already exists here
         self.flow_logger = self.flow.logger
-        self.logger_widget = LogWidget(self.flow_logger)
+        self.logger_widget = LogWidget(self.flow_logger, self.flow)
         self.ui.logs_scrollArea.widget().layout().addWidget(self.logger_widget)
 
     def open_docks(self, docks):

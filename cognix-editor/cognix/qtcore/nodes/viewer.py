@@ -1,11 +1,13 @@
+from __future__ import annotations
 from typing import TYPE_CHECKING
 from qtpy.QtGui import QCloseEvent, QHideEvent, QShowEvent
 from qtpy.QtWidgets import QTabWidget, QVBoxLayout, QDialog, QSplitter
 from qtpy.QtCore import Qt
 
-from cognixcore import Node
-
 from ..code_editor.widgets import CodePreviewWidget
+from ..addons.logging import LogWidget
+
+from cognixcore import Node
 
 if TYPE_CHECKING:
     from .gui import NodeGUI
@@ -17,7 +19,7 @@ class NodeViewerWidget:
     A view is a detached window for interacting with the node other than the inspector.
     """
 
-    def __init__(self, params: tuple[Node, 'NodeGUI']):
+    def __init__(self, params: tuple[Node, NodeGUI]):
         self.node, self.node_gui = params
         self._inspector_widget = None
     
@@ -102,10 +104,11 @@ class NodeViewerDefault(NodeViewerWidget, QDialog):
     
     attach_inspect_widgets = True
     
-    def __init__(self, params: tuple[Node, 'NodeGUI'], parent=None):
+    def __init__(self, params: tuple[Node, NodeGUI], parent=None):
         NodeViewerWidget.__init__(self, params)
         QDialog.__init__(self, parent)
         
+        node, _ = params
         self.setLayout(QVBoxLayout())
         self.setWindowFlag(Qt.Widget)
     
@@ -115,11 +118,17 @@ class NodeViewerDefault(NodeViewerWidget, QDialog):
         self._inspector_widget = None
         
         if self.attach_inspect_widgets:
+            
             self.inspect_tab_widget = QTabWidget()
             
+            # inspector
             self._inspector_widget = self.node_gui.create_inspector()
             self.inspect_tab_widget.addTab(self._inspector_widget, 'Inspector')
             
+            # logger
+            self.logger = LogWidget(node.logger, node)
+            self.inspect_tab_widget.addTab(self.logger, 'Logger')
+            # code preview
             self.code_preview_widget = CodePreviewWidget(
                 self.node_gui.session_gui.cd_storage,
             )
