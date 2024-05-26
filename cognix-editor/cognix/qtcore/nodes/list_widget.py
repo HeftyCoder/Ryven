@@ -40,7 +40,7 @@ from re import escape
 from ..utils import IdentifiableGroupsModel
 from ..util_widgets import FilterTreeView, TreeViewSearcher
 from ..env import GUIEnv
-
+from ..utils import get_folder_icon
 from cognixcore import Node
 from cognixcore.base import Identifiable, IdentifiableGroups
 
@@ -129,6 +129,7 @@ class NodeGroupsModel(IdentifiableGroupsModel[type[Node]]):
     
     Designed to be combined with tree views.
     """
+    
     def __init__(self, list_widget: NodeListWidget, groups: IdentifiableGroups[type[Node]], label="Packages", separator='.'):
         self.list_widget = list_widget
         super().__init__(groups, label, separator)
@@ -141,7 +142,8 @@ class NodeGroupsModel(IdentifiableGroupsModel[type[Node]]):
         item = QStandardItem(name)
         item.setFont(text_font())
         # https://specifications.freedesktop.org/icon-naming-spec/latest/ar01s04.html
-        item.setIcon(QIcon.fromTheme('folder', self.list_widget.style().standardIcon(QStyle.SP_DirIcon)))
+        
+        item.setIcon(get_folder_icon())
         item.setDragEnabled(False)
         item.setEditable(False)
         
@@ -237,6 +239,10 @@ class NodeListWidget(QWidget):
         self.search_line_edit.textChanged.connect(self._update_view)
         nodes_widget.layout().addWidget(self.search_line_edit)
         
+        self.nodes_list_title = QLabel('all nodes') # the QListView doesn't seem to have a header
+        self.nodes_list_title.setFont(text_font())
+        nodes_widget.layout().addWidget(self.nodes_list_title)
+        
         self.nodes_list_model = NodesPackageModel(self.nodes)
         self.nodes_list = QListView()
         self.nodes_list.setDragEnabled(True)
@@ -253,7 +259,10 @@ class NodeListWidget(QWidget):
         if not pack_nodes or self.package_nodes == pack_nodes:
             return
         self.package_nodes = pack_nodes
-        self.nodes_list_model.setHorizontalHeaderLabels([f'package: {pkg_name}'])
+        
+        pkg_name = pkg_name if pkg_name else 'all nodes'
+        self.nodes_list_title.setText(pkg_name)
+        self.nodes_list_model.setHorizontalHeaderLabels([pkg_name])
         self._update_view()
 
     def mousePressEvent(self, event):

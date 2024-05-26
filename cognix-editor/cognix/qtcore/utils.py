@@ -7,7 +7,7 @@ from qtpy.QtCore import (
     QByteArray, 
     Signal,
 )
-from qtpy.QtGui import QStandardItem, QStandardItemModel
+from qtpy.QtGui import QStandardItem, QStandardItemModel, QIcon
 from cognixcore.utils import serialize, deserialize
 from cognixcore.base import Event, Identifiable, IdentifiableGroups, InfoType
 
@@ -19,6 +19,13 @@ if TYPE_CHECKING:
 
 class Location:
     PACKAGE_PATH = None
+
+__folder_icon: QIcon = None 
+def get_folder_icon() -> QIcon:
+    global __folder_icon
+    if not __folder_icon:
+        __folder_icon = QIcon(Location.PACKAGE_PATH + '/resources/pics/cognix folder icon.png')
+    return __folder_icon
     
 def connect_signal_event(signal: Signal, ev: Event, callback):
     signal.connect(callback)
