@@ -40,7 +40,7 @@ from re import escape
 from ..utils import IdentifiableGroupsModel
 from ..util_widgets import FilterTreeView, TreeViewSearcher
 from ..env import GUIEnv
-from ..utils import get_folder_icon
+from ..utils import get_folder_icon, get_node_icon, text_font
 from cognixcore import Node
 from cognixcore.base import Identifiable, IdentifiableGroups
 
@@ -92,13 +92,6 @@ def search(items: dict, text: str) -> dict:
 
     return sort_by_val(distances)
 
-
-__text_font = QFont('Source Code Pro', 9)
-__text_font.setPointSizeF(__text_font.pointSizeF() * 1.15)
-
-def text_font():
-    return __text_font
-
 def create_node_mime(node: type[Node]) -> QMimeData:
     mime_data = QMimeData()
     mime_data.setData('application/json', bytes(json.dumps(
@@ -117,7 +110,8 @@ class NodeStandardItem(QStandardItem):
         super().__init__(text)
         self.setEditable(False)
         self.setDragEnabled(True)
-        self.setFont(text_font())
+        self.setFont(text_font)
+        self.setIcon(get_node_icon())
         self.node_type = node_type
     
     def mimeData(self):
@@ -140,7 +134,7 @@ class NodeGroupsModel(IdentifiableGroupsModel[type[Node]]):
      
     def create_subgroup(self, name: str, path: str) -> QStandardItem:
         item = QStandardItem(name)
-        item.setFont(text_font())
+        item.setFont(text_font)
         # https://specifications.freedesktop.org/icon-naming-spec/latest/ar01s04.html
         
         item.setIcon(get_folder_icon())
@@ -225,8 +219,6 @@ class NodeListWidget(QWidget):
         if self.show_packages:
             splitter.addWidget(self.tree_searcher)
         
-        splitter.setSizes([30])
-        
         # searchable nodes list view
         
         nodes_widget = QWidget()
@@ -240,7 +232,7 @@ class NodeListWidget(QWidget):
         nodes_widget.layout().addWidget(self.search_line_edit)
         
         self.nodes_list_title = QLabel('all nodes') # the QListView doesn't seem to have a header
-        self.nodes_list_title.setFont(text_font())
+        self.nodes_list_title.setFont(text_font)
         nodes_widget.layout().addWidget(self.nodes_list_title)
         
         self.nodes_list_model = NodesPackageModel(self.nodes)
@@ -249,8 +241,10 @@ class NodeListWidget(QWidget):
         self.nodes_list.setModel(self.nodes_list_model)
         nodes_widget.layout().addWidget(self.nodes_list)
 
+        
         self._update_view('')
-
+        splitter.setSizes([50, 50])
+        
         self.setStyleSheet(self.session_gui.design.node_selection_stylesheet)
 
         self.search_line_edit.setFocus()

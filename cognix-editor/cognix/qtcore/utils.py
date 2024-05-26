@@ -7,7 +7,7 @@ from qtpy.QtCore import (
     QByteArray, 
     Signal,
 )
-from qtpy.QtGui import QStandardItem, QStandardItemModel, QIcon
+from qtpy.QtGui import QStandardItem, QStandardItemModel, QIcon, QFont
 from cognixcore.utils import serialize, deserialize
 from cognixcore.base import Event, Identifiable, IdentifiableGroups, InfoType
 
@@ -22,11 +22,31 @@ class Location:
 
 __folder_icon: QIcon = None 
 def get_folder_icon() -> QIcon:
+    """Gets the default folder icon"""
     global __folder_icon
     if not __folder_icon:
-        __folder_icon = QIcon(Location.PACKAGE_PATH + '/resources/pics/cognix folder icon.png')
+        __folder_icon = QIcon(f'{Location.PACKAGE_PATH}/resources/pics/cognix folder icon.png')
     return __folder_icon
-    
+
+__node_icon: QIcon = None
+def get_node_icon() -> QIcon:
+    """Gets the default node icon"""
+    global __node_icon
+    if not __node_icon:
+        __node_icon = QIcon(f'{Location.PACKAGE_PATH}/resources/pics/cognix node.png')
+    return __node_icon
+
+__var_icon: QIcon = None
+def get_var_icon() -> QIcon:
+    """Gets the default variable icon"""
+    global __var_icon
+    if not __var_icon:
+        __var_icon = QIcon(f'{Location.PACKAGE_PATH}/resources/pics/data icon.png')
+    return __var_icon
+
+text_font = QFont('Source Code Pro', 9)
+text_font.setPointSizeF(text_font.pointSizeF() * 1.15)
+
 def connect_signal_event(signal: Signal, ev: Event, callback):
     signal.connect(callback)
     ev.sub(signal.emit)

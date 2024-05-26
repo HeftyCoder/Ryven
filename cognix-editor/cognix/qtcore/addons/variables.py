@@ -35,7 +35,10 @@ from ..utils import (
     create_tooltip, 
     connect_signal_event, 
     Location, 
-    IdentifiableGroupsModel
+    IdentifiableGroupsModel,
+    text_font,
+    get_folder_icon,
+    get_var_icon,
 )
 from ..util_widgets import EditVal_Dialog, FilterTreeView, TreeViewSearcher
 from ..flows.commands import DelegateCommand
@@ -51,7 +54,7 @@ class VariableGroupsModel(IdentifiableGroupsModel[VarType]):
     
     item_clicked_signal = Signal(type)
     
-    def __init__(self, groups: IdentifiableGroups[VarType], label="Data Types", separator='.'):
+    def __init__(self, groups: IdentifiableGroups[VarType], label="Variable Types", separator='.'):
         super().__init__(groups, label, separator)
         self._selected: type[Any] = None
     
@@ -59,10 +62,19 @@ class VariableGroupsModel(IdentifiableGroupsModel[VarType]):
     def selected(self):
         return self._selected
     
+    def create_subgroup(self, name: str, path: str) -> QStandardItem:
+        result = IdentifiableGroupsModel[VarType].create_subgroup(self, name, path)
+        result.setFont(text_font)
+        result.setIcon(get_folder_icon())
+        return result
+        
     def create_id_item(self, id: Identifiable[VarType]):
         item = QStandardItem(id.name)
+        item.setFont(text_font)
         item.setEditable(False)
         item.setDragEnabled(False)
+        item.setIcon(get_var_icon())
+        
         def on_click():
             self._selected = id.info.val_type
             self.item_clicked_signal.emit(id.info.val_type)
@@ -77,7 +89,7 @@ class VarTypeDialogue(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setLayout(QVBoxLayout())
-        self.setWindowTitle("Select Data Type")
+        self.setWindowTitle("Variable Types")
         
         # use the built in variable types for now
         self.data_model = VariableGroupsModel(variable_groups)
@@ -85,14 +97,16 @@ class VarTypeDialogue(QDialog):
         # create tree view and model
         self.tree_view = FilterTreeView(self.data_model)
         self.tree_searcher = TreeViewSearcher(self.tree_view)
-        self.tree_searcher.search_bar.setPlaceholderText('search datas...')
+        self.tree_searcher.search_bar.setPlaceholderText('search variable types...')
         self.layout().addWidget(self.tree_searcher)
         
         # button
         self.button = QPushButton("Change Data")
         def on_click():
-            self.confirmed.emit(self.data_model.selected)
-            self.data_model._selected = None
+            if self.data_model._selected:
+                self.confirmed.emit(self.data_model.selected)
+                self.data_model._selected = None
+            
             self.close()
             
         self.button.clicked.connect(on_click)
