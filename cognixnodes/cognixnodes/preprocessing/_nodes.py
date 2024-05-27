@@ -14,6 +14,7 @@ from collections.abc import Sequence
 
 from ..input.payloads.core import Signal
 from .utils.segmentation_helper import CircularBuffer
+from .utils.windowing_helper import CircularBufferWindowing
 
 class SegmentationNode(Node):
     title = 'Segmentation'
@@ -92,6 +93,52 @@ class SegmentationNode(Node):
         self.current_timestamp = marker_ts
         return True
 
+
+class WindowingNode(Node):
+    title = 'Windowing'
+    version = '0.1'
+
+    class Config(NodeTraitsConfig):
+        buffer_duration: float = CX_Float(10.0, desc = 'Duration of the buffer in seconds')
+        window_length: float = CX_Float(5.0,desc='length of the window')
+
+    init_inputs = [PortConfig(label='data')]
+
+    init_outputs = [PortConfig(label='window data')]
+    
+    def __init__(self, flow: Flow):
+        super().__init__(flow)
+        self.buffer: CircularBufferWindowing = None
+    
+    @property
+    def config(self) -> WindowingNode.Config:
+        return self._config
+        
+    def update_event(self, inp=-1):
+        
+        update_result = self.call_update_event(inp)
+        
+        if update_result and self.buffer:
+            window = self.buffer.find_segment(self.config.window_length)
+            self.set_output(0, window)
+    
+    def call_update_event(self, inp):
+        data_signal: Signal = self.input(inp)
+        if not data_signal:
+            return False
+        
+        # create buffer if it doesn't exist
+        if not self.buffer:
+            self.buffer = CircularBufferWindowing(
+                sampling_frequency=data_signal.info.nominal_srate,
+                buffer_duration=self.config.buffer_duration,
+                start_time=data_signal.timestamps[0]
+            )
+        
+        self.buffer.append(data_signal.data.T, data_signal.timestamps)
+        return True
+    
+
  
 class SignalSelectionNode(Node):
     
@@ -104,7 +151,6 @@ class SignalSelectionNode(Node):
             'C3', 'Cp1', 'Cp5', 'P7', 'P3', 'Pz', 'Po3', 'O1', 'Oz', 'O2', 'Po4',
             'P4', 'P8', 'Cp6', 'Cp2', 'C4', 'T8', 'Fc6', 'Fc2', 'F4', 'F8', 'Af4',
             'Fp2', 'Fz', 'Cz']
-        
         
         channels_selected = List(
             editor=CheckListEditor(
@@ -147,8 +193,7 @@ class SignalSelectionNode(Node):
         
         sub_signal = signal.data[self.chan_inds]
         self.set_output(0, sub_signal)
-            
-            
+             
 class FIRFilterNode(Node):
     title = 'FIR Filter'
     version = '0.1'

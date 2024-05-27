@@ -1,6 +1,7 @@
 import numpy as np
 from collections.abc import Sequence
 
+
 def find_index(tx: float, buffer: Sequence, current_index: int, buffer_duration: float, tstart: float, tend: float, sampling_frequency:float , effective_sampling_frequency: float) -> tuple[int, bool]:
     size = int(buffer_duration * sampling_frequency)
     dts = 1/effective_sampling_frequency
@@ -15,44 +16,44 @@ def find_index(tx: float, buffer: Sequence, current_index: int, buffer_duration:
             if tx >= tstart
             else (size - int((tend - tx)/dts), True)
         )
-
+        
         extra_index = 0
         if buffer[index[0]] > 0:
             extra_index = int((tx - buffer[index[0]])/dts)
-        
+                
         new_index = (index[0] + extra_index,index[1])
-
+        
         return new_index
-
-def find_segment(tm: float, x: float, y: float,buffer_tm: Sequence, buffer_data: Sequence, current_index: int, buffer_duration: float, tstart: float, tend: float, sampling_frequency: float, effective_sampling_frequency: float):
-    size = int(buffer_duration * sampling_frequency)
-       
-    m_index, m_overflow = find_index(tm,buffer_tm,current_index,buffer_duration,tstart,tend,sampling_frequency,effective_sampling_frequency)
-    x_index, x_overflow = find_index(tm + x,buffer_tm,current_index,buffer_duration,tstart,tend,sampling_frequency,effective_sampling_frequency)
-    y_index, y_overflow = find_index(tm + y,buffer_tm,current_index,buffer_duration,tstart,tend,sampling_frequency,effective_sampling_frequency)   
-
-    if ((m_index < 0 or x_index < 0 or y_index < 0) or 
-        buffer_tm[m_index] < 0 or buffer_tm[x_index] < 0 or buffer_tm[y_index] < 0 or x>y): 
-            return []
     
-    if not (x_overflow or y_overflow) or (x_overflow and y_overflow):
-        print(tm,buffer_tm[x_index],buffer_tm[m_index],buffer_tm[y_index])
+def find_window(t_window:float,start_time_window:float,start_time_index:int,buffer_tm: Sequence, buffer_data: Sequence, current_index: int, buffer_duration: float, tstart: float, tend: float, sampling_frequency: float, effective_sampling_frequency: float):
+    size = int(buffer_duration * sampling_frequency)
+    
+    m_index,m_overflow = find_index(tx = t_window + start_time_window,buffer=buffer_tm,current_index=current_index,buffer_duration=buffer_duration,tstart=tstart,tend=tend,sampling_frequency=sampling_frequency,effective_sampling_frequency=effective_sampling_frequency)
+    
+    window = np.zeros((32,1))
 
-        return buffer_data[:,x_index:y_index]
+    if m_index < 0 or buffer_tm[m_index] < 0:
+        pass
     
     else:
-        print(tm,buffer_tm[x_index],buffer_tm[m_index],buffer_tm[y_index])
-        start,end = (x_index,y_index) if x_overflow else (y_index,x_index)
-        return np.concatenate((buffer_data[:,start:size],buffer_data[:,0:end]))
+        
+        if m_index < start_time_index:
+            window = np.concatenate((buffer_data[:,start_time_index:size],buffer_data[:,0:m_index]),axis=1)
+        else: 
+            window = buffer_data[:,start_time_index:m_index]
+            
+        print("SEGMENTTTTTTTTTTTTTTTTTT",buffer_tm[start_time_index],buffer_tm[m_index])
+        
+        start_time_index,start_time_window = m_index,t_window + start_time_window
+            
+    return start_time_index,start_time_window,window
 
-
-class CircularBuffer:
+class CircularBufferWindowing:
     """An implementation of a circular buffer for handling data and timestamps"""
     
-    def __init__(self, sampling_frequency:float, buffer_duration:float, error_margin:float, start_time:float):
+    def __init__(self, sampling_frequency:float, buffer_duration:float,start_time:float):
         self.nominal_srate = sampling_frequency
         self.effective_srate = 0
-        self.error_margin = error_margin
         self.buffer_duration = buffer_duration
         self.size = int(buffer_duration * self.nominal_srate)
         self.current_index = 0
@@ -60,6 +61,9 @@ class CircularBuffer:
         self.tstart = start_time
         self.tend = start_time
         self.dts = 1 / self.nominal_srate
+        
+        self.time_window_start = start_time
+        self.index_window_start = 0
 
         self.buffer_data = np.full((32,self.size),-1.0,dtype=float)
         self.buffer_timestamps = np.full(self.size,-1.0,dtype=float)
@@ -114,19 +118,24 @@ class CircularBuffer:
         """Finds closest index of the buffer based on a timestamp"""
         return find_index(timestamp, self.buffer_data, self.current_index, self.buffer_duration, self.tstart, self.tend, self.nominal_srate ,self.nominal_srate)
     
-    def find_segment(self, timestamp: float, offsets: tuple[float, float]):
+    def find_segment(self, timestamp: float):
         """Extracts a segment of the buffer based around a timestamp and offsets"""
-        x_offset, y_offset = offsets
-        return find_segment(
-            timestamp, 
-            x_offset, 
-            y_offset,
-            self.buffer_timestamps,
-            self.buffer_data,
-            self.current_index,
-            self.buffer_duration,
-            self.tstart,
-            self.tend,
-            self.nominal_srate,
-            self.effective_srate
+        
+        new_index_start,new_time_start,window = find_window(
+            t_window = timestamp,
+            start_time_window = self.time_window_start,
+            start_time_index = self.index_window_start,
+            buffer_tm = self.buffer_timestamps,
+            buffer_data=self.buffer_data,
+            current_index=self.current_index,
+            buffer_duration=self.buffer_duration,
+            tstart=self.tstart,
+            tend=self.tend,
+            sampling_frequency=self.nominal_srate,
+            effective_sampling_frequency=self.effective_srate
         )
+        
+        if window.shape[1]!=1:
+            self.time_window_start = new_time_start
+            self.index_window_start = new_index_start
+            return window
