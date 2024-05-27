@@ -11,9 +11,9 @@ from qtpy.QtWidgets import (
     QMessageBox,
 )
 from qtpy.QtGui import QIcon, QImage
-from qtpy.QtCore import Qt, QEvent, QBuffer
+from qtpy.QtCore import Qt, QEvent, QBuffer, Signal
 
-from ..utils import Location
+from ..utils import Location, connect_signal_event
 from cognixcore import Flow
 
 from typing import TYPE_CHECKING
@@ -21,10 +21,10 @@ if TYPE_CHECKING:
     from ..session_gui import SessionGUI
     
     
-class FlowsList_FlowWidget(QWidget):
+class FlowsListItemWidget(QWidget):
     """A QWidget representing a single Flow for the FlowsListWidget."""
 
-    def __init__(self, flows_list_widget, session_gui, flow: Flow):
+    def __init__(self, flows_list_widget: FlowsListWidget, session_gui: SessionGUI, flow: Flow):
         super().__init__()
 
         self.session_gui = session_gui
@@ -136,18 +136,31 @@ class FlowsList_FlowWidget(QWidget):
 class FlowsListWidget(QWidget):
     """Convenience class for a QWidget to easily manage the flows of a session."""
 
+    _flow_deleted_signal = Signal(Flow)
+    _flow_renamed_signal = Signal(Flow)
+    
     def __init__(self, session_gui: SessionGUI):
         super().__init__()
 
         self.session_gui = session_gui
-        self.list_widgets = []
+        self.flow_items: dict[Flow, FlowsListItemWidget] = {}
         self.ignore_name_line_edit_signal = False  # because disabling causes firing twice otherwise
 
         self.setup_UI()
 
-        self.session_gui.flow_view_created.connect(self.add_new_flow)
-        self.session_gui.flow_deleted.connect(self.recreate_list)
-
+        self.session_gui.flow_view_created.connect(self._on_flow_created)
+        
+        s = self.session_gui.core_session
+        connect_signal_event(
+            self._flow_deleted_signal,
+            s.flow_deleted,
+            self._on_flow_deleted
+        )
+        connect_signal_event(
+            self._flow_renamed_signal,
+            s.flow_renamed,
+            self._on_flow_renamed
+        )
 
     def setup_UI(self):
         main_layout = QVBoxLayout(self)
@@ -181,33 +194,25 @@ class FlowsListWidget(QWidget):
 
         main_layout.addWidget(self.new_flow_title_lineedit)
 
-
-        self.recreate_list()
-
-
-    def recreate_list(self):
-        # remove flow widgets
-        for i in reversed(range(self.list_layout.count())):
-            self.list_layout.itemAt(i).widget().setParent(None)
-        self.list_widgets.clear()
-
-        # re-create flow widgets
-        for s in self.session_gui.core_session.flows.values():
-            new_widget = FlowsList_FlowWidget(self, self.session_gui, s)
-            self.list_widgets.append(new_widget)
-
-        # add flow widgets to layout
-        for w in self.list_widgets:
-            self.list_layout.addWidget(w)
-
     def create_flow(self):
         title = self.new_flow_title_lineedit.text()
 
         if self.session_gui.core_session.new_flow_title_valid(title):
             self.session_gui.core_session.create_flow(title=title)
 
-    def add_new_flow(self, flow, flow_view):
-        self.recreate_list()
+    def _on_flow_created(self, flow, flow_view):
+        new_widget = FlowsListItemWidget(self, self.session_gui, flow)
+        self.list_layout.addWidget(new_widget)
+        self.flow_items[flow] = new_widget
+    
+    def _on_flow_deleted(self, flow: Flow):
+        flow_item = self.flow_items[flow]
+        del self.flow_items[flow]
+        self.list_layout.removeWidget(flow_item)
+    
+    def _on_flow_renamed(self, flow: Flow):
+        flow_item = self.flow_items[flow]
+        flow_item.title_line_edit.setText(flow.title)
 
     def del_flow(self, flow, flow_widget):
         msg_box = QMessageBox(QMessageBox.Warning, 'sure about deleting flow?',

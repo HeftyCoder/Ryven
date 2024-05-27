@@ -7,6 +7,7 @@ from .flows.view import FlowView
 from .design import Design
 from .gui_base import GUIBase
 from .code_editor.codes_storage import SourceCodeStorage
+from ..qtcore.utils import connect_signal_event
 
 from cognixcore import (
     set_complete_data_func,
@@ -29,10 +30,10 @@ class SessionGUI(GUIBase, QObject):
     the :code:`session` directly to create, rename, delete flows,
     register nodes, etc.
     """
-
-    flow_created = Signal(object)
-    flow_deleted = Signal(object)
-    flow_renamed = Signal(object, str)
+    
+    __flow_created_signal = Signal(object)
+    __flow_deleted_signal = Signal(object)
+    
     flow_view_created = Signal(object, object)
 
     def __init__(self, gui_parent: QWidget, gui_env: GUIEnv=None, log_level=DEBUG):
@@ -57,7 +58,7 @@ class SessionGUI(GUIBase, QObject):
         self.wnd_light_type = 'dark'
         self.cd_storage = SourceCodeStorage(self.__gui_env)
         # flow views
-        self.flow_views = {}  # {Flow : FlowView}
+        self.flow_views: dict[Flow, FlowView] = {}
 
         # register complete_data function
         set_complete_data_func(self.get_complete_data_function(self))
@@ -69,10 +70,10 @@ class SessionGUI(GUIBase, QObject):
         self.design = Design()
 
         # connect to session
-        self.core_session.flow_created.sub(self._flow_created)
-        self.core_session.flow_deleted.sub(self._flow_deleted)
-        self.core_session.flow_renamed.sub(self._flow_renamed)
-
+        s = self.core_session
+        connect_signal_event(self.__flow_created_signal, s.flow_created, self._flow_created)
+        connect_signal_event(self.__flow_deleted_signal, s.flow_deleted, self._flow_deleted)
+        
     @property
     def gui_env(self):
         """Utility property for accessing the global GUI environment."""
@@ -83,8 +84,6 @@ class SessionGUI(GUIBase, QObject):
         Builds the flow view for a newly created flow, saves it in
         self.flow_views, and emits the flow_view_created signal.
         """
-        self.flow_created.emit(flow)
-
         self.flow_views[flow] = FlowView(
             session_gui=self,
             flow=flow,
@@ -99,10 +98,3 @@ class SessionGUI(GUIBase, QObject):
         Removes the flow view for a deleted flow from self.flow_views.
         """
         self.flow_views.pop(flow)
-        self.flow_deleted.emit(flow)
-
-    def _flow_renamed(self, flow: Flow, new_name: str):
-        """
-        Renames the flow view for a renamed flow.
-        """
-        self.flow_renamed.emit(flow, new_name)

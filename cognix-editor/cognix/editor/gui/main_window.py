@@ -2,6 +2,7 @@ import sys
 import os
 import os.path
 
+from PySide6.QtCore import QObject
 from qtpy.QtGui import QIcon, QKeySequence
 from qtpy.QtWidgets import (
     QMainWindow,
@@ -13,8 +14,9 @@ from qtpy.QtWidgets import (
     QMessageBox,
     QTabWidget,
     QDockWidget,
+    QProgressDialog,
 )
-from qtpy.QtCore import Qt, QByteArray
+from qtpy.QtCore import Qt, QByteArray, QTimer, Signal
 
 from ..gui.main_console import MainConsole
 from ..gui.flow_ui import FlowUI, FlowView
@@ -29,19 +31,26 @@ from ..main.utils import (
 from .. import import_nodes_package
 from ..gui.dialogs import GetTextDialog, ChooseFlowDialog
 
-# ryvencore_qt
 from ...qtcore import SessionGUI, NodeGUI
 from ...qtcore.flows.list_widget import FlowsListWidget
 from ...qtcore.nodes.list_widget import NodeListWidget
-from ...qtcore.addons.variables import VarTypeDialogue, VariableGroupsModel
+from ...qtcore.addons.variables import VarTypeDialogue
+from ...qtcore.utils import connect_signal_event
 
 from cognixcore import InfoMsgs, Flow
-
-    
+from threading import Thread
+        
 class MainWindow(QMainWindow):
 
     __built_in_packages = ['built_in', 'cognix_nodes']
     __session_gui_instance = None
+    
+    _dialog_label_signal = Signal(str)
+    _loading_finished_signal = Signal()
+    _module_error = Signal(Exception)
+    _node_types_updated = Signal(list)
+    __flow_deleted_signal = Signal(Flow)
+    __flow_renamed_signal = Signal(Flow)
     
     @classmethod
     def get_session_gui_instance(cls) -> SessionGUI:
@@ -58,13 +67,16 @@ class MainWindow(QMainWindow):
     ):
         super().__init__(parent)
 
+        self._requested_packages = requested_packages
+        self._required_packages = required_packages
+        self._project_content = project_content if project_content else None
+        
         self.config = config
         self.session_gui, self.core_session = None, None
         self.theme = config.window_theme
         self.node_packages = {}  # {Node: str}
         self.flow_UIs: dict[Flow, FlowUI] = {}
         self.flow_ui_template: dict[str, QByteArray | dict] = None
-        self._project_content = None
         self.wnd_light_type = wnd_light_type
         
         # Init Session GUI
@@ -81,9 +93,20 @@ class MainWindow(QMainWindow):
         else:
             self.core_session._info_messenger().disable()
 
+        # this didn't even need to be signal
         self.session_gui.flow_view_created.connect(self.flow_created)
-        self.session_gui.flow_renamed.connect(self.flow_renamed)
-        self.session_gui.flow_deleted.connect(self.flow_deleted)
+        
+        connect_signal_event(
+            self.__flow_renamed_signal, 
+            self.core_session.flow_renamed, 
+            self.flow_renamed
+            )
+        
+        connect_signal_event(
+            self.__flow_deleted_signal,
+            self.core_session.flow_deleted,
+            self.flow_deleted
+        )
         
         # Create data type dialogue
         self.type_dialog = VarTypeDialogue(parent=self)
@@ -140,30 +163,82 @@ The editor console can still be used for commands.
 
         # Setup ryvencore Session and load project
 
-        self.import_nodes(path=abs_path_from_package_dir('main/packages/cognix_library/'))
-
         # Requested packages take precedence over other packages
-        print('importing requested packages...')
-        self.import_packages(requested_packages)
-        if project_content is not None:
-            self._project_content = project_content
-            print('importing required packages...')
-            self.import_packages(required_packages)
-            print('loading project...')
-            self.core_session.load(project_content)
-            # load the flow_ui_template if it exists
-            self.set_flow_ui_template(project_content.get('flow_ui_template'))
-            # After everything has loaded, load previous UI geometry and state
-            self.load_qt_window(project_content)
-            for flow_ui in self.flow_UIs.values():
-                self.load_flow_ui(flow_ui)
-            print('done')
-        else:
-            self.core_session.create_flow(title='hello world')
-
+        self.progress_dial = QProgressDialog(":D", None, 0, 0)
+        self.progress_dial.setWindowFlag(Qt.WindowType.WindowCloseButtonHint, False)
+        self.progress_dial.hide()
+        
+        # signals
+        self._dialog_label_signal.connect(self.progress_dial.setLabelText)
+        def _on_loaded_project():
+            
+            if self._project_content:
+                # load the flow_ui_template if it exists
+                self.set_flow_ui_template(self._project_content.get('flow_ui_template'))
+                # After everything has loaded, load previous UI geometry and state
+                self.load_qt_window(self._project_content)
+                for flow_ui in self.flow_UIs.values():
+                    self.load_flow_ui(flow_ui)
+            
+            self.progress_dial.close()
+            self.show()
+        
+        self._loading_finished_signal.connect(_on_loaded_project)
+        
+        def _on_module_error(e: Exception):
+            import traceback
+            traceback.print_exc()
+            msg_box = QMessageBox(
+                QMessageBox.Warning,
+                'Missing Python module',
+                str(e),
+                QMessageBox.Ok,
+                self,
+            )
+            msg_box.exec()
+            sys.exit(e)
+            
+        self._module_error.connect(_on_module_error)
+        
+        self._node_types_updated.connect(self.nodes_list_widget.update_list)
         self.resize(1500, 800)  # FIXME: this renders the --geometry argument useless, no?
         # self.showMaximized()
     
+    def load(self):
+        """Loads the project, displaying a dialogue. It then shows it."""
+        # this function essentially separates the logic loading and the gui
+        # loading by attaching the logic behind a thread
+        
+        self.progress_dial.show()
+        
+        def change_dial_label(label: str):
+            self._dialog_label_signal.emit(label)
+            
+        def _load():
+            change_dial_label("Importing Cognix Library...")
+            self.import_nodes(path=abs_path_from_package_dir('main/packages/cognix_library/'))
+            
+            if self._requested_packages:
+                change_dial_label("Importing requested packages...")
+                self.import_packages(self._requested_packages)
+            
+            if self._project_content:
+                
+                if self._required_packages:
+                    change_dial_label('Importing required packages...')
+                    self.import_packages(self._required_packages)
+                
+                change_dial_label('Loading Project...')
+                self.core_session.load(self._project_content)
+            else:
+                self.core_session.create_flow(title='hello world')
+                
+            self._loading_finished_signal.emit()
+            
+        # start the loading
+        t = Thread(target=_load)
+        t.start()
+            
     def closeEvent(self, event):
         for flow_ui in self.flow_UIs.values():
             flow_ui.unload()
@@ -458,7 +533,7 @@ CONTROLS
     def on_new_flow_triggered(self):
         new_flow_title = GetTextDialog('choose unique title', '', 'new flow title', self).get_text()
 
-        if self.core_session.flow_title_valid(new_flow_title):
+        if self.core_session.new_flow_title_valid(new_flow_title):
             self.core_session.create_flow(new_flow_title)
         else:
             flow = [f for f in self.core_session.flows if f.title == new_flow_title][0]
@@ -468,7 +543,7 @@ CONTROLS
         flow = ChooseFlowDialog('choose flow', self.core_session.flows, self).get_flow()
         new_title = GetTextDialog('new title', flow.title, 'new flow title', self).get_text()
 
-        if self.core_session.flow_title_valid(new_title):
+        if self.core_session.new_flow_title_valid(new_title):
             self.core_session.rename_flow(flow, new_title)
 
     def on_delete_flow_triggered(self):
@@ -522,6 +597,7 @@ CONTROLS
             self.import_nodes(p)
 
     def import_nodes(self, package: NodesPackage = None, path: str = None):
+        
         if package is not None:
             p = package
         else:
@@ -536,24 +612,14 @@ CONTROLS
         try:
             node_types = import_nodes_package(p)
         except ModuleNotFoundError as e:
-            import traceback
-            traceback.print_exc()
-            msg_box = QMessageBox(
-                QMessageBox.Warning,
-                'Missing Python module',
-                str(e),
-                QMessageBox.Ok,
-                self,
-            )
-            msg_box.exec_()
-            sys.exit(e)
+            self._module_error.emit(e)
 
         self.core_session.register_node_types(node_types)
 
         for n in node_types:
             self.node_packages[n] = p
 
-        self.nodes_list_widget.update_list(list(self.core_session.node_types))
+        self._node_types_updated.emit(list(self.core_session.node_types))
 
     def set_flow_ui_template(self, template: dict[str, str | QByteArray | dict] | None):
         if template is None:

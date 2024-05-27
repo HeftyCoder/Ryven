@@ -288,7 +288,7 @@ class NodeListWidget(QWidget):
         self.search_line_edit.setFocus()
         self.search_line_edit.selectAll()
 
-    def update_list(self, nodes):
+    def update_list(self, nodes: Sequence[type[Node]]):
         """update the list of available nodes"""
         self.nodes = sort_nodes(nodes)
         self._update_view('')

@@ -112,7 +112,7 @@ def run(*args_,
 
     # Startup dialog
     if conf.show_dialog:
-        from ..gui.startup_dialog import StartupDialog
+        from ..gui.startup import StartupDialog
 
         # Get packages and project file interactively and update arguments accordingly
 
@@ -183,20 +183,23 @@ def run(*args_,
         parent=gui_parent,
         wnd_light_type=wnd_light_type
     )
-    editor.show()
+    
+    editor.load()
+    
     if conf.rest_api:
         session = editor.session_gui.core_session
         session.rest_api.run(
             port=conf.rest_api_port, 
             on_other_thread=True, 
         )
-
+    
+    
     # Start application
     if qt_app is None:
         if conf.verbose:
             # Run application
             editor.print_info()
-            sys.exit(app.exec_())
+            sys.exit(app.exec())
 
         else:
             # Redirect console output
@@ -206,7 +209,7 @@ def run(*args_,
                     contextlib.redirect_stderr(console_errout_redirect):
                 # Run application
                 editor.print_info()
-                sys.exit(app.exec_())
+                sys.exit(app.exec())
 
     else:
         return editor
