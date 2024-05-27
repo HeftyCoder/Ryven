@@ -22,9 +22,10 @@ from qtpy.QtWidgets import (
     QStyle,
     QLineEdit,
     QWidget,
+    QLineEdit,
 )
 from qtpy.QtCore import Qt, QSize
-from qtpy.QtGui import QIcon, QPainter
+from qtpy.QtGui import QIcon, QPainter, QIntValidator
 
 from ..main.args_parser import unparse_sys_args
 from ..main.config import Config
@@ -412,18 +413,31 @@ class StartupDialog(QDialog):
         fbox.addRow(defer_code_label, defer_code_cb)
         
         # Rest API
+        rest_api_widget = QWidget()
+        rest_api_widget.setLayout(QHBoxLayout())
         
         rest_api_label = QLabel('RESTful API:')
         rest_api_cb = QCheckBox('Enabled')
         rest_api_cb.setToolTip(
             f'''Choose whether you want to start a RESTful service to connect
-            to the CogniX Session
+            to the CogniX Session. If the given port is not available, a random
+            free port will be chosen.
             '''
         )
+        
+        # check box
+        
         rest_api_cb.toggled.connect(self.on_rest_api_toggled)
         rest_api_cb.setChecked(self.conf.rest_api)
-        fbox.addRow(rest_api_label, rest_api_cb)
+        rest_api_widget.layout().addWidget(rest_api_cb)
         
+        # port
+        self.rest_api_port = QLineEdit(str(self.conf.rest_api_port))
+        self.rest_api_port.setValidator(QIntValidator())
+        self.rest_api_port.editingFinished.connect(self.on_rest_port_edited)
+        rest_api_widget.layout().addWidget(self.rest_api_port)
+        
+        fbox.addRow(rest_api_label, rest_api_widget)
         
         layout.addLayout(fbox)
 
@@ -434,7 +448,7 @@ class StartupDialog(QDialog):
         buttons_layout.addWidget(gen_config_button)
         buttons = QDialogButtonBox(
             QDialogButtonBox.Ok | QDialogButtonBox.Cancel
-        )  # this crashes with Python 3.11
+        )
         self.ok_button = buttons.button(QDialogButtonBox.Ok)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
@@ -623,7 +637,13 @@ class StartupDialog(QDialog):
     #
     
     def on_rest_api_toggled(self, check):
+        """Call-back method, whenever the rest api checkbox was toggled"""
         self.conf.rest_api = check
+        
+    def on_rest_port_edited(self):
+        """Call-back method, whenever the rest api port was changed"""
+        self.conf.rest_api_port = int(self.rest_api_port.text())
+        
     # Helper/Working methods
     #
 
@@ -801,4 +821,4 @@ class StartupDialog(QDialog):
         command, config = unparse_sys_args(self.conf)
 
         d = ShowCommandDialog(command, config)
-        d.exec_()
+        d.exec()

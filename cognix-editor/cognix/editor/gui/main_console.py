@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import code
 import re
 
@@ -12,6 +14,10 @@ from qtpy.QtGui import QTextCharFormat, QBrush, QColor, QFont
 
 from ...qtcore.code_editor.widgets import CodeEditorWidget
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from ...qtcore.session_gui import SessionGUI
+
 class MainConsole(QWidget):
     """
     Interpreter with interactive console.
@@ -21,7 +27,7 @@ class MainConsole(QWidget):
     The input field below can also expand to a text edit to take whole code blocks.
     """
 
-    instance = None
+    instance: MainConsole = None
 
     def __init__(
             self,
@@ -32,7 +38,7 @@ class MainConsole(QWidget):
 
         super(MainConsole, self).__init__()
 
-        self.session = None  # set by MainWindow
+        self.session: SessionGUI = None  # set by MainWindow
         self.window_theme = window_theme
 
         self.init_ui(history, blockcount)
