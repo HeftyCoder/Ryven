@@ -15,6 +15,7 @@ from qtpy.QtWidgets import (
     QTabWidget,
     QDockWidget,
     QProgressDialog,
+    QDialog,
 )
 from qtpy.QtCore import Qt, QByteArray, QTimer, Signal
 
@@ -215,11 +216,11 @@ The editor console can still be used for commands.
             self._dialog_label_signal.emit(label)
             
         def _load():
-            change_dial_label("Importing Cognix Library...")
+            change_dial_label('Importing Cognix Library...')
             self.import_nodes(path=abs_path_from_package_dir('main/packages/cognix_library/'))
             
             if self._requested_packages:
-                change_dial_label("Importing requested packages...")
+                change_dial_label('Importing requested packages...')
                 self.import_packages(self._requested_packages)
             
             if self._project_content:
@@ -232,6 +233,33 @@ The editor console can still be used for commands.
                 self.core_session.load(self._project_content)
             else:
                 self.core_session.create_flow(title='hello world')
+            
+            if self.config.rest_api:
+                change_dial_label('REST API port validity check...')
+                session = self.core_session
+                port = self.config.rest_api_port
+                try:
+                    session.rest_api.run(
+                        port=port, 
+                        on_other_thread=True, 
+                        wait_time_if_thread= 1.25
+                    )
+                except Exception as e:
+                    change_dial_label(f'Port {port} taken! Searching...')
+                    from socket import socket, AF_INET, SOCK_STREAM
+                    from errno import EADDRINUSE
+                    for port in range(7555, 65500):
+                        with socket(AF_INET, SOCK_STREAM) as s:
+                            try:
+                                s.bind(('127.0.0.1', port))
+                                break
+                            except:
+                                continue
+                    change_dial_label(f'Starting REST API @ {port}')
+                    session.rest_api.run(
+                        port=port,
+                        on_other_thread=True
+                    )
                 
             self._loading_finished_signal.emit()
             
@@ -392,6 +420,31 @@ CONTROLS
         perf_menu.addAction(self.ac_perf_mode_pretty)
 
         self.ui.menuView.addMenu(perf_menu)
+        
+        # APIs
+        self.api_menu = QMenu('APIs', self)
+        self.ui.menuBar.addMenu(self.api_menu)
+        
+        self.rest_api_action = QAction('REST', self)
+        self.api_menu.addAction(self.rest_api_action)
+        self.rest_api_msg = QMessageBox(
+                None,
+                'Rest API',
+                'Nothing yet',
+                QMessageBox.Ok,
+                self,
+            )
+        
+        self.rest_api_msg.hide()
+        def on_rest_api_action():
+            rest = self.core_session.rest_api
+            if rest.running:
+                self.rest_api_msg.setText(f'REST running @{rest.port}!')
+            else:
+                self.rest_api_msg.setText(f'REST inactive!')
+            self.rest_api_msg.show()
+        self.rest_api_action.triggered.connect(on_rest_api_action)
+        
         self.session_gui.design.set_performance_mode(self.config.performance_mode)
 
         # animations
