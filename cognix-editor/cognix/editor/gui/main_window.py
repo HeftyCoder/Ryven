@@ -235,17 +235,32 @@ The editor console can still be used for commands.
                 self.core_session.create_flow(title='hello world')
             
             if self.config.rest_api:
+                from logging import getLogger, INFO, ERROR, DEBUG
                 change_dial_label('REST API port validity check...')
                 session = self.core_session
                 port = self.config.rest_api_port
+                
+                # set up custom handlers for uvicorn to avoid
+                # weird behaviour 
+                s_handlers = session.logger.handlers
+                uvicorn_logger = getLogger('uvicorn')
+                uvicorn_logger.handlers = s_handlers
+                uvicorn_logger.setLevel(DEBUG)
+                
+                uvicorn_error_logger = getLogger('uvicorn.error')
+                uvicorn_error_logger.setLevel(ERROR)
+                
+                uvicorn_access_logger = getLogger('uvicorn.access')
+                uvicorn_access_logger.setLevel(INFO)
+                
                 try:
                     session.rest_api.run(
                         port=port, 
                         on_other_thread=True, 
-                        wait_time_if_thread= 1
+                        wait_time_if_thread= 1.25,
+                        bypass_uvicorn_log=True,
                     )
                 except Exception as e:
-                    print(e)
                     change_dial_label(f'Port {port} taken! Searching...')
                     from socket import socket, AF_INET, SOCK_STREAM
                     from errno import EADDRINUSE
@@ -261,7 +276,6 @@ The editor console can still be used for commands.
                         port=port,
                         on_other_thread=True
                     )
-                
             self._loading_finished_signal.emit()
             
         # start the loading

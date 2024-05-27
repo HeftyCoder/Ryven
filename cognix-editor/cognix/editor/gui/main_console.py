@@ -28,7 +28,9 @@ class MainConsole(QWidget):
     """
 
     instance: MainConsole = None
-
+    write_signal = Signal(str)
+    error_write_signal = Signal(str)
+    
     def __init__(
             self,
             window_theme,
@@ -41,6 +43,9 @@ class MainConsole(QWidget):
         self.session: SessionGUI = None  # set by MainWindow
         self.window_theme = window_theme
 
+        self.write_signal.connect(self.write)
+        self.error_write_signal.connect(self.errorwrite)
+        
         self.init_ui(history, blockcount)
 
 
@@ -322,7 +327,7 @@ def init_main_console(window_theme):
 
     MainConsole.instance = MainConsole(window_theme)
 
-    console_stdout_redirect = RedirectOutput(MainConsole.instance.write)
-    console_errout_redirect = RedirectOutput(MainConsole.instance.errorwrite)
+    console_stdout_redirect = RedirectOutput(MainConsole.instance.write_signal.emit)
+    console_errout_redirect = RedirectOutput(MainConsole.instance.error_write_signal.emit)
 
     return console_stdout_redirect, console_errout_redirect

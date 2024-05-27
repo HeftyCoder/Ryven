@@ -171,8 +171,7 @@ def run(*args_,
     #
 
     # Init main console
-    (console_stdout_redirect, console_errout_redirect) = \
-        init_main_console(ryven_palette)
+    (console_stdout_redirect, console_errout_redirect) = init_main_console(ryven_palette)
 
     # Init main window
     editor = MainWindow(
@@ -184,23 +183,23 @@ def run(*args_,
         wnd_light_type=wnd_light_type
     )
     
-    editor.load()
-    
     # Start application
     if qt_app is None:
         if conf.verbose:
             # Run application
             editor.print_info()
+            editor.load()
             sys.exit(app.exec())
 
         else:
             # Redirect console output
             import contextlib
 
-            with contextlib.redirect_stdout(console_stdout_redirect), \
-                    contextlib.redirect_stderr(console_errout_redirect):
+            with (contextlib.redirect_stdout(console_stdout_redirect),
+                    contextlib.redirect_stderr(console_errout_redirect)):
                 # Run application
                 editor.print_info()
+                editor.load()
                 sys.exit(app.exec())
 
     else:

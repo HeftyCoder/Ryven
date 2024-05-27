@@ -15,11 +15,31 @@ from cognixcore import (
     Session,
 )
 
-from logging import DEBUG
+from logging import (
+    DEBUG, 
+    INFO, 
+    NOTSET, 
+    Handler, 
+    LogRecord, 
+    Formatter
+)
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .env import GUIEnv
 
+class SessionLogHandler(Handler):
+    
+    def __init__(self, level: int | str = 0, formatter: Formatter = None):
+        super().__init__(level)
+        if formatter:
+            self.setFormatter(formatter)
+        else:
+            self.setFormatter(Formatter('%(levelname)s: %(name)s: %(message)s'))
+        
+    def emit(self, record: LogRecord):
+        # somehow this prints it twice, I can't tell why
+        print(self.format(record))
+        
 class SessionGUI(GUIBase, QObject):
     """
     Session wrapper class, implementing the GUI.
@@ -50,6 +70,11 @@ class SessionGUI(GUIBase, QObject):
             
         self.core_session = Session(gui=True, load_optional_addons=True)
         self.core_session.logg_addon.log_level = log_level
+        # We're setting a simple handler to just print the output
+        # It will be either the terminal or the gui console
+        self.core_session.logger.addHandler(SessionLogHandler(level=NOTSET))
+        # We're explicitly passing INFO here as this logger is tied
+        # to the rest api and the console
         setattr(self.core_session, 'gui', self)
 
         self.gui_parent = gui_parent
