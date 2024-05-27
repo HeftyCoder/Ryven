@@ -242,9 +242,10 @@ The editor console can still be used for commands.
                     session.rest_api.run(
                         port=port, 
                         on_other_thread=True, 
-                        wait_time_if_thread= 1.25
+                        wait_time_if_thread= 1
                     )
                 except Exception as e:
+                    print(e)
                     change_dial_label(f'Port {port} taken! Searching...')
                     from socket import socket, AF_INET, SOCK_STREAM
                     from errno import EADDRINUSE

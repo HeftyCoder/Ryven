@@ -93,8 +93,8 @@ from .connections import (
 from .drawings import DrawingObject
 from ..design import Design
 
+from collections.abc import Iterable
 from enum import Enum
-
 from cognixcore.flow_player import GraphStateEvent, GraphState
 
 from typing import TYPE_CHECKING
@@ -247,15 +247,16 @@ class FlowView(GUIBase, QGraphicsView):
     
     nodes_selection_changed = Signal(list)
     node_placed = Signal(Node)
-
-    create_node_request = Signal(object, dict)
-    remove_node_request = Signal(Node)
-
     connect_request = Signal(NodePort, NodePort)
-
-    # get_nodes_data_request = Signal(list)
-    # get_connections_data_request = Signal(list)
     get_flow_data_request = Signal()
+    
+    node_added_signal = Signal(Node)
+    node_removed_signal = Signal(Node)
+    connection_added_signal = Signal(tuple)
+    connection_removed_signal = Signal(tuple)
+    
+    nodes_from_data_signal = Signal(list)
+    connections_from_data_signal = Signal(list)
 
     viewport_update_mode_changed = Signal(str)
 
@@ -282,9 +283,9 @@ class FlowView(GUIBase, QGraphicsView):
         self.session_gui = session_gui
         self.design = session_gui.design
         self.node_items: dict[Node, NodeItem] = {}
-        self.node_items__cache: dict = {}
-        self.connection_items: dict = {}  # {Connection: ConnectionItem}
-        self.connection_items__cache: dict = {}
+        self.node_items__cache: dict[Node, NodeItem] = {}
+        self.connection_items: dict[tuple[NodeOutput, NodeInput], ConnectionItem] = {}  # {Connection: ConnectionItem}
+        self.connection_items__cache: dict[tuple[NodeOutput, NodeInput], ConnectionItem] = {}
         self.selection_mode: _SelectionMode = _SelectionMode.UNDOABLE_CLICK
 
         # DRAGGING - CONNECTION
@@ -318,21 +319,41 @@ class FlowView(GUIBase, QGraphicsView):
             'scene pos': None,
             'delta': 0,
         }
-
-        # CONNECTIONS TO FLOW
-        self.create_node_request.connect(self.flow.create_node)
-        self.remove_node_request.connect(self.flow.remove_node)
-        # TODO: need to check if the 2 lines below are used
-        # self.get_nodes_data_request.connect(self.flow.gen_nodes_data)
-        # self.get_connections_data_request.connect(self.flow.gen_conns_data)
+        
         self.get_flow_data_request.connect(self.flow.data)
 
         # CONNECTIONS FROM FLOW
-        self.flow.node_added.sub(self.add_node)
-        self.flow.node_removed.sub(self.remove_node)
-        self.flow.connection_added.sub(self.add_connection)
-        self.flow.connection_removed.sub(self.remove_connection)
-
+        connect_signal_event(
+            self.node_added_signal,
+            self.flow.node_added,
+            self.add_node 
+        )
+        connect_signal_event(
+            self.node_removed_signal,
+            self.flow.node_removed,
+            self.remove_node
+        )
+        connect_signal_event(
+            self.connection_added_signal,
+            self.flow.connection_added,
+            self.add_connection
+        )
+        connect_signal_event(
+            self.connection_removed_signal,
+            self.flow.connection_removed,
+            self.remove_connection
+        )
+        connect_signal_event(
+            self.nodes_from_data_signal,
+            self.flow.nodes_created_from_data,
+            self.add_nodes
+        )
+        connect_signal_event(
+            self.connections_from_data_signal,
+            self.flow.connections_created_from_data,
+            self.add_connections
+        )
+        
         # CREATE UI
         scene = QGraphicsScene(self)
         scene.setItemIndexMethod(QGraphicsScene.NoIndex)
@@ -404,7 +425,7 @@ class FlowView(GUIBase, QGraphicsView):
         
         # MENU
         self._menu = QMenu()
-    
+        
         menu_button = QPushButton("Menu")
         self._menu_button = menu_button
         menu_layout_widget.layout().addWidget(menu_button)
@@ -1270,6 +1291,10 @@ class FlowView(GUIBase, QGraphicsView):
     def create_node__cmd(self, node_class):
         self.push_undo(PlaceNodeCommand(self, node_class, self._node_place_pos))
 
+    def add_nodes(self, nodes: Iterable[Node]):
+        for node in nodes:
+            self.add_node(node)
+    
     def add_node(self, node: Node):
         # create item
         item: NodeItem = None
@@ -1291,8 +1316,6 @@ class FlowView(GUIBase, QGraphicsView):
             )
             item.initialize()
 
-            self.node_placed.emit(node)
-
             item_data = node.load_data
             if item_data is not None and 'pos x' in item_data:
                 pos = QPointF(item_data['pos x'], item_data['pos y'])
@@ -1300,6 +1323,7 @@ class FlowView(GUIBase, QGraphicsView):
                 pos = self._node_place_pos
 
             self._add_node_item(item, pos)
+            self.node_placed.emit(node)
 
         # auto connect
         if self._auto_connection_pin:
@@ -1389,6 +1413,10 @@ class FlowView(GUIBase, QGraphicsView):
         # otherwise this would delete the connection if it existed
         self.push_undo(ConnectPortsCommand(self, out=out, inp=inp, silent=self.silent_on_connecting()))
 
+    def add_connections(self, conns: list[tuple[NodeOutput, NodeInput]]):
+        for c in conns:
+            self.add_connection(c)
+            
     def add_connection(self, c: tuple[NodeOutput, NodeInput]):
         out, inp = c
 
@@ -1662,19 +1690,28 @@ class FlowView(GUIBase, QGraphicsView):
             self.push_undo(SelectComponentsCommand(self, all_items, self._current_selected))
 
     def _copy(self):  # ctrl+c
+        selected_nodes = self.selected_nodes()
+        selected_drawings = self.selected_drawings()
+        
+        if not selected_nodes and not selected_drawings:
+            return
         data = {
-            'nodes': self._get_nodes_data(self.selected_nodes()),
-            'connections': self._get_connections_data(self.selected_nodes()),
-            'output data': self._get_output_data(self.selected_nodes()),
-            'drawings': self._get_drawings_data(self.selected_drawings()),
+            'nodes': self._get_nodes_data(selected_nodes),
+            'connections': self._get_connections_data(selected_nodes),
+            'drawings': self._get_drawings_data(selected_drawings),
         }
         QGuiApplication.clipboard().setText(json.dumps(data))
 
     def _cut(self):  # ctrl+x
+        selected_nodes = self.selected_nodes()
+        selected_drawings = self.selected_drawings()
+        
+        if not selected_nodes and not selected_drawings:
+            return
         data = {
-            'nodes': self._get_nodes_data(self.selected_nodes()),
-            'connections': self._get_connections_data(self.selected_nodes()),
-            'drawings': self._get_drawings_data(self.selected_drawings()),
+            'nodes': self._get_nodes_data(selected_nodes),
+            'connections': self._get_connections_data(selected_nodes),
+            'drawings': self._get_drawings_data(selected_drawings),
         }
         QGuiApplication.clipboard().setText(json.dumps(data))
         self.remove_selected_components__cmd()
@@ -1683,6 +1720,7 @@ class FlowView(GUIBase, QGraphicsView):
         data = {}
         try:
             data = json.loads(QGuiApplication.clipboard().text())
+            print(data['nodes'])
         except Exception as e:
             return
 
@@ -1734,18 +1772,15 @@ class FlowView(GUIBase, QGraphicsView):
 
     def _get_nodes_data(self, nodes):
         """generates the data for the specified list of nodes"""
-        f_complete_data = self.session_gui.core_session.complete_data
-        return f_complete_data(self.flow._gen_nodes_data(nodes))
+        return self.session_gui.core_session.complete_data(
+            self.flow._gen_nodes_data(nodes)
+        )
 
     def _get_connections_data(self, nodes):
         """generates the connections data for connections between a specified list of nodes"""
-        f_complete_data = self.session_gui.core_session.complete_data
-        return f_complete_data(self.flow._gen_conns_data(nodes))
-
-    def _get_output_data(self, nodes):
-        """generates the serialized data of output ports of the specified nodes"""
-        f_complete_data = self.session_gui.core_session.complete_data
-        return f_complete_data(self.flow._gen_output_data(nodes))
+        return self.session_gui.core_session.complete_data(
+            self.flow._gen_conns_data(nodes)
+        )
 
     def _get_drawings_data(self, drawings):
         """generates the data for a list of drawings"""

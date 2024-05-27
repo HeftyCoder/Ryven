@@ -3,10 +3,16 @@ This file contains the implementations of undoable actions for FlowView.
 """
 from __future__ import annotations
 
-from qtpy.QtCore import QObject, QPointF
+from qtpy.QtCore import QObject, QPointF, Signal
 from qtpy.QtWidgets import QUndoCommand
 
-from cognixcore import InfoMsgs, Flow, Node
+from cognixcore import (
+    InfoMsgs, 
+    Flow, 
+    Node, 
+    NodeOutput, 
+    NodeInput
+)
 
 import traceback
 
@@ -138,6 +144,9 @@ class MoveComponentsCommand(FlowUndoCommand):
 
 
 class PlaceNodeCommand(FlowUndoCommand):
+    
+    node_placed = Signal(Node)
+    
     def __init__(self, flow_view: FlowView, node_class, pos):
         super().__init__(flow_view)
 
@@ -145,6 +154,10 @@ class PlaceNodeCommand(FlowUndoCommand):
         self.node = None
         self.item_pos = pos
         self._prev_selected = flow_view._current_selected
+        
+        def on_node_placed(node: Node):
+            self.setText(f'Create {node.gui.item}')
+        self.node_placed.connect(on_node_placed)
 
     def undo_(self):
         self.flow.remove_node(self.node)
@@ -156,7 +169,7 @@ class PlaceNodeCommand(FlowUndoCommand):
                 self.flow.add_node(self.node)
             else:
                 self.node = self.flow.create_node(self.node_class)
-            self.setText(f'Create {self.node.gui.item}')
+            self.node_placed.emit(self.node)
         except Exception as e:
             traceback.print_exc()
             raise e
@@ -344,13 +357,22 @@ class ConnectPortsCommand(FlowUndoCommand):
         
 
 class PasteCommand(FlowUndoCommand):
+    
+    add_existing_signal = Signal()
+    add_new_signal = Signal()
+    
     def __init__(self, flow_view, data, offset_for_middle_pos):
         super().__init__(flow_view)
 
         self.data = data
         self.modify_data_positions(offset_for_middle_pos)
-        self.pasted_components = None
+        self.nodes: list[Node] = []
+        self.connections: list[tuple[NodeOutput, NodeInput]] = []
+        self.drawings = []
         self.setText('Paste')
+        
+        self.add_new_signal.connect(self.select_new_components_in_view)
+        self.add_existing_signal.connect(self.add_existing_components)
 
     def modify_data_positions(self, offset):
         """adds the offset to the components' positions in data"""
@@ -363,59 +385,54 @@ class PasteCommand(FlowUndoCommand):
             drawing['pos y'] = drawing['pos y'] + offset.y()
 
     def redo_(self):
-        if self.pasted_components is None:
-            self.pasted_components = {}
+        if (not self.nodes and
+            not self.connections and
+            not self.drawings):
 
             # create components
             self.create_drawings()
 
-            (
-                self.pasted_components['nodes'],
-                self.pasted_components['connections'],
-            ) = self.flow.load_components(
+            self.nodes, self.connections = self.flow.load_components(
                 nodes_data=self.data['nodes'],
-                conns_data=self.data['connections'],
-                output_data=self.data['output data'],
+                conns_data=self.data['connections']
             )
 
-            self.select_new_components_in_view()
+            self.add_new_signal.emit()
         else:
-            self.add_existing_components()
+            self.add_existing_signal.emit()
 
     def undo_(self):
         # remove components and their items from flow
-        for c in self.pasted_components['connections']:
+        for c in self.connections:
             self.flow.remove_connection(c)
-        for n in self.pasted_components['nodes']:
+        for n in self.nodes:
             self.flow.remove_node(n)
-        for d in self.pasted_components['drawings']:
+        for d in self.drawings:
             self.flow_view.remove_drawing(d)
 
     def add_existing_components(self):
         # add existing components and items to flow
-        for n in self.pasted_components['nodes']:
+        for n in self.nodes:
             self.flow.add_node(n)
-        for c in self.pasted_components['connections']:
+        for c in self.connections:
             self.flow.add_connection(c)
-        for d in self.pasted_components['drawings']:
+        for d in self.drawings:
             self.flow_view.add_drawing(d)
 
         self.select_new_components_in_view()
 
     def select_new_components_in_view(self):
         self.flow_view.clear_selection()
-        for d in self.pasted_components['drawings']:
+        for d in self.drawings:
             d.setSelected(True)
-        for n in self.pasted_components['nodes']:
+        for n in self.nodes:
             node_item = self.flow_view.node_items[n]
             node_item.setSelected(True)
 
     def create_drawings(self):
-        drawings = []
         for d in self.data['drawings']:
             new_drawing = self.flow_view.create_drawing(d)
             self.flow_view.add_drawing(
                 new_drawing, posF=QPointF(d['pos x'], d['pos y'])
             )
-            drawings.append(new_drawing)
-        self.pasted_components['drawings'] = drawings
+            self.drawings.append(new_drawing)
