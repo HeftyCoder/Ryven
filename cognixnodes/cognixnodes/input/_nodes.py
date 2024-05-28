@@ -25,7 +25,7 @@ from traitsui.api import CheckListEditor
 
 import numpy as np
 
-from ..core import SignalInfo, Signal
+from ..core import SignalInfo, TimeSignal
 
 class LSLSignalInfo(SignalInfo):
     
@@ -85,7 +85,7 @@ class LSLInputNode(FrameNode):
     
     title = 'LSL Input'
     version = '0.1'
-    init_outputs = [PortConfig(label='data', allowed_data=Signal)]
+    init_outputs = [PortConfig(label='data', allowed_data=TimeSignal)]
     
     def __init__(self, params):
         super().__init__(params)
@@ -177,6 +177,6 @@ class LSLInputNode(FrameNode):
         if not timestamps:
             return False
         
-        signal = Signal(timestamps, samples, self.signal_info)
+        signal = TimeSignal(timestamps, samples, self.signal_info)
         self.set_output(0, signal)
         return True
