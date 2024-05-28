@@ -47,14 +47,15 @@ class SignalInfo:
     
     
 class Signal:
+    """
+    Represents the data being passed over nodes for signal processing
+    """
     
     def __init__(
         self,  
-        timestamps: Sequence[float], 
         data: np.ndarray,
         signal_info: SignalInfo 
     ):
-        self._timestamps = timestamps
         self._data = data
         self._info = signal_info
         
@@ -63,12 +64,18 @@ class Signal:
         return self._info
     
     @property
-    def timestamps(self):
-        return self._timestamps
-    
-    @property
     def data(self):
         return self._data
     
     def subdata(self, indexes: Sequence[int]):
         return self._data[indexes]
+
+class TimeSignal(Signal):
+    
+    def __init__(self, timestamps: Sequence[float], data: np.ndarray, signal_info: SignalInfo):
+        super().__init__(data, signal_info)
+        self._timestamps = timestamps
+    
+    @property
+    def timestamps(self):
+        return self._timestamps
