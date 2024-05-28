@@ -99,7 +99,7 @@ class ConnectionItem(GUIBase, QGraphicsPathItem, QObject):
         else:
             self._anim_timer.stop()
     
-    def __on_data(self, out: NodeOutput, data):
+    def __on_data(self, node: Node, index: int, out: NodeOutput, data):
         """Emits the data changed signal for this connection item"""
         output, _ = self.connection
         if out == output and (self.session_design.connection_animation_enabled or self._anim_timer.is_running):
@@ -199,12 +199,12 @@ class ConnectionItem(GUIBase, QGraphicsPathItem, QObject):
         
         # for data event
         node = self.node()
-        if change == QGraphicsItem.ItemSceneChange and hasattr(node, 'output_changed'):
+        if change == QGraphicsItem.ItemSceneChange:
             # if connection is added to the scene, subscribe to data change event
             if value:
-                node.output_changed.sub(self.__on_data)
+                node.output_updated.sub(self.__on_data)
             else:
-                node.output_changed.unsub(self.__on_data)
+                node.output_updated.unsub(self.__on_data)
                 
         return QGraphicsItem.itemChange(self, change, value)
 

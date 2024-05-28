@@ -1,5 +1,7 @@
 from __future__ import annotations
 from random import randint
+from cognixcore.config import NodeConfig
+from cognixcore.flow import Flow
 from sklearn import datasets
 from sklearn.model_selection import train_test_split
 
@@ -9,6 +11,7 @@ from traitsui.api import EnumEditor
 
 import time
 import logging
+from numbers import Number
 
 class TestStreamNode(FrameNode):
     
@@ -64,6 +67,25 @@ class TestLogNode(Node):
     
     def update_event(self, inp=-1):
         self.start()
+
+class AddNode(Node):
+    """A node for adding stuff together"""
+    title = "Add Test Node"
+    version = "0.1"
+    
+    init_inputs = [PortConfig('x'), PortConfig('y')]
+    init_outputs = [PortConfig('result')]
+        
+    def init(self):
+        self.values: dict[int, Any] = {}
+    
+    def update_event(self, inp=-1):
+        self.values[inp] = self.input(inp)
+        result = 0
+        for value in self.values.values():
+            result += value
+        self.set_output(0, result) 
+        
     
     
 

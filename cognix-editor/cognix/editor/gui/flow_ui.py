@@ -33,6 +33,7 @@ if TYPE_CHECKING:
 
 class FlowUI(QMainWindow):
     flow_alg_mode_display_titles = {
+        FlowAlg.MANUAL: 'manual',
         FlowAlg.DATA: 'data-flow',
         FlowAlg.DATA_OPT: 'data-flow opt',
         FlowAlg.EXEC: 'exec-flow',
@@ -99,7 +100,7 @@ class FlowUI(QMainWindow):
         self.flow_alg_mode_dropdown.currentTextChanged.connect(self.flow_algorithm_mode_toggled)
 
         # catch up on flow modes
-        self.flow_alg_mode_changed(self.flow.algorithm_mode())
+        self.flow_alg_mode_changed(self.flow.algorithm_mode)
 
         # variables list widget
         self.vars_list_widget = VariablesListWidget(
