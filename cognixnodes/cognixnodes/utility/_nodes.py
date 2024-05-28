@@ -88,6 +88,9 @@ class ValNode(UtilNode):
         self.display_title = ''
         self.val = None
 
+    def init(self):
+        self.update_event(0)
+        
     def place_event(self):
         self.update()
     

@@ -12,10 +12,10 @@ from traitsui.api import EnumEditor
 import time
 import logging
 from numbers import Number
-
+from random import randint
 class TestStreamNode(FrameNode):
     
-    title = "Random Data Generator For classification"
+    title = "Classification Data Generator"
     version='0.1'
     
     init_outputs = [PortConfig(label='data'), PortConfig(label='class')]
@@ -32,6 +32,25 @@ class TestStreamNode(FrameNode):
         self.set_output(0, self.X)
         self.set_output(1, self.y)
         time.sleep(5)
+
+class TestRandomGeneratorNode(FrameNode):
+    
+    title = "Random Number Frame Node"
+    version = "0.1"
+    
+    init_outputs = [PortConfig('result')]
+    
+    def init(self):
+        self.current_time = 0
+        
+    def frame_update_event(self):
+        
+        self.current_time += self.player.delta_time
+        if self.current_time >= 5:
+            self.current_time = 0
+            self.set_output(0, randint(10, 50))
+            return True
+        return False
 
 class TestLogNode(Node):
     """A node for testing log messages!"""
@@ -68,7 +87,7 @@ class TestLogNode(Node):
     def update_event(self, inp=-1):
         self.start()
 
-class AddNode(Node):
+class TestAddNode(Node):
     """A node for adding stuff together"""
     title = "Add Test Node"
     version = "0.1"

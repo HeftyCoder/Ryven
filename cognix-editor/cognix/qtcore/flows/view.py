@@ -1720,7 +1720,6 @@ class FlowView(GUIBase, QGraphicsView):
         data = {}
         try:
             data = json.loads(QGuiApplication.clipboard().text())
-            print(data['nodes'])
         except Exception as e:
             return
 
