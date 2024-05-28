@@ -1,5 +1,5 @@
-"""Defines the various payloads from the input package"""
-from abc import ABC, abstractmethod
+"""Defines the core functionalities and data types for Cognix"""
+
 from collections.abc import Mapping, Sequence
 import numpy as np
 
@@ -43,7 +43,6 @@ class SignalInfo:
     
     @property
     def channels(self):
-        print(self._channels)
         return self._channels
     
     

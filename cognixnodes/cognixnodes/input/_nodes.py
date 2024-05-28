@@ -24,8 +24,34 @@ from threading import Thread
 from traitsui.api import CheckListEditor
 
 import numpy as np
-# from cognix.nodes.input.payloads.lsl import LSLStreamInfo
-from .payloads.lsl import LSLSignalInfo, Signal
+
+from ..core import SignalInfo, Signal
+
+class LSLSignalInfo(SignalInfo):
+    
+    def __init__(self, lsl_info: StreamInfo):
+        self._lsl_info = lsl_info
+        
+        stream_xml = lsl_info.desc()
+        chans_xml = stream_xml.child("channels")
+        chan_xml_list = []
+        ch = chans_xml.child("channel")
+        while ch.name() == "channel":
+            chan_xml_list.append(ch)
+            ch = ch.next_sibling("channel")
+            
+        channels =  {
+            chan_xml_list[c_index].child_value('label'): c_index 
+            for c_index in range(len(chan_xml_list))
+        }
+        
+        super().__init__(
+            nominal_srate=lsl_info.nominal_srate(),
+            signal_type=lsl_info.type(),
+            data_format=lsl_info.channel_format(),
+            name=lsl_info.name(),
+            channels=channels
+        )
 
 class LSLInputNode(FrameNode):
     """Test class for receiving an lsl stream"""
@@ -58,7 +84,7 @@ class LSLInputNode(FrameNode):
         
     
     title = 'LSL Input'
-    version = '0.0.1'
+    version = '0.1'
     init_outputs = [PortConfig(label='data', allowed_data=Signal)]
     
     def __init__(self, params):
@@ -67,33 +93,18 @@ class LSLInputNode(FrameNode):
         self.inlet: StreamInlet = None
         self.formats = ['double64','float32','int32','string','int16','int8','int64']
         self.reset()
-
+    
     @property
     def config(self) -> LSLInputNode.Config:
         return self._config
-
-    def stop(self):
-        import time
-        
-        self.force_stop = True
-        if self.t:
-            self.t.join()
-            
-        if self.inlet:
-            self.inlet.close_stream()
-            
-        self.set_progress_value(-1,'Stopping stream...')
-        time.sleep(1)
-        self.progress = None
-        
-    def reset(self):
+    
+    def init(self):
         self.t = None
         self.force_stop = False
         self.inlet = None
         self.signal_info = None
         self.buffer = None
-         
-    def start(self):
+        
         ### Check boolean for buffer
         self.buffer_size = self.config.buffer_size
         self.define_buffer = self.config.define_buffer
@@ -105,11 +116,14 @@ class LSLInputNode(FrameNode):
         flags = 0
         for flag in self.processing_flag_mode:
             flags |= flag
-        print(flags)
+        
+        if self.define_buffer:
+            self.buffer = np.zeros(
+                (self.buffer_size * 2, self.inlet.channel_count),
+                dtype=self.formats[self.inlet.channel_format]
+            )
         
         def _search_stream():
-            
-            print(self.stream_name)
             
             self.progress = None
             self.progress = ProgressState(1,-1,'Searching stream')
@@ -136,27 +150,33 @@ class LSLInputNode(FrameNode):
             
         self.t = Thread(target=_search_stream)
         self.t.start()
+
+    def stop(self):
+        
+        self.force_stop = True
+        if self.t:
+            self.t.join()
+            
+        if self.inlet:
+            self.inlet.close_stream()
+            
+        self.set_progress_value(-1,'Stopping stream...')
+        self.progress = None
     
     def frame_update_event(self):
         if not self.inlet:
-            return
+            return False
         
         if self.define_buffer:
-            self.buffer = np.zeros(
-                (self.buffer_size * 2, self.inlet.channel_count),
-                dtype=self.formats[self.inlet.channel_format]
-            )
             _,timestamps = self.inlet.pull_chunk(max_samples=self.buffer_size * 2, dest_obj=self.buffer)
             samples = self.buffer[:len(timestamps),:]
         else:
-            samples,timestamps = self.inlet.pull_chunk()
+            samples, timestamps = self.inlet.pull_chunk()
             samples = np.array(samples)
 
         if not timestamps:
-            return
-        
-        print(timestamps[0])
+            return False
         
         signal = Signal(timestamps, samples, self.signal_info)
-
         self.set_output(0, signal)
+        return True

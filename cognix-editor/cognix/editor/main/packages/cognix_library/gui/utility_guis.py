@@ -138,6 +138,7 @@ class ValGui(NodeGUI):
     color = '#c69a15'
 
     def initialized(self):
+        super().initialized()
         self.main_widget().value_changed.connect(self.widget_val_updated)
         self.actions['edit val via dialog'] = {'method': self.action_edit_via_dialog}
 
