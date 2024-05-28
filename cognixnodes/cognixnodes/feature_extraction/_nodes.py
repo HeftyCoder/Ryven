@@ -17,8 +17,8 @@ from collections.abc import Sequence
 from .utils.fbscp_func import FBCSP_binary
 from .utils.stats_helper import *
 
-class FBSCPNode(Node):
-    title = 'Filter Bank Common Spatial Patterns'
+class FBSCPBinaryNode(Node):
+    title = 'FBCSP Binary'
     version = '0.1'
     
     class Config(NodeTraitsConfig):
@@ -32,7 +32,7 @@ class FBSCPNode(Node):
     init_outputs = [PortConfig(label='features')]
     
     @property
-    def config(self) -> FBSCPNode.Config:
+    def config(self) -> FBSCPBinaryNode.Config:
         return self._config 
         
     def start(self):

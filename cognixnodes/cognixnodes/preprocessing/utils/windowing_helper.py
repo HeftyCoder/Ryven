@@ -31,6 +31,7 @@ def find_window(t_window:float,start_time_window:float,start_time_index:int,buff
     m_index,m_overflow = find_index(tx = t_window + start_time_window,buffer=buffer_tm,current_index=current_index,buffer_duration=buffer_duration,tstart=tstart,tend=tend,sampling_frequency=sampling_frequency,effective_sampling_frequency=effective_sampling_frequency)
     
     window = np.zeros((32,1))
+    timestamps = []
 
     if m_index < 0 or buffer_tm[m_index] < 0:
         pass
@@ -39,14 +40,16 @@ def find_window(t_window:float,start_time_window:float,start_time_index:int,buff
         
         if m_index < start_time_index:
             window = np.concatenate((buffer_data[:,start_time_index:size],buffer_data[:,0:m_index]),axis=1)
+            timestamps = np.concatenate((buffer_tm[:,start_time_index:size],buffer_tm[:,0:m_index]),axis=1)
         else: 
             window = buffer_data[:,start_time_index:m_index]
+            timestamps = buffer_tm[:,start_time_index:m_index]
             
         print("SEGMENTTTTTTTTTTTTTTTTTT",buffer_tm[start_time_index],buffer_tm[m_index])
         
         start_time_index,start_time_window = m_index,t_window + start_time_window
             
-    return start_time_index,start_time_window,window
+    return start_time_index,start_time_window,window,timestamps
 
 class CircularBufferWindowing:
     """An implementation of a circular buffer for handling data and timestamps"""
@@ -121,7 +124,7 @@ class CircularBufferWindowing:
     def find_segment(self, timestamp: float):
         """Extracts a segment of the buffer based around a timestamp and offsets"""
         
-        new_index_start,new_time_start,window = find_window(
+        new_index_start,new_time_start,window,timestamps = find_window(
             t_window = timestamp,
             start_time_window = self.time_window_start,
             start_time_index = self.index_window_start,
@@ -138,4 +141,4 @@ class CircularBufferWindowing:
         if window.shape[1]!=1:
             self.time_window_start = new_time_start
             self.index_window_start = new_index_start
-            return window
+            return window,timestamps

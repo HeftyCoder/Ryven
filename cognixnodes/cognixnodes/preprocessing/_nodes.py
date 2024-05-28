@@ -12,7 +12,7 @@ from pylsl import local_clock
 
 from collections.abc import Sequence
 
-from ..input.payloads.core import Signal
+from ..core import Signal,TimeSignal
 from .utils.segmentation_helper import CircularBuffer
 from .utils.windowing_helper import CircularBufferWindowing
 
@@ -26,34 +26,33 @@ class SegmentationNode(Node):
         buffer_duration: float = CX_Float(10.0, desc = 'Duration of the buffer in seconds')
         error_margin: float = CX_Float()
 
-    init_inputs = [PortConfig(label='data'),
-                   PortConfig(label='marker')]
+    init_inputs = [PortConfig(label='data',allowed_data=TimeSignal),
+                   PortConfig(label='marker',allowed_data=TimeSignal)]
 
-    init_outputs = [PortConfig(label='segment')]
-    
-    def __init__(self, flow: Flow):
-        super().__init__(flow)
+    init_outputs = [PortConfig(label='segment',allowed_data=TimeSignal)]
+
+    def init(self):
         self.buffer: CircularBuffer = None
         self.update_dict = {
             0: self.update_data,
             1: self.update_marker
         }
-        self.reset()
-    
+        self.current_timestamp = -1
+        
     @property
     def config(self) -> SegmentationNode.Config:
         return self._config
     
-    def reset(self):
-        self.current_timestamp = -1
-        
     def update_event(self, inp=-1):
         
         update_result = self.call_update_event(inp)
         
         if update_result and self.buffer and self.current_timestamp > 0:
-            segment = self.buffer.find_segment(self.current_timestamp, self.config.offset)
-            self.set_output(0, segment)
+            segment,timestamps = self.buffer.find_segment(self.current_timestamp, self.config.offset)
+            
+            signal = TimeSignal(timestamps, segment, self.data_signal.info)
+            
+            self.set_output(0, signal)
     
     def call_update_event(self, inp):
         func = self.update_dict.get(inp)
@@ -62,20 +61,20 @@ class SegmentationNode(Node):
         return func(inp)
     
     def update_data(self, inp: int):
-        data_signal: Signal = self.input(inp)
-        if not data_signal:
+        self.data_signal: Signal = self.input(inp)
+        if not self.data_signal:
             return False
         
         # create buffer if it doesn't exist
         if not self.buffer:
             self.buffer = CircularBuffer(
-                sampling_frequency=data_signal.info.nominal_srate,
+                sampling_frequency=self.data_signal.info.nominal_srate,
                 buffer_duration=self.config.buffer_duration,
                 error_margin=self.config.error_margin,
                 start_time=local_clock()
             )
         
-        self.buffer.append(data_signal.data.T, data_signal.timestamps)
+        self.buffer.append(self.data_signal.data.T, self.data_signal.timestamps)
         return True
 
     def update_marker(self, inp: int):
@@ -102,12 +101,11 @@ class WindowingNode(Node):
         buffer_duration: float = CX_Float(10.0, desc = 'Duration of the buffer in seconds')
         window_length: float = CX_Float(5.0,desc='length of the window')
 
-    init_inputs = [PortConfig(label='data')]
+    init_inputs = [PortConfig(label='data',allowed_data=TimeSignal)]
 
-    init_outputs = [PortConfig(label='window data')]
-    
-    def __init__(self, flow: Flow):
-        super().__init__(flow)
+    init_outputs = [PortConfig(label='window data',allowed_data=TimeSignal)]
+ 
+    def init(self):
         self.buffer: CircularBufferWindowing = None
     
     @property
@@ -119,26 +117,28 @@ class WindowingNode(Node):
         update_result = self.call_update_event(inp)
         
         if update_result and self.buffer:
-            window = self.buffer.find_segment(self.config.window_length)
-            self.set_output(0, window)
+            window,timestamps = self.buffer.find_segment(self.config.window_length)
+            
+            signal = TimeSignal(timestamps, window, self.data_signal.info)
+            
+            self.set_output(0, signal)
     
     def call_update_event(self, inp):
-        data_signal: Signal = self.input(inp)
-        if not data_signal:
+        self.data_signal: Signal = self.input(inp)
+        if not self.data_signal:
             return False
         
         # create buffer if it doesn't exist
         if not self.buffer:
             self.buffer = CircularBufferWindowing(
-                sampling_frequency=data_signal.info.nominal_srate,
+                sampling_frequency=self.data_signal.info.nominal_srate,
                 buffer_duration=self.config.buffer_duration,
-                start_time=data_signal.timestamps[0]
+                start_time=self.data_signal.timestamps[0]
             )
         
-        self.buffer.append(data_signal.data.T, data_signal.timestamps)
+        self.buffer.append(self.data_signal.data.T, self.data_signal.timestamps)
         return True
     
-
  
 class SignalSelectionNode(Node):
     
@@ -162,21 +162,14 @@ class SignalSelectionNode(Node):
     
     init_inputs = [PortConfig(label='data_in')]
     init_outputs = [PortConfig(label='data_out')]
-    
-    def __init__(self, flow: Flow):
-        super().__init__(flow)
-        self.reset()
+
+    def init(self):
+        self.chan_inds = None
+        self.selected_channels = set(self.config.channels_selected)
 
     @property
     def config(self) -> SignalSelectionNode.Config:
         return self._config
-    
-    def reset(self):
-        self.chan_inds = None
-        
-    def start(self):
-        self.selected_channels = set(self.config.channels_selected)
-        print(self.selected_channels)
         
     def update_event(self, inp=-1):
         
@@ -216,8 +209,7 @@ class FIRFilterNode(Node):
     def config(self) -> FIRFilterNode.Config:
         return self._config
     
-    def start(self):
-        
+    def init(self):
         self.filter_length = 'auto'
         print(self.config.filter_length_str,self.config.filter_length_int)
         if self.config.filter_length_str:
@@ -262,7 +254,6 @@ class IIRFilterNode(Node):
         order: int = CX_Int(desc='the order of the filter')
         ftype: str = Enum('butter','cheby1','cheby2','ellip','bessel')
         
-        
     init_inputs = [PortConfig(label='data',allowed_data=Signal)]
     init_outputs = [PortConfig(label='filtered data',allowed_data=Signal)]
     
@@ -270,7 +261,7 @@ class IIRFilterNode(Node):
     def config(self) -> IIRFilterNode.Config:
         return self._config
     
-    def start(self):
+    def init(self):
         self.params = dict(
             order = self.config.order,
             ftype = self.config.ftype
@@ -324,7 +315,7 @@ class NotchFilterNode(Node):
     def config(self) -> NotchFilterNode.Config:
         return self._config
     
-    def start(self):
+    def init(self):
         self.line_freq = self.config.freqs
         self.filter_length_input = self.config.filter_length_sec if self.config.filter_length_sec else self.config.filter_length_samples
         if not self.filter_length_input:
@@ -377,7 +368,7 @@ class ResamplingNode(Node):
     def config(self) -> ResamplingNode.Config:
         return self._config
     
-    def start(self):
+    def init(self):
         self.upsample_factor = self.config.upsample_factor
         self.downsample_factor = self.config.downsample_factor
         self.method = self.config.method
@@ -417,7 +408,7 @@ class RemoveTrendNode(Node):
     def config(self) -> RemoveTrendNode.Config:
         return self._config
     
-    def start(self):
+    def init(self):
         self.detrend_type = self.config.detrendType
         self.detrend_cutoff = self.config.detrendCutoff
         
@@ -451,7 +442,7 @@ class SignalToMNENode(Node):
     def config(self) -> SignalToMNENode.Config:
         return self._config
     
-    def start(self):
+    def init(self):
         self.montage = self.config.montage
         
     def update_event(self,inp=-1):

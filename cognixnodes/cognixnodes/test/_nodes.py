@@ -9,7 +9,6 @@ from cognixcore import Node, FrameNode, PortConfig
 from cognixcore.config.traits import *
 from traitsui.api import EnumEditor
 
-import time
 import logging
 from numbers import Number
 from random import randint
@@ -31,7 +30,6 @@ class TestStreamNode(FrameNode):
     def frame_update_event(self) -> bool:
         self.set_output(0, self.X)
         self.set_output(1, self.y)
-        time.sleep(5)
 
 class TestRandomGeneratorNode(FrameNode):
     
