@@ -155,7 +155,7 @@ class NodeInspectorDefaultWidget(NodeInspectorWidget, QWidget):
             for i in range(len(ports)):
                 port = ports[i]
                 label = port.label_str if port.label_str else 'No label'
-                data_constr = port.allowed_data.__name__ if port.allowed_data else None
+                data_constr = port.allowed_data if port.allowed_data else None
                 desc += f"{i+1}) [ Label: {label}, Constraint: {data_constr} ]<br>" 
             
             if not desc:
