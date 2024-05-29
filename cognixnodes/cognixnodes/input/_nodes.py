@@ -64,6 +64,7 @@ class LSLInputNode(FrameNode):
         search_action: str = Enum('name','type', desc='Filtering of streams based of specific value')    
         define_buffer:bool = Bool(True, desc='the creation of a buffer for the saving of the data samples')
         buffer_size: int = CX_Int(3276, desc='the size of the buffer in which the data samples are stored')
+        debug: bool = Bool(False, desc="when true, logs debug messages")
 
         #### configuration for buffer size of data received
         #### (define buffer) Boolean for transformation from list to np.array (if False transform else keep)
@@ -91,8 +92,7 @@ class LSLInputNode(FrameNode):
         super().__init__(params)
         
         self.inlet: StreamInlet = None
-        self.formats = ['double64','float32','int32','string','int16','int8','int64']
-        self.reset()
+        self.formats = ['double64','float32','int32',str,'int16','int8','int64']
     
     @property
     def config(self) -> LSLInputNode.Config:
@@ -103,7 +103,7 @@ class LSLInputNode(FrameNode):
         self.force_stop = False
         self.inlet = None
         self.signal_info = None
-        self.buffer = None
+        self.buffer:np.ndarray | list = None
         
         ### Check boolean for buffer
         self.buffer_size = self.config.buffer_size
@@ -113,15 +113,11 @@ class LSLInputNode(FrameNode):
         self.search_action = self.config.search_action
         self.processing_flag_mode = self.config.processing_flag_mode
         
+        self.logger.warn(f'buffer_size:{self.buffer_size},define_buffer:{self.define_buffer}')
+        
         flags = 0
         for flag in self.processing_flag_mode:
             flags |= flag
-        
-        if self.define_buffer:
-            self.buffer = np.zeros(
-                (self.buffer_size * 2, self.inlet.channel_count),
-                dtype=self.formats[self.inlet.channel_format]
-            )
         
         def _search_stream():
             
@@ -146,6 +142,20 @@ class LSLInputNode(FrameNode):
                                                                  
                 self.inlet = StreamInlet(results[0],processing_flags=flags)
                 self.signal_info = LSLSignalInfo(self.inlet.info())
+                
+                if self.define_buffer: 
+                    
+                    if self.formats[self.inlet.channel_format]!=str:
+                    
+                        self.buffer = np.zeros(
+                            (self.buffer_size * 2, int(self.inlet.channel_count)),
+                            dtype=self.formats[self.inlet.channel_format]
+                        )
+                    
+                    else:
+                        
+                        self.buffer = []
+    
                 self.progress = ProgressState(1, 1, 'Streaming!')
             
         self.t = Thread(target=_search_stream)
@@ -164,16 +174,29 @@ class LSLInputNode(FrameNode):
         self.progress = None
     
     def frame_update_event(self):
-        if not self.inlet:
+        if not self.inlet or (self.define_buffer and self.buffer is None):
             return False
         
         if self.define_buffer:
-            _,timestamps = self.inlet.pull_chunk(max_samples=self.buffer_size * 2, dest_obj=self.buffer)
-            samples = self.buffer[:len(timestamps),:]
+            if self.formats[self.inlet.channel_format]!=str:
+            
+                _,timestamps = self.inlet.pull_chunk(max_samples=self.buffer_size * 2, dest_obj=self.buffer)
+                if timestamps:
+                    samples = self.buffer[:len(timestamps),:]
+            
+            else:
+                samples, timestamps = self.inlet.pull_chunk()
+                if timestamps:
+                    samples = np.array(samples)
+        
         else:
             samples, timestamps = self.inlet.pull_chunk()
-            samples = np.array(samples)
-
+            if timestamps:
+                samples = np.array(samples)
+        
+        if self.config.debug and timestamps:
+            self.logger.info(timestamps)
+            
         if not timestamps:
             return False
         

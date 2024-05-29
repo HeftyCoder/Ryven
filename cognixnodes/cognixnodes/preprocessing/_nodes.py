@@ -27,18 +27,22 @@ class SegmentationNode(Node):
         error_margin: float = CX_Float()
 
     init_inputs = [PortConfig(label='data',allowed_data=TimeSignal),
-                   PortConfig(label='marker',allowed_data=TimeSignal)]
+                   PortConfig(label='marker',allowed_data=TimeSignal | Sequence[tuple[str,float]])]
 
-    init_outputs = [PortConfig(label='segment',allowed_data=TimeSignal)]
+    init_outputs = [PortConfig(label='segment',allowed_data = Sequence[TimeSignal] | TimeSignal)]
 
     def init(self):
         self.buffer: CircularBuffer = None
+        
+        print("BUFFFFERRRRRRRRRRR",self.buffer.current_index)
+        
         self.update_dict = {
             0: self.update_data,
             1: self.update_marker
         }
-        self.current_timestamp = -1
-        
+        self.list_of_marker_timestamps = np.full(shape=1000,fill_value=np.nan,dtype='float64')
+        self.current_length = 0
+             
     @property
     def config(self) -> SegmentationNode.Config:
         return self._config
@@ -47,13 +51,29 @@ class SegmentationNode(Node):
         
         update_result = self.call_update_event(inp)
         
-        if update_result and self.buffer and self.current_timestamp > 0:
-            segment,timestamps = self.buffer.find_segment(self.current_timestamp, self.config.offset)
+        if update_result and self.buffer:
+            output_data = []
+            output_timestamps =[]
+            timestamps_out = 0
             
-            signal = TimeSignal(timestamps, segment, self.data_signal.info)
-            
-            self.set_output(0, signal)
-    
+            for i in range(self.current_length):
+                segment,timestamps = self.buffer.find_segment(self.list_of_marker_timestamps[i], self.config.offset)
+                
+                if segment.shape[1]!=1:
+                    output_timestamps.append(timestamps)
+                    output_data.append(segment)
+                    timestamps_out += 1
+                    self.list_of_marker_timestamps[i] = np.nan
+                    
+            if timestamps_out!=0:
+                signal = (
+                    TimeSignal(output_timestamps[0], output_data[0], self.data_signal.info) 
+                    if timestamps_out == 1 
+                    else [TimeSignal(output_timestamps[i], output_data[i], self.data_signal.info) for i in range(timestamps_out)]
+                )
+                self.set_output(0, signal)
+                self.current_length -= timestamps_out
+                
     def call_update_event(self, inp):
         func = self.update_dict.get(inp)
         if not func:
@@ -71,25 +91,39 @@ class SegmentationNode(Node):
                 sampling_frequency=self.data_signal.info.nominal_srate,
                 buffer_duration=self.config.buffer_duration,
                 error_margin=self.config.error_margin,
-                start_time=local_clock()
+                start_time=self.data_signal.timestamps[0]
             )
         
         self.buffer.append(self.data_signal.data.T, self.data_signal.timestamps)
         return True
 
     def update_marker(self, inp: int):
-        marker_signal: Signal = self.input(inp)
+        marker_signal = self.input(inp)        
+        
         # no signal or no buffer
         if not marker_signal:
             return False
         
-        marker_name = marker_signal.data[0]
-        marker_ts = marker_signal.timestamps[0]
-        # marker doesn't match
-        if marker_name != self.config.marker_name:
+        timestamps = []
+                        
+        if isinstance(marker_signal,TimeSignal):
+            timestamps = [ts for name,ts in zip(marker_signal.data,marker_signal.timestamps) if name[0] == self.config.marker_name]
+
+        ### list of type [[marker1,timestamp1],[marker2,timestamp2]]
+        elif isinstance(marker_signal,list): 
+            timestamps = [marker[1] for marker in marker_signal if marker[0] == self.config.marker_name]
+            
+        ## no markers match
+        if len(timestamps) == 0:
             return False
-        print(marker_name,marker_ts)
-        self.current_timestamp = marker_ts
+        
+        print(timestamps)
+        
+        self.last_timestamps = timestamps
+        
+        self.list_of_marker_timestamps[self.current_length : self.current_length + len(timestamps)] = timestamps
+        self.list_of_marker_timestamps.sort()
+        self.current_length += len(timestamps)
         return True
 
 
@@ -194,7 +228,7 @@ class FIRFilterNode(Node):
     class Config(NodeTraitsConfig):
         low_freq: float = CX_Float(desc='the low frequency of the filter')
         high_freq: float = CX_Float(desc='the high frequency of the fitler')
-        filter_length_str: str = CX_String(desc='the length of the filterin ms')
+        filter_length_str: str = CX_String('None',desc='the length of the filterin ms')
         filter_length_int: int = CX_Int(desc='the length of the filter in samples')
         l_trans_bandwidth:float = CX_Float(0.0,desc='the width of the transition band at the low cut-off frequency in Hz')
         h_trans_bandwidth:float = CX_Float(0.0,desc='the width of the transition band at the high cut-off frequency in Hz')
@@ -202,7 +236,7 @@ class FIRFilterNode(Node):
         fir_window:str = Enum('hamming','hann','blackman',desc='the window to use in the FIR filter')
         fir_design:str = Enum('firwin','firwin2',desc='the design of the FIR filter')
             
-    init_inputs = [PortConfig(label='data',allowed_data=Signal)]
+    init_inputs = [PortConfig(label='data',allowed_data=TimeSignal)]
     init_outputs = [PortConfig(label='filtered data',allowed_data=Signal)]
     
     @property
@@ -212,16 +246,15 @@ class FIRFilterNode(Node):
     def init(self):
         self.filter_length = 'auto'
         print(self.config.filter_length_str,self.config.filter_length_int)
-        if self.config.filter_length_str:
+        if self.config.filter_length_str != 'None':
             self.filter_length = self.config.filter_length_str
-        if self.config.filter_length_int:
+        if self.config.filter_length_int != 0:
             self.filter_length = self.config.filter_length_int
                 
     def update_event(self, inp=-1):
         
         signal:Signal = self.input(inp)
         if signal:
-            filtered_signal:Signal = signal.copy()
             
             filtered_data = mne.filter.filter_data(
                 data = signal.data,
@@ -229,16 +262,19 @@ class FIRFilterNode(Node):
                 l_freq = self.config.low_freq,
                 h_freq = self.config.high_freq,
                 filter_length = self.filter_length,
-                l_trans_bandwidth = self.config.l_trans_bandwidth if self.config.l_trans_bandwidth!=0.0 else None,
-                h_trans_bandwidth = self.config.h_trans_bandwidth if self.config.h_trans_bandwidth!=0.0 else None,
+                l_trans_bandwidth = self.config.l_trans_bandwidth if self.config.l_trans_bandwidth!=0.0 else 'auto',
+                h_trans_bandwidth = self.config.h_trans_bandwidth if self.config.h_trans_bandwidth!=0.0 else 'auto',
                 n_jobs = -1,
                 method = 'fir',
                 phase = self.config.phase,
                 fir_window = self.config.fir_window,
                 fir_design = self.config.fir_design
                 )
+            
+            print(filtered_data)
 
-            filtered_signal.data = filtered_data
+            filtered_signal = Signal(data = filtered_data,signal_info = signal.info)
+            
             self.set_output(0, filtered_signal)
     
           

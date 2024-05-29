@@ -31,19 +31,18 @@ def find_segment(tm: float, x: float, y: float,buffer_tm: Sequence, buffer_data:
     x_index, x_overflow = find_index(tm + x,buffer_tm,current_index,buffer_duration,tstart,tend,sampling_frequency,effective_sampling_frequency)
     y_index, y_overflow = find_index(tm + y,buffer_tm,current_index,buffer_duration,tstart,tend,sampling_frequency,effective_sampling_frequency)   
 
-    if ((m_index < 0 or x_index < 0 or y_index < 0) or 
+    if ((m_index < 0 or x_index < 0 or y_index < 0 or y_index > size or x_index>size or m_index>size) or 
         buffer_tm[m_index] < 0 or buffer_tm[x_index] < 0 or buffer_tm[y_index] < 0 or x>y): 
-            return [],[]
+            return np.zeros((32,1)),np.zeros(1)
     
     if not (x_overflow or y_overflow) or (x_overflow and y_overflow):
-        print(tm,buffer_tm[x_index],buffer_tm[m_index],buffer_tm[y_index])
-
-        return buffer_data[:,x_index:y_index],buffer_tm[:,x_index:y_index]
+        print("SEGMENTTTTTTTTTTTT",tm + x,tm,tm+y,buffer_tm[x_index],buffer_tm[m_index],buffer_tm[y_index])
+        return buffer_data[:,x_index:y_index],buffer_tm[x_index:y_index]
     
     else:
-        print(tm,buffer_tm[x_index],buffer_tm[m_index],buffer_tm[y_index])
+        print("SEGMENTTTTTTTTTTTT",tm + x,tm,tm+y,buffer_tm[x_index],buffer_tm[m_index],buffer_tm[y_index])
         start,end = (x_index,y_index) if x_overflow else (y_index,x_index)
-        return np.concatenate((buffer_data[:,start:size],buffer_data[:,0:end])),np.concatenate((buffer_tm[:,start:size],buffer_tm[:,0:end]))
+        return np.concatenate((buffer_data[:,start:size],buffer_data[:,0:end]),axis=1),np.concatenate((buffer_tm[start:size],buffer_tm[0:end]))
 
 
 class CircularBuffer:

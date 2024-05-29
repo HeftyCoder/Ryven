@@ -40,10 +40,10 @@ def find_window(t_window:float,start_time_window:float,start_time_index:int,buff
         
         if m_index < start_time_index:
             window = np.concatenate((buffer_data[:,start_time_index:size],buffer_data[:,0:m_index]),axis=1)
-            timestamps = np.concatenate((buffer_tm[:,start_time_index:size],buffer_tm[:,0:m_index]),axis=1)
+            timestamps = np.concatenate((buffer_tm[start_time_index:size],buffer_tm[0:m_index]))
         else: 
             window = buffer_data[:,start_time_index:m_index]
-            timestamps = buffer_tm[:,start_time_index:m_index]
+            timestamps = buffer_tm[start_time_index:m_index]
             
         print("SEGMENTTTTTTTTTTTTTTTTTT",buffer_tm[start_time_index],buffer_tm[m_index])
         

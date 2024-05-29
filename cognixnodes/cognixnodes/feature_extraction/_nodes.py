@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..input.payloads.core import Signal
+from ..core import Signal,TimeSignal
 import mne
 
 from cognixcore.api import (
@@ -14,56 +14,59 @@ from cognixcore.config.traits import *
 import numpy as np
 from traitsui.api import CheckListEditor
 from collections.abc import Sequence
-from .utils.fbscp_func import FBCSP_binary
 from .utils.stats_helper import *
+from .utils.fbcsp import FBCSP
+from .utils.filterbank import FilterBank
 
-class FBSCPBinaryNode(Node):
-    title = 'FBCSP Binary'
+class FBCSPNode(Node):
+    title = 'FBCSP'
     version = '0.1'
     
     class Config(NodeTraitsConfig):
-        n_windows: int = CX_Int(2,desc='the number of windows used for FBSCP')
-        n_features: int = CX_Int(4,desc='the number of features to create')
-        freq_bands: str = CX_Str('4-40',desc='the frequency range in Hz in which the FBSCP functions -')
+        n_filters: int = CX_Int(2,desc='the number of windows used for FBSCP')
+        min_freq: float = CX_Float(0.0,desc='the minimum frequency in Hz in which the FBSCP functions -')
+        max_freq: float = CX_Float(0.0,desc='the maximum frequency in Hz in which the FBSCP functions -')
         freq_bands_split: int = CX_Int(10,desc='how to split the frequency band')
-        filter_order:int = CX_Int(3,desc='the order of the filter')
     
     init_inputs = [PortConfig(label='data',allowed_data=Signal)]
-    init_outputs = [PortConfig(label='features')]
+    init_outputs = [PortConfig(label='features',allowed_data=Signal)]
     
     @property
-    def config(self) -> FBSCPBinaryNode.Config:
+    def config(self) -> FBCSPNode.Config:
         return self._config 
         
-    def start(self):
-        self.frequency_bands = self.config.freq_bands.split('-')
-        if len(self.frequency_bands) != 2:
-            self.frequency_bands = None
-        else:
-            self.frequency_bands = [int(_) for _ in self.frequency_bands]
-            
-        self.freq_splits = self.config.freq_bands_split if self.config.freq_bands_split else None
+    def init(self):
+        self.min_freq = self.config.min_freq if self.config.min_freq != 0.0 else None
+        self.max_freq = self.config.max_freq if self.config.min_freq != 0.0 else None
+        self.freq_splits = self.config.freq_bands_split if self.config.freq_bands_split!=0 else None
+        self.n_filters = self.config.n_filters
         
     def update_event(self, inp=-1):
         signal: Signal = self.input(inp)
         if signal:
-            features = signal.copy()
             
-            fbscp_fs = FBCSP_binary(
-                data_dict = signal.data,
+            fbank = FilterBank(
                 fs = signal.info.nominal_srate,
-                n_w = self.config.n_windows,
-                n_features = self.config.n_features,
-                n_freq_bands = self.frequency_bands,
-                n_splits_freq = self.freq_splits,
-                filter_order = self.config.filter_order,
+                fmin = self.min_freq,
+                fmax = self.max_freq,
+                splits = self.freq_splits
             )
             
-            features_extracted = fbscp_fs.extract_features()
+            fbank_coeff = fbank.get_filter_coeff()
+            filtered_data = fbank.filter_data(signal.data)
             
-            print(features_extracted)
+            labels = signal.labels
             
-            self.set_output(0, features_extracted)
+            label_unique = np.unique(labels)
+            
+            fbcsp_feature_extractor = FBCSP(self.n_filters)
+            fbcsp_feature_extractor.fit(filtered_data,labels)
+            
+            features = fbcsp_feature_extractor.transform(filtered_data,class_idx=labels[0])
+            
+            print(features)
+            
+            self.set_output(0, features)
             
 class PSDMultitaperNode(Node):
     title = 'Power Spectral Density with Multitaper'
@@ -84,7 +87,7 @@ class PSDMultitaperNode(Node):
     def config(self) -> PSDMultitaperNode.Config:
         return self._config
 
-    def start(self):
+    def init(self):
         self.fmin = self.config.fmin
 
         self.fmax = np.inf
@@ -139,7 +142,7 @@ class PSDWelchNode(Node):
     def config(self) -> PSDWelchNode.Config:
         return self._config
 
-    def start(self):
+    def init(self):
         self.fmin = self.config.fmin
 
         self.fmax = np.inf
@@ -196,7 +199,7 @@ class MorletTFNode(Node):
     def config(self) -> MorletTFNode.Config:
         return self._config
 
-    def start(self):
+    def init(self):
         self.n_cycles = self.config.n_cycles
         self.zero_mean = self.config.zero_mean
         self.use_fft = self.config.use_fft
@@ -241,7 +244,7 @@ class MultitaperTFNode(Node):
     def config(self) -> MultitaperTFNode.Config:
         return self._config
 
-    def start(self):
+    def init(self):
         self.n_cycles = self.config.n_cycles
         self.zero_mean = self.config.zero_mean
         self.time_bandwidth = self.config.time_bandwidth if self.config.time_bandwidth >= 2.0 else 4.0
@@ -288,7 +291,7 @@ class StockwellTFNode(Node):
     def config(self) -> StockwellTFNode.Config:
         return self._config
 
-    def start(self):
+    def init(self):
         self.fmin = self.config.fmin if self.config.fmin else None
         self.fmax = self.config.fmax if self.config.fmax else None
         self.n_fft = self.config.n_fft if self.config.n_fft else None
@@ -334,7 +337,7 @@ class CWTNode(Node):
     def config(self) -> CWTNode.Config:
         return self._config
 
-    def start(self):
+    def init(self):
         self.use_fft = self.config.use_fft
         self.mode = self.config.mode
 
@@ -370,7 +373,7 @@ class STFTNode(Node):
     def config(self) -> CWTNode.Config:
         return self._config
 
-    def start(self):
+    def init(self):
         self.wsize = self.config.wsize
         self.tstep = self.config.tstep
 
@@ -404,7 +407,7 @@ class ISTFTode(Node):
     def config(self) -> ISTFTode.Config:
         return self._config
 
-    def start(self):
+    def init(self):
         self.Tx = self.config.Tx if self.config.Tx else None
         self.tstep = self.config.tstep
 
@@ -443,7 +446,7 @@ class FourierCSDNode(Node):
     def config(self) -> FourierCSDNode.Config:
         return self._config
 
-    def start(self):
+    def init(self):
         self.fmin = self.config.fmin
         self.fmax = self.config.fmax if self.config.fmax else np.inf
         self.t0 = self.config.t0
@@ -494,7 +497,7 @@ class MultitaperCSDNode(Node):
     def config(self) -> MultitaperCSDNode.Config:
         return self._config
 
-    def start(self):
+    def init(self):
         self.fmin = self.config.fmin
         self.fmax = self.config.fmax if self.config.fmax else np.inf
         self.t0 = self.config.t0
@@ -545,7 +548,7 @@ class MorletCSDNode(Node):
     def config(self) -> MorletCSDNode.Config:
         return self._config
 
-    def start(self):
+    def init(self):
         self.t0 = self.config.t0
         self.tmin = self.config.tmin if self.config.tmin else None
         self.tmax = self.config.tmax if self.config.tmax else None
@@ -581,7 +584,7 @@ class MeanNode(Node):
     init_inputs = [PortConfig(label='data',allowed_data=Signal)]
     init_outputs = [PortConfig(label='features')]
     
-    def start(self):
+    def init(self):
         classes = list(Statistics.subclasses.values())
         self.func = self.stats_selected[0]
         self.features = np.zeros((32,1))
@@ -602,7 +605,7 @@ class VarNode(Node):
     init_inputs = [PortConfig(label='data',allowed_data=Signal)]
     init_outputs = [PortConfig(label='features')]
     
-    def start(self):
+    def init(self):
         classes = list(Statistics.subclasses.values())
         self.func = self.stats_selected[1]
         self.features = np.zeros((32,1))
@@ -623,7 +626,7 @@ class StdNode(Node):
     init_inputs = [PortConfig(label='data',allowed_data=Signal)]
     init_outputs = [PortConfig(label='features')]
     
-    def start(self):
+    def init(self):
         classes = list(Statistics.subclasses.values())
         self.func = self.stats_selected[2]
         self.features = np.zeros((32,1))
@@ -644,7 +647,7 @@ class PTPNode(Node):
     init_inputs = [PortConfig(label='data',allowed_data=Signal)]
     init_outputs = [PortConfig(label='features')]
     
-    def start(self):
+    def init(self):
         classes = list(Statistics.subclasses.values())
         self.func = self.stats_selected[3]
         self.features = np.zeros((32,1))
@@ -665,7 +668,7 @@ class SkewNode(Node):
     init_inputs = [PortConfig(label='data',allowed_data=Signal)]
     init_outputs = [PortConfig(label='features')]
     
-    def start(self):
+    def init(self):
         classes = list(Statistics.subclasses.values())
         self.func = self.stats_selected[4]
         self.features = np.zeros((32,1))
@@ -686,7 +689,7 @@ class KurtNode(Node):
     init_inputs = [PortConfig(label='data',allowed_data=Signal)]
     init_outputs = [PortConfig(label='features')]
     
-    def start(self):
+    def init(self):
         classes = list(Statistics.subclasses.values())
         self.func = self.stats_selected[5]
         self.features = np.zeros((32,1))
@@ -707,7 +710,7 @@ class RMSNode(Node):
     init_inputs = [PortConfig(label='data',allowed_data=Signal)]
     init_outputs = [PortConfig(label='features')]
     
-    def start(self):
+    def init(self):
         classes = list(Statistics.subclasses.values())
         self.func = self.stats_selected[6]
         self.features = np.zeros((32,1))
@@ -728,7 +731,7 @@ class MobilityNode(Node):
     init_inputs = [PortConfig(label='data',allowed_data=Signal)]
     init_outputs = [PortConfig(label='features')]
     
-    def start(self):
+    def init(self):
         classes = list(Statistics.subclasses.values())
         self.func = self.stats_selected[7]
         self.features = np.zeros((32,1))
@@ -749,7 +752,7 @@ class ComplexityNode(Node):
     init_inputs = [PortConfig(label='data',allowed_data=Signal)]
     init_outputs = [PortConfig(label='features')]
     
-    def start(self):
+    def init(self):
         classes = list(Statistics.subclasses.values())
         self.func = self.stats_selected[8]
         self.features = np.zeros((32,1))
@@ -770,7 +773,7 @@ class Quantile75thNode(Node):
     init_inputs = [PortConfig(label='data',allowed_data=Signal)]
     init_outputs = [PortConfig(label='features')]
     
-    def start(self):
+    def init(self):
         classes = list(Statistics.subclasses.values())
         self.func = self.stats_selected[9]
         self.features = np.zeros((32,1))
@@ -791,7 +794,7 @@ class Quantile25thNode(Node):
     init_inputs = [PortConfig(label='data',allowed_data=Signal)]
     init_outputs = [PortConfig(label='features')]
     
-    def start(self):
+    def init(self):
         classes = list(Statistics.subclasses.values())
         self.func = self.stats_selected[10]
         self.features = np.zeros((32,1))
@@ -837,7 +840,7 @@ class StatisticsNode(Node):
     def config(self) -> StatisticsNode.Config:
         return self._config
     
-    def start(self):
+    def init(self):
         self.stats_selected = self.config.stats_selected
         classes = list(Statistics.subclasses.values())
         self.funcs = [classes[_] for _ in self.stats_selected]
@@ -1016,7 +1019,7 @@ class PowerSpectrumNode(Node):
     def config(self) -> PowerSpectrumNode.Config:
         return self._config
     
-    def start(self):
+    def init(self):
         self.fmin = self.config.fmin if self.config.fmin else None
         self.fmax = self.config.fmax if self.config.fmax else None
         self.n_splits = self.config.n_splits if self.config.n_splits else None
