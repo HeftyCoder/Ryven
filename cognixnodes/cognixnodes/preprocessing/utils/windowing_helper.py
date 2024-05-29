@@ -141,4 +141,5 @@ class CircularBufferWindowing:
         if window.shape[1]!=1:
             self.time_window_start = new_time_start
             self.index_window_start = new_index_start
-            return window,timestamps
+        
+        return window,timestamps

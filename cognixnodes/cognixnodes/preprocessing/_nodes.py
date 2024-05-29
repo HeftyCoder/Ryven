@@ -3,6 +3,8 @@ from __future__ import annotations
 from cognixcore import Flow, PortConfig
 import mne
 
+from mne_icalabel import label_components  
+
 from cognixcore.config.traits import *
 from typing import Union
 import numpy as np
@@ -33,8 +35,6 @@ class SegmentationNode(Node):
 
     def init(self):
         self.buffer: CircularBuffer = None
-        
-        print("BUFFFFERRRRRRRRRRR",self.buffer.current_index)
         
         self.update_dict = {
             0: self.update_data,
@@ -93,6 +93,8 @@ class SegmentationNode(Node):
                 error_margin=self.config.error_margin,
                 start_time=self.data_signal.timestamps[0]
             )
+
+            print("FIRST TIMESTAMP",self.data_signal.timestamps[0])
         
         self.buffer.append(self.data_signal.data.T, self.data_signal.timestamps)
         return True
@@ -153,9 +155,10 @@ class WindowingNode(Node):
         if update_result and self.buffer:
             window,timestamps = self.buffer.find_segment(self.config.window_length)
             
-            signal = TimeSignal(timestamps, window, self.data_signal.info)
+            if len(timestamps)!=0:
+                signal = TimeSignal(timestamps, window, self.data_signal.info)
             
-            self.set_output(0, signal)
+                self.set_output(0, signal)
     
     def call_update_event(self, inp):
         self.data_signal: Signal = self.input(inp)
@@ -169,6 +172,8 @@ class WindowingNode(Node):
                 buffer_duration=self.config.buffer_duration,
                 start_time=self.data_signal.timestamps[0]
             )
+
+            print("FIRST TIMESTAMP",self.data_signal.timestamps[0])
         
         self.buffer.append(self.data_signal.data.T, self.data_signal.timestamps)
         return True
@@ -638,7 +643,7 @@ class InterpolateEEGNode(Node):
             
             self.set_output(0,new_eeg) 
  
-from mne_icalabel import label_components   
+ 
 class RepairArtifactsICANode(Node):
     title = 'Repair Artifacts with ICA'
     version = '0.1'

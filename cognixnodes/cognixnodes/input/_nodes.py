@@ -195,7 +195,7 @@ class LSLInputNode(FrameNode):
                 samples = np.array(samples)
         
         if self.config.debug and timestamps:
-            self.logger.info(timestamps)
+            self.logger.info(f'{timestamps},{samples}')
             
         if not timestamps:
             return False
