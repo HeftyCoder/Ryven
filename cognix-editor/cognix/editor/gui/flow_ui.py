@@ -166,9 +166,9 @@ class FlowUI(QMainWindow):
         # w.setStyleSheet('')
         return w
 
-    def flow_alg_mode_changed(self, mode: str):
+    def flow_alg_mode_changed(self, mode: FlowAlg):
         self.flow_alg_mode_dropdown.setCurrentText(
-            self.flow_alg_mode_display_titles[FlowAlg.from_str(mode)]
+            self.flow_alg_mode_display_titles[mode]
         )
 
     def flow_algorithm_mode_toggled(self):
