@@ -333,7 +333,7 @@ class FIRFilterNode(Node):
         fir_design:str = Enum('firwin','firwin2',desc='the design of the FIR filter')
             
     init_inputs = [PortConfig(label='data',allowed_data=StreamSignal)]
-    init_outputs = [PortConfig(label='filtered data',allowed_data=Signal)]
+    init_outputs = [PortConfig(label='filtered data',allowed_data=LabeledSignal)]
     
     @property
     def config(self) -> FIRFilterNode.Config:
@@ -370,7 +370,12 @@ class FIRFilterNode(Node):
         
         print(filtered_data)
 
-        filtered_signal = Signal(filtered_data, None)
+        filtered_signal = LabeledSignal(
+            signal.labels,
+            filtered_data,
+            signal.info,
+            False,
+        )
         
         self.set_output(0, filtered_signal)
     
@@ -388,7 +393,7 @@ class IIRFilterNode(Node):
         ftype: str = Enum('butter','cheby1','cheby2','ellip','bessel')
         
     init_inputs = [PortConfig(label='data',allowed_data=StreamSignal)]
-    init_outputs = [PortConfig(label='filtered data',allowed_data=Signal)]
+    init_outputs = [PortConfig(label='filtered data',allowed_data=LabeledSignal)]
     
     @property
     def config(self) -> IIRFilterNode.Config:
@@ -421,7 +426,8 @@ class IIRFilterNode(Node):
             iir_params = iir_params_dict
             )
 
-        filtered_signal = Signal(
+        filtered_signal = LabeledSignal(
+            signal.labels,
             filtered_data,
             signal.info    
         )
@@ -446,7 +452,7 @@ class NotchFilterNode(Node):
 
         
     init_inputs = [PortConfig(label='data',allowed_data=StreamSignal)]
-    init_outputs = [PortConfig(label='filtered data',allowed_data=Signal)]
+    init_outputs = [PortConfig(label='filtered data',allowed_data=LabeledSignal)]
     
     @property
     def config(self) -> NotchFilterNode.Config:
@@ -487,8 +493,14 @@ class NotchFilterNode(Node):
             fir_design= self.fir_design
         )
         
-        filtered_signal = Signal(filtered_data, None)
+        filtered_signal = LabeledSignal(
+            signal.labels,
+            filtered_data, 
+            signal.info
+        )
         self.set_output(0, filtered_signal)
+
+# TODO CHECK CODE FROM HERE
 
 class ResamplingNode(Node):
     title = 'Resampling Data'
@@ -603,7 +615,6 @@ class SignalToMNENode(Node):
             
             self.set_output(0,raw_mne)
 
-# TODO CHECK CODE FROM HERE
 class MNEToSignalNode(Node):
     title = 'MNE to Signal'
     version = '0.1'
