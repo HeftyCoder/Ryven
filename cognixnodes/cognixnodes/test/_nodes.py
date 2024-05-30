@@ -12,6 +12,11 @@ from traitsui.api import EnumEditor
 import logging
 from numbers import Number
 from random import randint
+import numpy as np
+from collections.abc import Sequence
+
+from ..core import Signal,TimeSignal,LabeledSignal,FeatureSignal
+
 class TestStreamNode(FrameNode):
     
     title = "Classification Data Generator"
@@ -47,6 +52,70 @@ class TestRandomGeneratorNode(FrameNode):
         if self.current_time >= 5:
             self.current_time = 0
             self.set_output(0, randint(10, 50))
+            
+class TestRandomFeaturesNode(FrameNode):
+    
+    title = "Random Feature Node"
+    version = "0.1"
+    
+    init_outputs = [PortConfig('result',allowed_data=FeatureSignal)]
+    
+    def init(self):
+        self.current_time = 0
+        
+    def frame_update_event(self):
+        
+        self.current_time += self.player.delta_time
+        if self.current_time >= 5:
+            self.current_time = 0
+            data = np.random.rand(100,40)
+            classes = {
+                0:(0,50),
+                1:(0,50)
+            }
+            labels = [f'feature{i}' for i in range(40)]
+            signal = FeatureSignal(data = data,class_dict=classes,signal_info=None,labels=labels)
+            self.set_output(0, signal)
+
+class TestRandomFeaturesNode1(FrameNode):
+    
+    title = "Random Feature Node 1"
+    version = "0.1"
+    
+    init_outputs = [PortConfig('result',allowed_data=Sequence[LabeledSignal])]
+    
+    def init(self):
+        self.current_time = 0
+        
+    def frame_update_event(self):
+        
+        self.current_time += self.player.delta_time
+        if self.current_time >= 5:
+            self.current_time = 0
+            data = np.random.rand(50,32,100)
+            labels = [f'feature{i}' for i in range(100)]
+            signal = [LabeledSignal(data = data_,signal_info=None,labels=labels) for data_ in data]
+            self.set_output(0, signal)
+
+class TestRandomFeaturesNode2(FrameNode):
+    
+    title = "Random Feature Node 2"
+    version = "0.1"
+    
+    init_outputs = [PortConfig('result',allowed_data=Sequence[LabeledSignal])]
+    
+    def init(self):
+        self.current_time = 0
+        
+    def frame_update_event(self):
+        
+        self.current_time += self.player.delta_time
+        if self.current_time >= 5:
+            self.current_time = 0
+            data = np.random.rand(50,32,100)
+            labels = [f'feature{i}' for i in range(100)]
+            signal = [LabeledSignal(data = data_,signal_info=None,labels=labels) for data_ in data]
+            self.set_output(0, signal)
 
 class TestLogNode(Node):
     """A node for testing log messages!"""

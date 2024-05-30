@@ -10,11 +10,11 @@ from ...core import FeatureSignal
 class BasePredictor(ABC):
 
     @abstractmethod
-    def train(self, f_signal: FeatureSignal, binary_classification:bool):
+    def train(self, f_signal_train: FeatureSignal, binary_classification:bool):
         pass
 
     @abstractmethod
-    def test(self, f_signal: FeatureSignal):
+    def test(self, f_signal_test: FeatureSignal):
         pass
 
     @abstractmethod

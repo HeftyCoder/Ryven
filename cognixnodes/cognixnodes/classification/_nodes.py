@@ -9,6 +9,7 @@ from sklearn.model_selection import (
     train_test_split
 )
 
+from ..core import Signal,TimeSignal,LabeledSignal,FeatureSignal
 
 
 # from Orange.data import Table
@@ -114,7 +115,7 @@ class LogisticRegressionNode(ModelNode):
         solver:str = Enum('lbfgs','liblinear','newton-cg','newton-cholesky','sag','saga',desc='algorithm to use in the optimization problem')
         max_iter:int = CX_Int(100,desc='maximum number of iterations taken for the solvers to converge')
 
-    init_outputs = [PortConfig(label='model',allowed_data=LogisticRegressionClassifier)]
+    init_outputs = [PortConfig(label='model')]
     init_inputs = []
 
     @property
@@ -131,7 +132,6 @@ class LogisticRegressionNode(ModelNode):
         }
 
         self.model = LogisticRegressionClassifier(self.params)
-        print(self.model)
         self.set_output(0, self.model)
 
 class TrainNode(Node):
@@ -142,8 +142,8 @@ class TrainNode(Node):
     class Config(NodeTraitsConfig):
         binary:bool = Bool('binary classification?',desc='if the classification is binary or multiclass')
 
-    init_inputs = [PortConfig(label='data'),PortConfig(label='model',allowed_data=SciKitClassifier)]
-    init_outputs = [PortConfig(label='model',allowed_data=SciKitClassifier),
+    init_inputs = [PortConfig(label='data',allowed_data=FeatureSignal),PortConfig(label='model')]
+    init_outputs = [PortConfig(label='model'),
                     PortConfig(label='train accuracy'),
                     PortConfig(label='train precision'),
                     PortConfig(label='train recall'),
@@ -156,34 +156,35 @@ class TrainNode(Node):
     def init(self):
 
         self.signal = None
-        self.model = None
+        self.classifier = None
         self.load_model = False
+        self.model_exists = False
 
     def update_event(self, inp=-1):
 
         if inp == 0:self.signal = self.input(inp)
-        if inp == 1:self.model:SciKitClassifier = self.input(inp)
+        if inp == 1 and not self.model_exists:self.classifier:SciKitClassifier = self.input(inp)
 
-        if self.signal and self.model:
-            
-            data = self.signal.data
-            labels = self.signal.labels
-            
+        if self.signal and self.classifier:
+            self.model_exists = True
+
             (
                 trained_model,
                 train_accuracy,
                 train_precision,
                 train_precision,
                 train_f1
-            ) = self.model.train(data, labels, self.config.binary)
+            ) = self.classifier.train(self.signal, self.config.binary)
+            
+            self.classifier = trained_model
             
             # print(trained_model,train_accuracy,train_precision,train_precision,train_f1)
-            self.set_output(0, SciKitClassifier(trained_model))
+            self.set_output(0, self.classifier)
             self.set_output(1, train_accuracy)
             self.set_output(2, train_precision)
             self.set_output(3, train_precision)
             self.set_output(4, train_f1)
-            self.model = SciKitClassifier(trained_model)
+            
 
 
 class TrainTestSplitNode(Node):
@@ -193,11 +194,9 @@ class TrainTestSplitNode(Node):
     class Config(NodeTraitsConfig):
         train_test_split:float= CX_Float(0.2,desc='split of data between train and test data')
 
-    init_inputs = [PortConfig(label='data')]
-    init_outputs = [PortConfig(label='train data'),
-                    PortConfig(label='test data'),
-                    PortConfig(label='train classes'),
-                    PortConfig(label='test classes')]
+    init_inputs = [PortConfig(label='data',allowed_data=FeatureSignal)]
+    init_outputs = [PortConfig(label='train data',allowed_data=FeatureSignal),
+                    PortConfig(label='test data',allowed_data=FeatureSignal)]
 
     @property
     def config(self) -> TrainTestSplitNode.Config:
@@ -206,22 +205,18 @@ class TrainTestSplitNode(Node):
     def init(self):
 
         self.tt_split = self.config.train_test_split
+        self.model = SciKitClassifier(model = None)
 
     def update_event(self, inp=-1):
 
         signal = self.input(inp)
         
         if signal:
-            data = signal.data
-            labels = signal.labels
 
-            X_train,X_test,Y_train,Y_test = train_test_split(data,labels,test_size=self.tt_split,random_state=1)
-            self.set_output(0, X_train)
-            self.set_output(1, X_test)
-            self.set_output(2, Y_train)
-            self.set_output(3, Y_test)
-        else:
-            return 
+            train_signal,test_signal = self.model.split_data(signal,test_size=self.tt_split,random_state=1)
+            self.set_output(0, train_signal)
+            self.set_output(1, test_signal)
+
 
 class CrossValidationNode(Node):
 
@@ -234,7 +229,7 @@ class CrossValidationNode(Node):
         train_test_split:float= CX_Float(0.2,desc='split of data between train and test data')
         binary:bool = Bool(desc='if the classification is binary or multiclass')
 
-    init_inputs = [PortConfig(label='data'),PortConfig(label='model',allowed_data=SciKitClassifier)]
+    init_inputs = [PortConfig(label='data',allowed_data=FeatureSignal),PortConfig(label='model')]
     init_outputs = [PortConfig(label='cv accuracy'),
                     PortConfig(label='cv precision'),
                     PortConfig(label='cv recall'),
@@ -256,7 +251,9 @@ class CrossValidationNode(Node):
             train_test_split = self.config.train_test_split, 
             binary_classification = self.config.binary
         )
-        self.cv_model.average_setting()
+        print(self.cv_model)
+        
+        self.cv_model.set_average_setting()
 
     def update_event(self, inp=-1):
 
@@ -264,10 +261,8 @@ class CrossValidationNode(Node):
         if inp == 1:self.model:SciKitClassifier = self.input(2)
 
         if self.signal and self.model:
-            data = self.signal.data
-            labels = self.signal.labels
 
-            cv_accuracy,cv_precision,cv_precision,cv_f1 = self.cv_model.calculate_cv_score(model=self.model, X=data, Y=labels)
+            cv_accuracy,cv_precision,cv_precision,cv_f1 = self.cv_model.calculate_cv_score(model=self.model,f_signal=self.signal)
             
             self.set_output(0, cv_accuracy)
             self.set_output(1, cv_precision)
@@ -281,7 +276,7 @@ class SaveModel(Node):
     class Config(NodeTraitsConfig):
         filename: str = CX_String('file name',desc='the name of the model')
 
-    init_inputs = [PortConfig(label='model',allowed_data=SciKitClassifier),PortConfig(label='path')]
+    init_inputs = [PortConfig(label='model'),PortConfig(label='path')]
 
     def init(self):
 
@@ -294,76 +289,61 @@ class SaveModel(Node):
 
         self.define_path = False
         self.model = None
-        self.file_saved = False
+        self.other_path = None
+        self.filename = self.config.filename
         
     @property
     def config(self) -> SaveModel.Config:
         return self._config
 
     def stop(self):
-        self.file_saved = False
+        if self.model:
+            self.model.save_model(self.path+self.filename)
 
     def update_event(self, inp=-1):
         print(self.path)
-        path = self.input(1)
-        if path:
-            self.path = path
-        self.filename = self.config.filename
-        print(self.filename)
-        self.path += self.filename
-        self.define_path = True
-
-        if inp == 0:
-            self.model:SciKitClassifier = self.input(0)
+            
+        if inp == 0:self.model:SciKitClassifier = self.input(0)
+        if inp == 1:self.other_path = self.input(1) 
+        if self.other_path:self.path = self.other_path
         
-        if self.model and self.define_path and (not self.file_saved):
-            self.model.save_model(self.path)
-            self.file_saved = True
-        
+            
 class LoadModel(Node):
     title = 'Load Model'
     version = '0.1'
 
     class Config(NodeTraitsConfig):
-        path: str = CX_String('path file',desc='the path that the model is saved')
+        f: str = File('Some path',desc='path of the model to import')
 
-    init_inputs = [PortConfig(label='path')]
-    init_outputs = [PortConfig(label='model',allowed_data=SciKitClassifier)]
-
-    def __init__(self, flow: Flow):
-        super().__init__(flow)
-
-        self.define_path = False
-        self.path = None
+    init_outputs = [PortConfig(label='model')]
 
     @property
     def config(self) -> LoadModel.Config:
         return self._config
+    
+    def init(self):
+        self.path_file = self.config.f
+        self.define_model = False
 
     def update_event(self, inp=-1):
-        path = self.input(inp)
-        if not path:
-            path = self.config.path
-        self.define_path = True
-        self.path = path
-        self.model = SciKitClassifier.load_model(self.path)
-
-        print(self.model)
-
-        self.set_output(0, SciKitClassifier(self.model))
+        if not self.define_model:
+            self.model = SciKitClassifier.load_model(self.path)
+            print(self.model)
+            self.set_output(0, self.model)
+            self.define_model = True
 
 class TestNode(Node):
     title = 'Test Classifier'
     version = '0.1'
 
-    init_inputs = [PortConfig(label='data'), PortConfig(label='model',allowed_data=SciKitClassifier)]
+    init_inputs = [PortConfig(label='data',allowed_data=FeatureSignal), PortConfig(label='model')]
     init_outputs = [PortConfig(label='test accuracy'),
                     PortConfig(label='test precision'),
                     PortConfig(label='test recall'),
                     PortConfig(label='test f1_score')]
     
 
-    def init(self, flow: Flow):
+    def init(self):
 
         self.signal = None
         self.model = None
@@ -375,11 +355,7 @@ class TestNode(Node):
         if inp == 1:self.model:SciKitClassifier = self.input(2)
 
         if self.signal and self.model:
-
-            data = self.signal.data
-            labels = self.signal.labels
-
-            self.model,test_accuracy,test_precision,test_recall,test_f1 = self.model.test(data,labels)
+            self.model,test_accuracy,test_precision,test_recall,test_f1 = self.model.test(f_signal_test=self.signal)
             self.set_output(0, test_accuracy)
             self.set_output(1, test_precision)
             self.set_output(2, test_recall)

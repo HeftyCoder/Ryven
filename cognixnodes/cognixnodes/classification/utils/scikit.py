@@ -22,6 +22,7 @@ from sklearn.model_selection import (
     train_test_split
 )
 import joblib
+from ...core import FeatureSignal
 
 ##### from .core import SignalInfo,Signal
 ### X_train and Y_train are to change to just a Signal object
@@ -33,11 +34,22 @@ class SciKitClassifier(BasePredictor):
     def __init__(self,model):
         self.model = model
 
-    def train(self,X_train:np.ndarray,Y_train:np.ndarray,binary_classification:bool):
+    def train(self,f_signal_train: FeatureSignal,binary_classification:bool):
 
         average_setting = 'binary'
         if not binary_classification:
             average_setting = 'macro'
+            
+        X_train = f_signal_train.data
+        classes = f_signal_train.classes
+        
+        Y_train = []
+            
+        for class_label, (start_idx, end_idx) in classes.items():
+            for i in range(start_idx,end_idx):
+                Y_train.append(class_label)
+
+        Y_train = np.array(Y_train)
 
         self.model.fit(X_train,Y_train)
 
@@ -49,9 +61,20 @@ class SciKitClassifier(BasePredictor):
         train_recall = recall_score(Y_train,y_pred,average=average_setting)
         train_f1 = f1_score(Y_train,y_pred,average=average_setting)
         print(train_accuracy,train_precision,train_recall,train_f1)
-        return self.model,train_accuracy,train_precision,train_recall,train_f1
+        return self,train_accuracy,train_precision,train_recall,train_f1
     
-    def test(self,X_test:np.ndarray,Y_test:np.ndarray):
+    def test(self,f_signal_test: FeatureSignal):
+        
+        X_test = f_signal_test.data
+        classes = f_signal_test.classes
+        
+        Y_test = []
+            
+        for class_label, (start_idx, end_idx) in classes.items():
+            for i in range(start_idx,end_idx):
+                Y_test.append(class_label)
+
+        Y_test = np.array(Y_test)
 
         y_pred = self.model.predict(X_test)
 
@@ -62,11 +85,51 @@ class SciKitClassifier(BasePredictor):
         print(test_accuracy,test_precision,test_recall,test_f1)
         return test_accuracy,test_precision,test_recall,test_f1
 
-    def split_data(self,X:np.ndarray,Y:np.ndarray,test_size:float):
+    def split_data(self,f_signal:FeatureSignal,test_size:float):
+        
+        X = f_signal.data
+        classes = f_signal.classes
+        
+        unique_classes = np.unique(list(classes.keys()))  
+              
+        Y = []
+            
+        for class_label, (start_idx, end_idx) in classes.items():
+            for i in range(start_idx,end_idx):
+                Y.append(class_label)
+
+        Y = np.array(Y)
 
         X_train,X_test,Y_train,Y_test = train_test_split(X,Y,test_size,random_state=1)
 
-        return X_train,X_test,Y_train,Y_test
+        count = 0
+        features_train = []
+        classes_train = {}
+        for class_ in unique_classes:
+            x = X_train[Y_train == class_]
+            classes_train[class_] = (count,count + x.shape[0])
+            count += x.shape[0]
+            features_train.append(x)
+            
+        features_train = np.concatenate(features_train)
+        
+        train_signal = FeatureSignal(labels=f_signal.labels,class_dict=classes_train,data=features_train)       
+        
+        count = 0
+        features_test = []
+        classes_test = {}
+        for class_ in unique_classes:
+            x = X_test[Y_test == class_]
+            classes_test[class_] = (count,count + x.shape[0])
+            count += x.shape[0]
+            features_test.append(x)
+            
+        features_test = np.concatenate(features_test)
+        
+        test_signal = FeatureSignal(labels=f_signal.labels,class_dict=classes_test,data=features_test)       
+
+        
+        return train_signal,test_signal
       
     def save_model(self,path:str):
         joblib.dump(self.model,filename=path)
@@ -109,7 +172,18 @@ class CrossValidation:
         if not self.binary_classification:
             self.average_setting = '_macro'
         
-    def calculate_cv_score(self,model,X,Y):
+    def calculate_cv_score(self,model,f_signal:FeatureSignal):
+        X = f_signal.data
+        classes = f_signal.classes
+        
+        Y = []
+            
+        for class_label, (start_idx, end_idx) in classes.items():
+            for i in range(start_idx,end_idx):
+                Y.append(class_label)
+
+        Y = np.array(Y)
+        
         cv_accuracy = cross_val_score(model,X,Y,cv=self.cv_model,scoring='accuracy').mean()
         cv_precision = cross_val_score(model,X,Y,cv=self.cv_model,scoring=f'precision{self.average_setting}').mean()
         cv_recall = cross_val_score(model,X,Y,cv=self.cv_model,scoring=f'recall{self.average_setting}').mean()
