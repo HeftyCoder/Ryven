@@ -24,7 +24,7 @@ from .utils import xdfwriter
 from cognixcore import ProgressState
 from traitsui.api import CheckListEditor
 from threading import Thread
-from ..input.payloads.core import Signal
+from ..core import Signal
 import os
 
 class XDFWriterNode(Node):
