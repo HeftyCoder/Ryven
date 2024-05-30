@@ -17,6 +17,9 @@ class BasePredictor(ABC):
     def test(self, f_signal_test: FeatureSignal):
         pass
 
+    def predict(self,f_signal_test: FeatureSignal):
+        pass
+
     @abstractmethod
     def save_model(self, path:str):
         pass

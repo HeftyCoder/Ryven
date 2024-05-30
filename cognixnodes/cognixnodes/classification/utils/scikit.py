@@ -21,13 +21,12 @@ from sklearn.model_selection import (
     ShuffleSplit,
     train_test_split
 )
+from sklearn.preprocessing import LabelEncoder
 import joblib
 from ...core import FeatureSignal
 
 ##### from .core import SignalInfo,Signal
 ### X_train and Y_train are to change to just a Signal object
-
-
 
 class SciKitClassifier(BasePredictor):
     
@@ -35,13 +34,14 @@ class SciKitClassifier(BasePredictor):
         self.model = model
 
     def train(self,f_signal_train: FeatureSignal,binary_classification:bool):
-
         average_setting = 'binary'
         if not binary_classification:
             average_setting = 'macro'
             
         X_train = f_signal_train.data
         classes = f_signal_train.classes
+
+        class_labels = {list(classes.keys())[_]:_ for _ in range(len(list(classes.keys())))}
         
         Y_train = []
             
@@ -51,22 +51,41 @@ class SciKitClassifier(BasePredictor):
 
         Y_train = np.array(Y_train)
 
+        Y_train = np.array([class_labels[class_] for class_ in Y_train])
+
         self.model.fit(X_train,Y_train)
 
         y_pred = self.model.predict(X_train)
-        print(y_pred)
 
         train_accuracy = accuracy_score(Y_train,y_pred)
         train_precision = precision_score(Y_train,y_pred,average=average_setting)
         train_recall = recall_score(Y_train,y_pred,average=average_setting)
         train_f1 = f1_score(Y_train,y_pred,average=average_setting)
-        print(train_accuracy,train_precision,train_recall,train_f1)
-        return self,train_accuracy,train_precision,train_recall,train_f1
+
+        return self.model,train_accuracy,train_precision,train_recall,train_f1
     
-    def test(self,f_signal_test: FeatureSignal):
-        
+    def predict(self,f_signal_test: FeatureSignal):
         X_test = f_signal_test.data
         classes = f_signal_test.classes
+
+        class_labels = {_:list(classes.keys())[_] for _ in range(len(list(classes.keys())))}
+
+        y_pred = self.model.predict(X_test)
+
+        print(y_pred)
+
+        y_predictions = [class_labels[pred] for pred in y_pred]
+
+        print(y_predictions)
+
+        return y_predictions
+
+
+    def test(self,f_signal_test: FeatureSignal):        
+        X_test = f_signal_test.data
+        classes = f_signal_test.classes
+
+        class_labels = {list(classes.keys())[_]:_ for _ in range(len(list(classes.keys())))}
         
         Y_test = []
             
@@ -76,21 +95,24 @@ class SciKitClassifier(BasePredictor):
 
         Y_test = np.array(Y_test)
 
+        print(Y_test)
+
+        Y_test = np.array([class_labels[class_] for class_ in Y_test])
+
+        print(Y_test)
+
         y_pred = self.model.predict(X_test)
 
         test_accuracy = accuracy_score(Y_test,y_pred)
         test_precision = precision_score(Y_test,y_pred)
         test_recall = recall_score(Y_test,y_pred)
         test_f1 = f1_score(Y_test,y_pred)
-        print(test_accuracy,test_precision,test_recall,test_f1)
         return test_accuracy,test_precision,test_recall,test_f1
 
     def split_data(self,f_signal:FeatureSignal,test_size:float):
         
         X = f_signal.data
         classes = f_signal.classes
-        
-        unique_classes = np.unique(list(classes.keys()))  
               
         Y = []
             
@@ -100,7 +122,12 @@ class SciKitClassifier(BasePredictor):
 
         Y = np.array(Y)
 
-        X_train,X_test,Y_train,Y_test = train_test_split(X,Y,test_size,random_state=1)
+        encoder = LabelEncoder()
+        Y = encoder.fit_transform(Y)
+
+        unique_classes = np.unique(Y)  
+
+        X_train,X_test,Y_train,Y_test = train_test_split(X,Y,test_size=test_size,random_state=1)
 
         count = 0
         features_train = []
@@ -113,7 +140,7 @@ class SciKitClassifier(BasePredictor):
             
         features_train = np.concatenate(features_train)
         
-        train_signal = FeatureSignal(labels=f_signal.labels,class_dict=classes_train,data=features_train)       
+        train_signal = FeatureSignal(labels=f_signal.labels,class_dict=classes_train,data=features_train,signal_info=None)       
         
         count = 0
         features_test = []
@@ -125,8 +152,8 @@ class SciKitClassifier(BasePredictor):
             features_test.append(x)
             
         features_test = np.concatenate(features_test)
-        
-        test_signal = FeatureSignal(labels=f_signal.labels,class_dict=classes_test,data=features_test)       
+
+        test_signal = FeatureSignal(labels=f_signal.labels,class_dict=classes_test,data=features_test,signal_info=None)       
 
         
         return train_signal,test_signal
@@ -183,6 +210,10 @@ class CrossValidation:
                 Y.append(class_label)
 
         Y = np.array(Y)
+        encoder = LabelEncoder()
+        Y = encoder.fit_transform(Y)
+
+        print(model,self.cv_model)
         
         cv_accuracy = cross_val_score(model,X,Y,cv=self.cv_model,scoring='accuracy').mean()
         cv_precision = cross_val_score(model,X,Y,cv=self.cv_model,scoring=f'precision{self.average_setting}').mean()

@@ -70,8 +70,8 @@ class TestRandomFeaturesNode(FrameNode):
             self.current_time = 0
             data = np.random.rand(100,40)
             classes = {
-                0:(0,50),
-                1:(0,50)
+                '0':(0,50),
+                '1':(0,50)
             }
             labels = [f'feature{i}' for i in range(40)]
             signal = FeatureSignal(data = data,class_dict=classes,signal_info=None,labels=labels)
