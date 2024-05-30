@@ -9,7 +9,7 @@ def run():
     labels = [f"x{i}" for i in range(size)]
     data = np.random.rand(3, size)
     a = LabeledSignal(labels, data, None)
-
+    
     assert np.array_equal(
         a.ldm['x1':'x3'].data, 
         a[:, 1:4]
@@ -47,7 +47,7 @@ def run():
         "george": (0, 14), # EXCLUSIVE
         "john": (14, 25)
     }
-    a = ClassSignal(
+    a = FeatureSignal(
         labels,
         classes,
         data,

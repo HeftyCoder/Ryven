@@ -110,7 +110,7 @@ class CircularBuffer:
             buffer_tm[y_index] < 0 or 
             x>y
         ): 
-            return np.zeros((32,1)), np.zeros(1)
+            return False, False
     
         if not (x_overflow or y_overflow) or (x_overflow and y_overflow):
             print("SEGMENTTTTTTTTTTTT",tm + x,tm,tm+y,buffer_tm[x_index],buffer_tm[m_index],buffer_tm[y_index])

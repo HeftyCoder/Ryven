@@ -246,9 +246,9 @@ class StreamSignal(TimeSignal, LabeledSignal):
     def info(self):
         return self._info
 
-class ClassSignal(LabeledSignal):
+class FeatureSignal(LabeledSignal):
     """
-    Represents a signal whose rows correspond to a class
+    Represents a signal whose rows correspond to a feature
     and whose columns correspond to a feature label 
     """
     
@@ -287,7 +287,7 @@ class ClassSignal(LabeledSignal):
             else:
                 raise KeyError(f"Incompatible Key Type. Must be {str} or {list}")
             
-            return ClassSignal.DataMap(
+            return FeatureSignal.DataMap(
                 self.labels,
                 subclasses,
                 subdata,
@@ -295,7 +295,7 @@ class ClassSignal(LabeledSignal):
             )
         
         def signal(self):
-            return ClassSignal(
+            return FeatureSignal(
                 self.labels,
                 self.classes,
                 self.data,
@@ -311,7 +311,7 @@ class ClassSignal(LabeledSignal):
     ):
         super().__init__(labels, data, signal_info)
         self.classes = class_dict
-        self._class_datamap = ClassSignal.DataMap(
+        self._class_datamap = FeatureSignal.DataMap(
             labels, 
             class_dict, 
             data, 

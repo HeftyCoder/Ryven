@@ -78,7 +78,7 @@ class SegmentationNode(Node):
                     self.config.offset
                 )
                 
-                if segment.shape[1]!=1:
+                if segment:
                     output_timestamps.append(timestamps)
                     output_data.append(segment)
                     timestamps_out += 1

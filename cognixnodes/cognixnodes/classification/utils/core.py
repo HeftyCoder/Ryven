@@ -5,25 +5,24 @@ from cognixcore import PortConfig
 from abc import ABC
 import numpy as np
 
-##### from .core import SignalInfo,Signal
-### X_train and Y_train are to change to just a Signal object
+from ...core import FeatureSignal
 
 class BasePredictor(ABC):
 
     @abstractmethod
-    def train(self,X_train:np.ndarray,Y_train:np.ndarray,binary_classification:bool):
+    def train(self, f_signal: FeatureSignal, binary_classification:bool):
         pass
 
     @abstractmethod
-    def test(self,X_test:np.ndarray,Y_test:np.ndarray):
+    def test(self, f_signal: FeatureSignal):
         pass
 
     @abstractmethod
-    def save_model(self,path:str):
+    def save_model(self, path:str):
         pass
 
     @abstractmethod
-    def load_model(self,path:str):
+    def load_model(self, path:str):
         pass
     
 
