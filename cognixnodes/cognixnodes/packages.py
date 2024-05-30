@@ -28,7 +28,7 @@ Example:
 
 from .classification import _nodes as classification
 from .file import _nodes as file
-from .stream import _nodes as stream
+from .input import _nodes as input
 from .utility import _nodes as utility
 from .test import _nodes as test
 from .preprocessing import _nodes as preprocessing
@@ -37,7 +37,7 @@ from .feature_extraction import _nodes as feature_extraction
 
 cognix_package: dict[str, list[type[Node]]] = {
     'file': get_package_nodes(file),
-    'stream': get_package_nodes(stream),
+    'input': get_package_nodes(input),
     'util': get_package_nodes(utility),
     'test': get_package_nodes(test),
     'preprocessing': get_package_nodes(preprocessing),
