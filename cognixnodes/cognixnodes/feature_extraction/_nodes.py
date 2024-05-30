@@ -17,9 +17,10 @@ from collections.abc import Sequence
 from .utils.stats_helper import *
 from .utils.fbcsp import FBCSP
 from .utils.filterbank import FilterBank
+import os,joblib
 
-class FBCSPNode(Node):
-    title = 'FBCSP'
+class FBCSPTrainNode(Node):
+    title = 'FBCSP Training'
     version = '0.1'
     
     class Config(NodeTraitsConfig):
@@ -27,12 +28,14 @@ class FBCSPNode(Node):
         min_freq: float = CX_Float(0.0,desc='the minimum frequency in Hz in which the FBSCP functions -')
         max_freq: float = CX_Float(0.0,desc='the maximum frequency in Hz in which the FBSCP functions -')
         freq_bands_split: int = CX_Int(10,desc='how to split the frequency band')
+        filename:str = CX_Str('filename',desc='the name of the model in which to save')
+        f: str = File('Some path',desc='path of the model to import')
+        save_button: bool = Bool()
     
-    init_inputs = [PortConfig(label='data',allowed_data=Signal)]
-    init_outputs = [PortConfig(label='features',allowed_data=Signal)]
+    init_inputs = [PortConfig(label='data')]
     
     @property
-    def config(self) -> FBCSPNode.Config:
+    def config(self) -> FBCSPTrainNode.Config:
         return self._config 
         
     def init(self):
@@ -40,33 +43,124 @@ class FBCSPNode(Node):
         self.max_freq = self.config.max_freq if self.config.min_freq != 0.0 else None
         self.freq_splits = self.config.freq_bands_split if self.config.freq_bands_split!=0 else None
         self.n_filters = self.config.n_filters
-        
+        self.fbank = None
+        self.filename = self.config.filename
+        self.path_file = self.config.f
+        self.save_button = self.config.save_button
+
+        self.fbcsp_feature_extractor = FBCSP(self.n_filters)
+        if self.path_file != 'Some path' and os.path.exists(self.path_file):
+            self.fbcsp_feature_extractor = joblib.load(self.path_file)
+
+    def stop(self):
+        if self.save_button:
+            joblib.dump(self.fbcsp_feature_extractor,f'{self.filename}.joblib')
+        self.fbcsp_feature_extractor = None
+
     def update_event(self, inp=-1):
-        signal: Signal = self.input(inp)
+        # signal: Signal = self.input(inp)
+        signal = self.input(inp)
         if signal:
+
+            if not self.fbank:       
+                self.fbank = FilterBank(
+                            # fs = signal.info.nominal_srate,
+                            fs = 2048.0,
+                            fmin = self.min_freq,
+                            fmax = self.max_freq,
+                            splits = self.freq_splits
+                        )
+                fbank_coeff = self.fbank.get_filter_coeff()
+                
+            # data = signal.data
+            # labels = signal.labels
+
+            data = signal[0]
+            labels = signal[1]
             
-            fbank = FilterBank(
-                fs = signal.info.nominal_srate,
-                fmin = self.min_freq,
-                fmax = self.max_freq,
-                splits = self.freq_splits
-            )
+            print(data.shape)
+
             
-            fbank_coeff = fbank.get_filter_coeff()
-            filtered_data = fbank.filter_data(signal.data)
+            filtered_data = self.fbank.filter_data(data)
+
+            print(filtered_data.shape)
+
+            self.fbcsp_feature_extractor.fit(filtered_data,labels)
+
+            print(len(self.fbcsp_feature_extractor.fbcsp_filters_multi))
+
             
-            labels = signal.labels
             
-            label_unique = np.unique(labels)
+class FBCSPTransformNode(Node):
+    title = 'FBCSP Transform'
+    version = '0.1'
+    
+    class Config(NodeTraitsConfig):
+        n_filters: int = CX_Int(2,desc='the number of windows used for FBSCP')
+        min_freq: float = CX_Float(0.0,desc='the minimum frequency in Hz in which the FBSCP functions -')
+        max_freq: float = CX_Float(0.0,desc='the maximum frequency in Hz in which the FBSCP functions -')
+        freq_bands_split: int = CX_Int(10,desc='how to split the frequency band')
+        f: str = File('Some path',desc='path of the model to import')
+        class_id: int = CX_Int(0,desc='class from which to extract features from created filters')
+
+    
+    init_inputs = [PortConfig(label='data')]
+    init_outputs = [PortConfig(label='features')]
+    
+    @property
+    def config(self) -> FBCSPTransformNode.Config:
+        return self._config 
+        
+    def init(self):
+        self.min_freq = self.config.min_freq if self.config.min_freq != 0.0 else None
+        self.max_freq = self.config.max_freq if self.config.min_freq != 0.0 else None
+        self.freq_splits = self.config.freq_bands_split if self.config.freq_bands_split!=0 else None
+        self.n_filters = self.config.n_filters
+        self.fbank = None
+        self.fbcsp_feature_extractor = None
+        self.path_file = self.config.f
+        self.class_id = self.config.class_id
+
+        self.file_exists = False
+        if self.path_file != 'Some path' and os.path.exists(self.path_file):
+            self.file_exists = True
+
+    def update_event(self, inp=-1):
+        # signal: Signal = self.input(inp)
+
+        signal = self.input(inp)
+
+        if signal and self.file_exists:
+
+            if not self.fbank:          
+                self.fbank = FilterBank(
+                            fs = 2048.0,
+                            # fs = signal.info.nominal_srate,
+                            fmin = self.min_freq,
+                            fmax = self.max_freq,
+                            splits = self.freq_splits
+                        )
+                fbank_coeff = self.fbank.get_filter_coeff()
+                self.fbcsp_feature_extractor = joblib.load(self.path_file)
+
+            # data = signal.data
+            # labels = signal.labels
+
+            data = signal[0]
+            labels = signal[1]
             
-            fbcsp_feature_extractor = FBCSP(self.n_filters)
-            fbcsp_feature_extractor.fit(filtered_data,labels)
+            filtered_data = self.fbank.filter_data(data)
+            select_class_labels = lambda cls, labels: [0 if y == cls else 1 for y in labels]
+
+            new_labels = np.asarray(select_class_labels(self.class_id,labels))
+
+            features = self.fbcsp_feature_extractor.transform(filtered_data,class_idx=self.class_id)
+
+            label_features = [f'feature_{i}' for i in range(features.shape[1])]
             
-            features = fbcsp_feature_extractor.transform(filtered_data,class_idx=labels[0])
-            
-            print(features)
-            
-            self.set_output(0, features)
+            self.set_output(0, features)            
+
+
             
 class PSDMultitaperNode(Node):
     title = 'Power Spectral Density with Multitaper'
