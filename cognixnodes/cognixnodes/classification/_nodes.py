@@ -298,7 +298,7 @@ class SaveModel(Node):
 
     def stop(self):
         if self.model:
-            self.model.save_model(self.path+self.filename)
+            self.model.save_model(self.path+self.filename+".joblib")
 
     def update_event(self, inp=-1):
         print(self.path)
@@ -327,7 +327,7 @@ class LoadModel(Node):
 
     def update_event(self, inp=-1):
         if not self.define_model:
-            self.model = SciKitClassifier.load_model(self.path)
+            self.model = SciKitClassifier.load_model(self.path+".joblib")
             print(self.model)
             self.set_output(0, self.model)
             self.define_model = True
