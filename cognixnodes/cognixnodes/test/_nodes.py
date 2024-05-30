@@ -47,8 +47,6 @@ class TestRandomGeneratorNode(FrameNode):
         if self.current_time >= 5:
             self.current_time = 0
             self.set_output(0, randint(10, 50))
-            return True
-        return False
 
 class TestLogNode(Node):
     """A node for testing log messages!"""

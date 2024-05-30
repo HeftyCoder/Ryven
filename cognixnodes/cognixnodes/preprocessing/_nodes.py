@@ -14,11 +14,16 @@ from pylsl import local_clock
 
 from collections.abc import Sequence
 
-from ..core import Signal,TimeSignal
-from .utils.segmentation_helper import CircularBuffer
+from ..core import Signal, TimeSignal, StreamSignal, LabeledSignal
+from .utils.circ_buffer import CircularBuffer
 from .utils.windowing_helper import CircularBufferWindowing
 
 class SegmentationNode(Node):
+    """
+    Outputs segments of a StreamSignal based on timestamps
+    of a specific marker.
+    """
+    
     title = 'Segmentation'
     version = '0.1'
 
@@ -28,19 +33,30 @@ class SegmentationNode(Node):
         buffer_duration: float = CX_Float(10.0, desc = 'Duration of the buffer in seconds')
         error_margin: float = CX_Float()
 
-    init_inputs = [PortConfig(label='data',allowed_data=TimeSignal),
-                   PortConfig(label='marker',allowed_data=TimeSignal | Sequence[tuple[str,float]])]
+    init_inputs = [
+        PortConfig(label='data', allowed_data=StreamSignal),
+        PortConfig(
+            label='marker', 
+            allowed_data=StreamSignal | Sequence[tuple[str, float]]
+        )
+    ]
 
-    init_outputs = [PortConfig(label='segment',allowed_data = Sequence[TimeSignal] | TimeSignal)]
+    init_outputs = [
+        PortConfig(
+            label='segment', 
+            allowed_data = Sequence[StreamSignal] | StreamSignal
+        )
+    ]
 
     def init(self):
         self.buffer: CircularBuffer = None
+        self.data_signal: StreamSignal = None
         
         self.update_dict = {
             0: self.update_data,
             1: self.update_marker
         }
-        self.list_of_marker_timestamps = np.full(shape=1000,fill_value=np.nan,dtype='float64')
+        self.marker_tm_cache = np.full(shape=1000,fill_value=np.nan,dtype='float64')
         self.current_length = 0
              
     @property
@@ -49,7 +65,7 @@ class SegmentationNode(Node):
     
     def update_event(self, inp=-1):
         
-        update_result = self.call_update_event(inp)
+        update_result = self.update_input(inp)
         
         if update_result and self.buffer:
             output_data = []
@@ -57,31 +73,41 @@ class SegmentationNode(Node):
             timestamps_out = 0
             
             for i in range(self.current_length):
-                segment,timestamps = self.buffer.find_segment(self.list_of_marker_timestamps[i], self.config.offset)
+                segment, timestamps = self.buffer.find_segment(
+                    self.marker_tm_cache[i], 
+                    self.config.offset
+                )
                 
                 if segment.shape[1]!=1:
                     output_timestamps.append(timestamps)
                     output_data.append(segment)
                     timestamps_out += 1
-                    self.list_of_marker_timestamps[i] = np.nan
+                    self.marker_tm_cache[i] = np.nan
                     
             if timestamps_out!=0:
-                signal = (
-                    TimeSignal(output_timestamps[0], output_data[0], self.data_signal.info) 
-                    if timestamps_out == 1 
-                    else [TimeSignal(output_timestamps[i], output_data[i], self.data_signal.info) for i in range(timestamps_out)]
-                )
-                self.set_output(0, signal)
-                self.current_length -= timestamps_out
+                signal = [
+                    StreamSignal(
+                        output_timestamps[i],
+                        self.data_signal.labels,
+                        output_data[i], 
+                        self.data_signal.info
+                    ) 
+                    for i in range(timestamps_out)
+                ]
+                if len(signal) == 1:
+                    signal = signal[0]
                 
-    def call_update_event(self, inp):
+                self.current_length -= timestamps_out    
+                self.set_output(0, signal)
+                
+    def update_input(self, inp):
         func = self.update_dict.get(inp)
         if not func:
             return False
         return func(inp)
     
     def update_data(self, inp: int):
-        self.data_signal: Signal = self.input(inp)
+        self.data_signal: StreamSignal = self.input(inp)
         if not self.data_signal:
             return False
         
@@ -108,12 +134,18 @@ class SegmentationNode(Node):
         
         timestamps = []
                         
-        if isinstance(marker_signal,TimeSignal):
-            timestamps = [ts for name,ts in zip(marker_signal.data,marker_signal.timestamps) if name[0] == self.config.marker_name]
+        if isinstance(marker_signal, TimeSignal):
+            timestamps = [
+                ts for name, ts in zip(marker_signal.data, marker_signal.timestamps) 
+                if name[0] == self.config.marker_name
+            ]
 
         ### list of type [[marker1,timestamp1],[marker2,timestamp2]]
-        elif isinstance(marker_signal,list): 
-            timestamps = [marker[1] for marker in marker_signal if marker[0] == self.config.marker_name]
+        elif isinstance(marker_signal, list): 
+            timestamps = [
+                time for marker, time in marker_signal 
+                if marker == self.config.marker_name
+            ]
             
         ## no markers match
         if len(timestamps) == 0:
@@ -123,9 +155,9 @@ class SegmentationNode(Node):
         
         self.last_timestamps = timestamps
         
-        self.list_of_marker_timestamps[self.current_length : self.current_length + len(timestamps)] = timestamps
-        self.list_of_marker_timestamps.sort()
+        self.marker_tm_cache[self.current_length : self.current_length + len(timestamps)] = timestamps
         self.current_length += len(timestamps)
+        self.marker_tm_cache[0:self.current_length].sort()
         return True
 
 
@@ -179,40 +211,54 @@ class WindowingNode(Node):
         return True
     
  
-class SignalSelectionNode(Node):
+class LabeledSignalSelectionNode(Node):
+    """
+    Selects part of a signal based on its labels. An option
+    allows for the labels given to be forced to lowercase.
+    """
     
-    title = 'EEG Signal Selection'
+    title = 'Select Labels'
     version = '0.1'
     
     class Config(NodeTraitsConfig):
         
-        channels = ['Fp1', 'Af3', 'F7', 'F3', 'Fc1', 'Fc5', 'T7',
+        labels_egg = ['Fp1', 'Af3', 'F7', 'F3', 'Fc1', 'Fc5', 'T7',
             'C3', 'Cp1', 'Cp5', 'P7', 'P3', 'Pz', 'Po3', 'O1', 'Oz', 'O2', 'Po4',
             'P4', 'P8', 'Cp6', 'Cp2', 'C4', 'T8', 'Fc6', 'Fc2', 'F4', 'F8', 'Af4',
-            'Fp2', 'Fz', 'Cz']
+            'Fp2', 'Fz', 'Cz'
+        ]
         
-        channels_selected = List(
-            editor=CheckListEditor(
-                values= [(channel, channel) for channel in channels],
-                cols=4
-            ),
-            style='custom'
-        )
+        force_lowercase: bool = Bool()
+        labels: list[str] = List(CX_Str())
     
-    init_inputs = [PortConfig(label='data_in')]
-    init_outputs = [PortConfig(label='data_out')]
-
-    def init(self):
-        self.chan_inds = None
-        self.selected_channels = set(self.config.channels_selected)
+    init_inputs = [
+        PortConfig(label='in', allowed_data=LabeledSignal)
+    ]
+    init_outputs = [
+        PortConfig(label='out', allowed_data=StreamSignal | LabeledSignal)
+    ]
 
     @property
-    def config(self) -> SignalSelectionNode.Config:
+    def config(self) -> LabeledSignalSelectionNode.Config:
         return self._config
+    
+    def init(self):
+        self.chan_inds = None
+        if self.config.force_lowercase:
+            self.selected_labels = set(self.config.labels)
+        else:
+            self.selected_labels = { label.lower() for label in self.config.labels }
+        
+        # these help for potential optimization
+        # check _optimize_searchs
+        # their values will be set to an empty "" if not
+        self.start_label: str = None
+        self.stop_label: str = None
+        self.is_optimized = False
         
     def update_event(self, inp=-1):
         
-        signal: Signal = self.input(inp)
+        signal: LabeledSignal | StreamSignal = self.input(inp)
         if not signal:
             return 
         
@@ -220,11 +266,20 @@ class SignalSelectionNode(Node):
             self.chan_inds = [
                 index 
                 for chan_name, index in signal.info.channels 
-                if chan_name in self.selected_channels
+                if chan_name in self.selected_labels
             ]
         
         sub_signal = signal.data[self.chan_inds]
         self.set_output(0, sub_signal)
+    
+    def _optimize_search(self, signal: LabeledSignal):
+        """
+        Checks whether the selected labels are in sequence in
+        the data signal (their corresponding indices are sequenced 
+        integers). If they are, the selection is optimized since
+        the internal numpy array is not copied.
+        """
+        
              
 class FIRFilterNode(Node):
     title = 'FIR Filter'

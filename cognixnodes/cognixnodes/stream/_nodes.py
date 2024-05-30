@@ -8,9 +8,7 @@ from pylsl import (
     proc_clocksync , 
     proc_dejitter, 
     proc_monotonize,
-    proc_none ,
     proc_threadsafe ,
-    proc_ALL
 )
 
 from cognixcore.api import (
@@ -25,9 +23,9 @@ from traitsui.api import CheckListEditor
 
 import numpy as np
 
-from ..core import SignalInfo, TimeSignal
+from ..core import StreamSignal, StreamSignalInfo
 
-class LSLSignalInfo(SignalInfo):
+class LSLSignalInfo(StreamSignalInfo):
     
     def __init__(self, lsl_info: StreamInfo):
         self._lsl_info = lsl_info
@@ -40,7 +38,7 @@ class LSLSignalInfo(SignalInfo):
             chan_xml_list.append(ch)
             ch = ch.next_sibling("channel")
             
-        channels =  {
+        self.channels: dict[str, int] =  {
             chan_xml_list[c_index].child_value('label'): c_index 
             for c_index in range(len(chan_xml_list))
         }
@@ -50,20 +48,19 @@ class LSLSignalInfo(SignalInfo):
             signal_type=lsl_info.type(),
             data_format=lsl_info.channel_format(),
             name=lsl_info.name(),
-            channels=channels
         )
 
 class LSLInputNode(FrameNode):
-    """Test class for receiving an lsl stream"""
+    """An LSL Input Stream"""
     
     class Config(NodeTraitsConfig):
         
-        f: str = File('Some path')
         stream_name: str = CX_Str('stream_name', desc='Stream name')
         stream_type: str = CX_Str('stream_type', desc = 'Stream type')
         search_action: str = Enum('name','type', desc='Filtering of streams based of specific value')    
         define_buffer:bool = Bool(True, desc='the creation of a buffer for the saving of the data samples')
         buffer_size: int = CX_Int(3276, desc='the size of the buffer in which the data samples are stored')
+        lowercase_labels: bool = Bool(False, desc="if checked, makes all the incoming labels into lowercase")
         debug: bool = Bool(False, desc="when true, logs debug messages")
 
         #### configuration for buffer size of data received
@@ -72,10 +69,10 @@ class LSLInputNode(FrameNode):
             editor=CheckListEditor(
                 values=
                 [
-                    (1, 'synchronization'),  
-                    (2, 'dejitter'),
-                    (4, 'monotonize'),
-                    (8, 'threadsafe')
+                    (proc_clocksync, 'synchronization'),  
+                    (proc_dejitter, 'dejitter'),
+                    (proc_monotonize, 'monotonize'),
+                    (proc_threadsafe, 'threadsafe')
                 ],
                 cols=2
             ),
@@ -86,13 +83,15 @@ class LSLInputNode(FrameNode):
     
     title = 'LSL Input'
     version = '0.1'
-    init_outputs = [PortConfig(label='data', allowed_data=TimeSignal)]
+    init_outputs = [PortConfig(label='data', allowed_data=StreamSignal)]
     
     def __init__(self, params):
         super().__init__(params)
         
         self.inlet: StreamInlet = None
         self.formats = ['double64','float32','int32',str,'int16','int8','int64']
+        # The stream won't change after initialization
+        self.cached_labels: list[str] = None 
     
     @property
     def config(self) -> LSLInputNode.Config:
@@ -102,7 +101,7 @@ class LSLInputNode(FrameNode):
         self.t = None
         self.force_stop = False
         self.inlet = None
-        self.signal_info = None
+        self.signal_info: LSLSignalInfo = None
         self.buffer:np.ndarray | list = None
         
         ### Check boolean for buffer
@@ -140,8 +139,14 @@ class LSLInputNode(FrameNode):
                 for flag in self.processing_flag_mode:
                     flags |= flag
                                                                  
-                self.inlet = StreamInlet(results[0],processing_flags=flags)
+                self.inlet = StreamInlet(results[0], processing_flags=flags)
                 self.signal_info = LSLSignalInfo(self.inlet.info())
+                
+                labels = self.signal_info.channels.keys()
+                self.cached_labels = (
+                    list(labels) if not self.config.lowercase_labels
+                    else [label.lower() for label in labels]
+                )
                 
                 if self.define_buffer: 
                     
@@ -175,15 +180,18 @@ class LSLInputNode(FrameNode):
     
     def frame_update_event(self):
         if not self.inlet or (self.define_buffer and self.buffer is None):
-            return False
+            return
         
         if self.define_buffer:
+            # numpy buffer used
             if self.formats[self.inlet.channel_format]!=str:
             
-                _,timestamps = self.inlet.pull_chunk(max_samples=self.buffer_size * 2, dest_obj=self.buffer)
+                _, timestamps = self.inlet.pull_chunk(max_samples=self.buffer_size * 2, dest_obj=self.buffer)
                 if timestamps:
                     samples = self.buffer[:len(timestamps),:]
-            
+            # there's an issue with the str (marker) streams
+            # since the marker streams are probably few, we
+            # don't use the buffer
             else:
                 samples, timestamps = self.inlet.pull_chunk()
                 if timestamps:
@@ -198,8 +206,16 @@ class LSLInputNode(FrameNode):
             self.logger.info(f'{timestamps},{samples}')
             
         if not timestamps:
-            return False
+            return
         
-        signal = TimeSignal(timestamps, samples, self.signal_info)
+        signal = StreamSignal(
+            timestamps, 
+            self.cached_labels,
+            samples, 
+            self.signal_info
+        )
         self.set_output(0, signal)
-        return True
+
+class LSLOutputNode(FrameNode):
+    """An LSL Output Stream"""
+    pass
