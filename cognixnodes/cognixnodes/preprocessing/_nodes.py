@@ -11,8 +11,8 @@ import numpy as np
 from traitsui.api import CheckListEditor
 
 from pylsl import local_clock
-
 from collections.abc import Sequence
+from sys import maxsize
 
 from ..core import Signal, TimeSignal, StreamSignal, LabeledSignal
 from .utils.circ_buffer import CircularBuffer
@@ -252,9 +252,8 @@ class LabeledSignalSelectionNode(Node):
         # these help for potential optimization
         # check _optimize_searchs
         # their values will be set to an empty "" if not
-        self.start_label: str = None
-        self.stop_label: str = None
-        self.is_optimized = False
+        self.start_ind: int = None
+        self.stop_ind: int = None
         
     def update_event(self, inp=-1):
         
@@ -262,15 +261,32 @@ class LabeledSignalSelectionNode(Node):
         if not signal:
             return 
         
-        if not self.chan_inds:
-            self.chan_inds = [
-                index 
-                for chan_name, index in signal.info.channels 
-                if chan_name in self.selected_labels
-            ]
+        if not self.start_ind:
+            self._optimize_search(signal)
         
-        sub_signal = signal.data[self.chan_inds]
-        self.set_output(0, sub_signal)
+        if isinstance(self.start_ind, str):
+            # no optimization found
+            subdata = signal.data[self.chan_inds]
+        else:
+            subdata = signal.data[self.start_ind: self.stop_ind]
+        
+        if isinstance(signal, StreamSignal):
+            subsignal = StreamSignal(
+                signal.timestamps,
+                self.selected_labels,
+                subdata,
+                signal.info,
+                False
+            )
+        elif isinstance(signal, LabeledSignal):
+            subsignal = LabeledSignal(
+                self.selected_labels,
+                subdata,
+                signal.info,
+                False
+            )
+        
+        self.set_output(0, subsignal)
     
     def _optimize_search(self, signal: LabeledSignal):
         """
@@ -280,6 +296,26 @@ class LabeledSignalSelectionNode(Node):
         the internal numpy array is not copied.
         """
         
+        # if no labels were given, choose all labels
+        if not self.selected_labels:
+            self.selected_labels = signal.labels
+        # find the indices
+        self.chan_inds = [
+            signal.ldm._label_to_index[label] 
+            for label in self.selected_labels 
+        ]
+        self.chan_inds.sort()
+        # this means that we have a sequence (0, 1, 2, 3..)
+        if (self.chan_inds[-1] - self.chan_inds[0] == len(self.chan_inds)):
+            self.start_ind = self.chan_inds[0]
+            self.stop_ind = self.chan_inds[-1]
+            # make the selected labels in order
+            self.selected_labels = [
+                self.selected_labels[i] for i in self.chan_inds
+            ]
+        else:
+            self.start_ind = ''
+            self.stop_ind = ''
              
 class FIRFilterNode(Node):
     title = 'FIR Filter'
@@ -296,7 +332,7 @@ class FIRFilterNode(Node):
         fir_window:str = Enum('hamming','hann','blackman',desc='the window to use in the FIR filter')
         fir_design:str = Enum('firwin','firwin2',desc='the design of the FIR filter')
             
-    init_inputs = [PortConfig(label='data',allowed_data=TimeSignal)]
+    init_inputs = [PortConfig(label='data',allowed_data=StreamSignal)]
     init_outputs = [PortConfig(label='filtered data',allowed_data=Signal)]
     
     @property
@@ -313,29 +349,30 @@ class FIRFilterNode(Node):
                 
     def update_event(self, inp=-1):
         
-        signal:Signal = self.input(inp)
-        if signal:
-            
-            filtered_data = mne.filter.filter_data(
-                data = signal.data,
-                sfreq = signal.info.nominal_srate,
-                l_freq = self.config.low_freq,
-                h_freq = self.config.high_freq,
-                filter_length = self.filter_length,
-                l_trans_bandwidth = self.config.l_trans_bandwidth if self.config.l_trans_bandwidth!=0.0 else 'auto',
-                h_trans_bandwidth = self.config.h_trans_bandwidth if self.config.h_trans_bandwidth!=0.0 else 'auto',
-                n_jobs = -1,
-                method = 'fir',
-                phase = self.config.phase,
-                fir_window = self.config.fir_window,
-                fir_design = self.config.fir_design
-                )
-            
-            print(filtered_data)
+        signal: StreamSignal = self.input(inp)
+        if not signal:
+            return
+        
+        filtered_data = mne.filter.filter_data(
+            data = signal.data,
+            sfreq = signal.info.nominal_srate,
+            l_freq = self.config.low_freq,
+            h_freq = self.config.high_freq,
+            filter_length = self.filter_length,
+            l_trans_bandwidth = self.config.l_trans_bandwidth if self.config.l_trans_bandwidth!=0.0 else 'auto',
+            h_trans_bandwidth = self.config.h_trans_bandwidth if self.config.h_trans_bandwidth!=0.0 else 'auto',
+            n_jobs = -1,
+            method = 'fir',
+            phase = self.config.phase,
+            fir_window = self.config.fir_window,
+            fir_design = self.config.fir_design
+            )
+        
+        print(filtered_data)
 
-            filtered_signal = Signal(data = filtered_data,signal_info = signal.info)
-            
-            self.set_output(0, filtered_signal)
+        filtered_signal = Signal(filtered_data, None)
+        
+        self.set_output(0, filtered_signal)
     
           
 class IIRFilterNode(Node):
@@ -350,7 +387,7 @@ class IIRFilterNode(Node):
         order: int = CX_Int(desc='the order of the filter')
         ftype: str = Enum('butter','cheby1','cheby2','ellip','bessel')
         
-    init_inputs = [PortConfig(label='data',allowed_data=Signal)]
+    init_inputs = [PortConfig(label='data',allowed_data=StreamSignal)]
     init_outputs = [PortConfig(label='filtered data',allowed_data=Signal)]
     
     @property
@@ -361,31 +398,35 @@ class IIRFilterNode(Node):
         self.params = dict(
             order = self.config.order,
             ftype = self.config.ftype
-            )
+        )
                 
     def update_event(self, inp=-1):
         
-        signal:Signal = self.input(inp)
-        if signal:
-            filtered_signal:Signal = signal.copy()
-            
-            iir_params_dict = mne.filter.construct_iir_filter(
-                iir_params = self.params,
-                f_pass = self.config.f_pass,
-                f_stop =  self.config.f_stop,
-                sfreq = signal.info.nominal_srate,
-                type = self.config.btype,      
+        signal:StreamSignal = self.input(inp)
+        if not signal:
+            return
+        
+        iir_params_dict = mne.filter.construct_iir_filter(
+            iir_params = self.params,
+            f_pass = self.config.f_pass,
+            f_stop =  self.config.f_stop,
+            sfreq = signal.info.nominal_srate,
+            type = self.config.btype,      
+        )
+        
+        filtered_data = mne.filter.filter_data(
+            data = signal.data,
+            sfreq = signal.info.nominal_srate,
+            method = 'iir',
+            iir_params = iir_params_dict
             )
-            
-            filtered_data = mne.filter.filter_data(
-                data = signal.data,
-                sfreq = signal.info.nominal_srate,
-                method = 'iir',
-                iir_params = iir_params_dict
-                )
 
-            filtered_signal.data = filtered_data
-            self.set_output(0, filtered_signal)
+        filtered_signal = Signal(
+            filtered_data,
+            signal.info    
+        )
+        
+        self.set_output(0, filtered_signal)
             
             
 class NotchFilterNode(Node):
@@ -404,7 +445,7 @@ class NotchFilterNode(Node):
         fir_design: str = Enum('firwin','firwin2')
 
         
-    init_inputs = [PortConfig(label='data',allowed_data=Signal)]
+    init_inputs = [PortConfig(label='data',allowed_data=StreamSignal)]
     init_outputs = [PortConfig(label='filtered data',allowed_data=Signal)]
     
     @property
@@ -424,29 +465,30 @@ class NotchFilterNode(Node):
         self.fir_design = self.config.fir_design
         
     def update_event(self,inp=-1):
-        signal: Signal = self.input(inp)
-        if signal: 
-            filtered_signal: Signal = signal.copy()
-            sampling_freq = signal.info.nominal_srate
-            
-            freqs = np.arange(self.line_freq,sampling_freq/2,self.line_freq)
-            
-            filtered_data = mne.filter.notch_filter(
-                x = signal.data,
-                Fs = sampling_freq,
-                freqs = freqs,
-                filter_length = self.filter_length_input,
-                method = self.method,
-                mt_bandwidth= self.bandwidth,
-                p_value=self.p_value,
-                n_jobs=-1,
-                phase = self.phase,
-                fir_window = self.fir_window,
-                fir_design= self.fir_design
-            )
-            
-            filtered_signal.data = filtered_data
-            self.set_output(0,filtered_signal)
+        signal: StreamSignal = self.input(inp)
+        if not signal:
+            return 
+        
+        sampling_freq = signal.info.nominal_srate
+        
+        freqs = np.arange(self.line_freq,sampling_freq/2,self.line_freq)
+        
+        filtered_data = mne.filter.notch_filter(
+            x = signal.data,
+            Fs = sampling_freq,
+            freqs = freqs,
+            filter_length = self.filter_length_input,
+            method = self.method,
+            mt_bandwidth= self.bandwidth,
+            p_value=self.p_value,
+            n_jobs=-1,
+            phase = self.phase,
+            fir_window = self.fir_window,
+            fir_design= self.fir_design
+        )
+        
+        filtered_signal = Signal(filtered_data, None)
+        self.set_output(0, filtered_signal)
 
 class ResamplingNode(Node):
     title = 'Resampling Data'
@@ -471,19 +513,19 @@ class ResamplingNode(Node):
         
     def update_event(self,inp=-1):
         signal: Signal = self.input(inp)
-        if signal: 
-            resampled_signal: Signal = signal.copy()
+        if not signal: 
+            return
             
-            resampled_data = mne.filter.resample(
-                x = signal.data,
-                up = self.upsample_factor,
-                down = self.downsample_factor,
-                n_jobs=-1,
-                method = self.method
-            )
-            
-            resampled_signal.data = resampled_data
-            self.set_output(0,resampled_signal)
+        resampled_data = mne.filter.resample(
+            x = signal.data,
+            up = self.upsample_factor,
+            down = self.downsample_factor,
+            n_jobs=-1,
+            method = self.method
+        )
+        
+        resampled_signal = Signal(resampled_data, None)
+        self.set_output(0,resampled_signal)
 
 
 
@@ -497,7 +539,7 @@ class RemoveTrendNode(Node):
         detrendType: str = Enum('high pass','high pass sinc','local detrend',desc='type of detrending to be performed')
         detrendCutoff:float = CX_Float(1.0,desc='the high-pass cutoff frequency to use for detrending (in Hz)')
         
-    init_inputs = [PortConfig(label='data',allowed_data=Signal)]
+    init_inputs = [PortConfig(label='data',allowed_data=StreamSignal)]
     init_outputs = [PortConfig(label='filtered data',allowed_data=Signal)]
     
     @property
@@ -509,20 +551,21 @@ class RemoveTrendNode(Node):
         self.detrend_cutoff = self.config.detrendCutoff
         
     def update_event(self,inp=-1):
-        signal: Signal = self.input(inp)
-        if signal: 
-            filtered_signal: Signal = signal.copy()
-            sampling_freq = signal.info.nominal_srate
-                    
-            filtered_data = remove_trend_data(
-                data = signal.data,
-                sample_rate=sampling_freq,
-                detrendType=self.detrend_type,
-                detrendCutoff=self.detrend_cutoff
-            )
-            
-            filtered_signal.data = filtered_data
-            self.set_output(0,filtered_signal)
+        signal: StreamSignal = self.input(inp)
+        if not signal:
+            return 
+        
+        sampling_freq = signal.info.nominal_srate
+                
+        filtered_data = remove_trend_data(
+            data = signal.data,
+            sample_rate=sampling_freq,
+            detrendType=self.detrend_type,
+            detrendCutoff=self.detrend_cutoff
+        )
+        
+        filtered_signal = Signal(filtered_data, None)
+        self.set_output(0, filtered_signal)
     
 class SignalToMNENode(Node):
     title = 'Data to MNE'
@@ -560,6 +603,7 @@ class SignalToMNENode(Node):
             
             self.set_output(0,raw_mne)
 
+# TODO CHECK CODE FROM HERE
 class MNEToSignalNode(Node):
     title = 'MNE to Signal'
     version = '0.1'
@@ -578,8 +622,6 @@ class MNEToSignalNode(Node):
             
         
             self.set_output(0,data)
-
-
 
 class RemovalLineNoisePrepNode(Node):
     title = 'Line Noise Removal PREP'
