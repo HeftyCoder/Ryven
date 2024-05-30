@@ -31,6 +31,11 @@ from qtpy.QtWidgets import QVBoxLayout, QWidget
 class NodeTraitsConfigInspector(NodeConfigInspector[NodeTraitsConfig], QWidget):
     """Basic config inspector"""
     
+    _item_traits = ['style', 'enabled_when', 'visible_when', 'defined_when', 'has_focus']
+    """
+    These traits, while existing for an Item, aren't passed directly through 
+    the Trait. Hence, we're redefining them and using them inside the GUI class.
+    """
     #   CLASS
     @classmethod
     def create_config_changed_event(cls, node: Node, gui: NodeGUI):
@@ -129,8 +134,12 @@ class NodeTraitsConfigInspector(NodeConfigInspector[NodeTraitsConfig], QWidget):
             items: list[Item] = []
             for tr in insp_traits:
                 internal_tr = inspected_obj.trait(tr)
-                style = getattr(internal_tr, 'style', None)
-                item = Item(tr, style=style) if style else Item(tr)
+                metadata = {}
+                for item_trait_name in self._item_traits:
+                    item_trait = getattr(internal_tr, item_trait_name, None)
+                    if item_trait:
+                        metadata[item_trait_name] = item_trait
+                item = Item(tr, **metadata) if metadata else Item(tr)
                 items.append(item)
                 
             config_group = VGroup (

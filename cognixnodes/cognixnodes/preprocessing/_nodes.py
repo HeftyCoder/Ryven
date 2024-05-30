@@ -16,7 +16,6 @@ from sys import maxsize
 
 from ..core import Signal, TimeSignal, StreamSignal, LabeledSignal
 from .utils.circ_buffer import CircularBuffer
-from .utils.windowing_helper import CircularBufferWindowing
 
 class SegmentationNode(Node):
     """
@@ -24,14 +23,19 @@ class SegmentationNode(Node):
     of a specific marker.
     """
     
-    title = 'Segmentation'
+    title = 'Segment'
     version = '0.1'
 
     class Config(NodeTraitsConfig):
-        offset: tuple[float, float] = Tuple((-0.5, 0.5))
+        offset: tuple[float, float] = CX_Tuple(-0.5, 0.5)
         marker_name: str = CX_String('marker')
-        buffer_duration: float = CX_Float(10.0, desc = 'Duration of the buffer in seconds')
-        error_margin: float = CX_Float()
+        mode: str = Enum(
+            'input', 
+            'buffer', 
+            desc='Whether to use the input to decide buffer size (offline) or manually (online)'
+        )
+        buffer_duration: float = CX_Float(10.0, desc = 'Duration of the buffer in seconds', visible_when='mode=="buffer"')
+        debug: bool = Bool(False, desc='debug message when data is segmented')
 
     init_inputs = [
         PortConfig(label='data', allowed_data=StreamSignal),
@@ -67,38 +71,47 @@ class SegmentationNode(Node):
         
         update_result = self.update_input(inp)
         
-        if update_result and self.buffer:
-            output_data = []
-            output_timestamps =[]
-            timestamps_out = 0
+        if not (update_result and self.buffer):
+            return
+        
+        output_data = []
+        output_timestamps =[]
+        timestamps_out = 0
+        
+        for i in range(self.current_length):
+            segment, timestamps = self.buffer.find_segment(
+                self.marker_tm_cache[i], 
+                self.config.offset
+            )
             
-            for i in range(self.current_length):
-                segment, timestamps = self.buffer.find_segment(
-                    self.marker_tm_cache[i], 
-                    self.config.offset
-                )
+            if isinstance(segment, np.ndarray):
+                output_timestamps.append(timestamps)
+                output_data.append(segment)
+                timestamps_out += 1
+                self.marker_tm_cache[i] = np.nan
+        
+        if timestamps_out!=0:
+            signal = [
+                StreamSignal(
+                    output_timestamps[i],
+                    self.data_signal.labels,
+                    output_data[i], 
+                    self.data_signal.info
+                ) 
+                for i in range(timestamps_out)
+            ]
+            
+            if self.config.debug:
+                msg = f"Found {len(signal)} Segments</br></br>"
+                for s in signal:
+                    msg += f"\t[{s.timestamps[0]} : {s.timestamps[-1]}]</br>"
+                self.logger.info(msg)
                 
-                if segment:
-                    output_timestamps.append(timestamps)
-                    output_data.append(segment)
-                    timestamps_out += 1
-                    self.marker_tm_cache[i] = np.nan
-                    
-            if timestamps_out!=0:
-                signal = [
-                    StreamSignal(
-                        output_timestamps[i],
-                        self.data_signal.labels,
-                        output_data[i], 
-                        self.data_signal.info
-                    ) 
-                    for i in range(timestamps_out)
-                ]
-                if len(signal) == 1:
-                    signal = signal[0]
-                
-                self.current_length -= timestamps_out    
-                self.set_output(0, signal)
+            if len(signal) == 1:
+                signal = signal[0]
+            
+            self.current_length -= timestamps_out    
+            self.set_output(0, signal)
                 
     def update_input(self, inp):
         func = self.update_dict.get(inp)
@@ -113,14 +126,18 @@ class SegmentationNode(Node):
         
         # create buffer if it doesn't exist
         if not self.buffer:
+            
+            buffer_duration = self.config.buffer_duration
+            if self.config.mode == 'input':
+                tms = self.data_signal.timestamps
+                buffer_duration = tms[-1] - tms[0]
+                
             self.buffer = CircularBuffer(
                 sampling_frequency=self.data_signal.info.nominal_srate,
-                buffer_duration=self.config.buffer_duration,
-                error_margin=self.config.error_margin,
-                start_time=self.data_signal.timestamps[0]
+                buffer_duration=buffer_duration,
+                start_time=self.data_signal.timestamps[0],
+                channels_count=len(self.data_signal.labels)
             )
-
-            print("FIRST TIMESTAMP",self.data_signal.timestamps[0])
         
         self.buffer.append(self.data_signal.data.T, self.data_signal.timestamps)
         return True
@@ -134,7 +151,7 @@ class SegmentationNode(Node):
         
         timestamps = []
                         
-        if isinstance(marker_signal, TimeSignal):
+        if isinstance(marker_signal, StreamSignal):
             timestamps = [
                 ts for name, ts in zip(marker_signal.data, marker_signal.timestamps) 
                 if name[0] == self.config.marker_name
@@ -151,8 +168,6 @@ class SegmentationNode(Node):
         if len(timestamps) == 0:
             return False
         
-        print(timestamps)
-        
         self.last_timestamps = timestamps
         
         self.marker_tm_cache[self.current_length : self.current_length + len(timestamps)] = timestamps
@@ -162,19 +177,39 @@ class SegmentationNode(Node):
 
 
 class WindowingNode(Node):
-    title = 'Windowing'
+    """
+    Segments a StreamSignal into sequencial, non-overlapping windows
+    of a given duration.
+    """
+    title = 'Window'
     version = '0.1'
 
     class Config(NodeTraitsConfig):
-        buffer_duration: float = CX_Float(10.0, desc = 'Duration of the buffer in seconds')
-        window_length: float = CX_Float(5.0,desc='length of the window')
-
-    init_inputs = [PortConfig(label='data',allowed_data=TimeSignal)]
-
-    init_outputs = [PortConfig(label='window data',allowed_data=TimeSignal)]
+        window_length: float = CX_Float(5.0, desc='length of the window in seconds')
+        mode: str = Enum(
+            'input', 
+            'buffer', 
+            desc='Whether to use the input to decide buffer size (offline) or manually (online)'
+        )
+        buffer_duration: float = CX_Float(10.0, desc = 'Duration of the buffer in seconds', visible_when='mode=="buffer"')
+        debug: bool = Bool(False, desc='debug message when data is segmented')
+    
+    init_inputs = [
+        PortConfig(
+            label='in',
+            allowed_data=StreamSignal
+        )
+    ]
+    init_outputs = [
+        PortConfig(
+            label='out',
+            allowed_data=StreamSignal | Sequence[StreamSignal]
+        )
+    ]
  
     def init(self):
-        self.buffer: CircularBufferWindowing = None
+        self.buffer: CircularBuffer = None
+        self.current_duration = 0
     
     @property
     def config(self) -> WindowingNode.Config:
@@ -184,32 +219,38 @@ class WindowingNode(Node):
         
         update_result = self.call_update_event(inp)
         
-        if update_result and self.buffer:
-            window,timestamps = self.buffer.find_segment(self.config.window_length)
-            
-            if len(timestamps)!=0:
-                signal = TimeSignal(timestamps, window, self.data_signal.info)
-            
-                self.set_output(0, signal)
+        if not (update_result and self.buffer):
+            return
+        
+        window,timestamps = self.buffer.find_segment(self.config.window_length)
+        
+        if len(timestamps)!=0:
+            signal = TimeSignal(timestamps, window, self.data_signal.info)
+        
+            self.set_output(0, signal)
     
     def call_update_event(self, inp):
-        self.data_signal: Signal = self.input(inp)
+        self.data_signal: StreamSignal = self.input(inp)
         if not self.data_signal:
             return False
         
+        buffer_duration = self.config.buffer_duration
+        if self.config.mode == 'input':
+            tms = self.data_signal.timestamps
+            buffer_duration = tms[-1] - tms[0]
+                
         # create buffer if it doesn't exist
         if not self.buffer:
-            self.buffer = CircularBufferWindowing(
+            self.buffer = CircularBuffer(
                 sampling_frequency=self.data_signal.info.nominal_srate,
-                buffer_duration=self.config.buffer_duration,
-                start_time=self.data_signal.timestamps[0]
+                buffer_duration=buffer_duration,
+                start_time=self.data_signal.timestamps[0],
+                channels_count=len(self.data_signal.labels),
             )
-
-            print("FIRST TIMESTAMP",self.data_signal.timestamps[0])
         
         self.buffer.append(self.data_signal.data.T, self.data_signal.timestamps)
+        self.current_duration += self.data_signal.time
         return True
-    
  
 class LabeledSignalSelectionNode(Node):
     """
@@ -333,7 +374,7 @@ class FIRFilterNode(Node):
         fir_design:str = Enum('firwin','firwin2',desc='the design of the FIR filter')
             
     init_inputs = [PortConfig(label='data',allowed_data=StreamSignal)]
-    init_outputs = [PortConfig(label='filtered data',allowed_data=Signal)]
+    init_outputs = [PortConfig(label='filtered data',allowed_data=LabeledSignal)]
     
     @property
     def config(self) -> FIRFilterNode.Config:
@@ -370,7 +411,12 @@ class FIRFilterNode(Node):
         
         print(filtered_data)
 
-        filtered_signal = Signal(filtered_data, None)
+        filtered_signal = LabeledSignal(
+            signal.labels,
+            filtered_data,
+            signal.info,
+            False,
+        )
         
         self.set_output(0, filtered_signal)
     
@@ -388,7 +434,7 @@ class IIRFilterNode(Node):
         ftype: str = Enum('butter','cheby1','cheby2','ellip','bessel')
         
     init_inputs = [PortConfig(label='data',allowed_data=StreamSignal)]
-    init_outputs = [PortConfig(label='filtered data',allowed_data=Signal)]
+    init_outputs = [PortConfig(label='filtered data',allowed_data=LabeledSignal)]
     
     @property
     def config(self) -> IIRFilterNode.Config:
@@ -421,7 +467,8 @@ class IIRFilterNode(Node):
             iir_params = iir_params_dict
             )
 
-        filtered_signal = Signal(
+        filtered_signal = LabeledSignal(
+            signal.labels,
             filtered_data,
             signal.info    
         )
@@ -446,7 +493,7 @@ class NotchFilterNode(Node):
 
         
     init_inputs = [PortConfig(label='data',allowed_data=StreamSignal)]
-    init_outputs = [PortConfig(label='filtered data',allowed_data=Signal)]
+    init_outputs = [PortConfig(label='filtered data',allowed_data=LabeledSignal)]
     
     @property
     def config(self) -> NotchFilterNode.Config:
@@ -487,8 +534,14 @@ class NotchFilterNode(Node):
             fir_design= self.fir_design
         )
         
-        filtered_signal = Signal(filtered_data, None)
+        filtered_signal = LabeledSignal(
+            signal.labels,
+            filtered_data, 
+            signal.info
+        )
         self.set_output(0, filtered_signal)
+
+# TODO CHECK CODE FROM HERE
 
 class ResamplingNode(Node):
     title = 'Resampling Data'
@@ -603,7 +656,6 @@ class SignalToMNENode(Node):
             
             self.set_output(0,raw_mne)
 
-# TODO CHECK CODE FROM HERE
 class MNEToSignalNode(Node):
     title = 'MNE to Signal'
     version = '0.1'
