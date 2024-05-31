@@ -29,6 +29,7 @@ from ..stream import LSLSignalInfo
 from collections.abc import Sequence
 import os
 import pyxdf
+import json
 
 class XDFWriterNode(Node):
     title = 'XDF Writer'
@@ -119,13 +120,15 @@ class XDFImportingNode(Node):
         file: str = File('Some path',desc='path of the model to import')
         lowercase_labels: bool = Bool(False, desc="if checked, makes all the incoming labels into lowercase")
 
-    init_outputs = [PortConfig(label='streams',allowed_data=Sequence[StreamSignal])]
+    init_outputs = [PortConfig(label='streams')]
         
     @property
     def config(self) -> XDFImportingNode.Config:
         return self._config
     
     def init(self):
+
+        formats = ['double64','float32','int32','string','int16','int8','int64']
         
         stream_collection = dict()
         
@@ -133,15 +136,22 @@ class XDFImportingNode(Node):
             streams , header = pyxdf.load_xdf(self.config.file)
             
             for stream in streams:
-                stream_name = stream['info']['name']
-                stream_type = stream['info']['type']
-                stream_channel_count = stream['info']['channel_count']
-                stream_srate = stream['info']['nominal_srate']
-                stream_format = stream['info']['channel_format']
+                stream_name = stream['info']['name'][0]
+                stream_type = stream['info']['type'][0]
+                stream_channel_count = stream['info']['channel_count'][0]
+                stream_srate = stream['info']['nominal_srate'][0]
+                stream_format = formats.index(stream['info']['channel_format'][0])
                 stream_id = stream['info']['stream_id']
                 stream_data = stream['time_series']
                 stream_timestamps = stream['time_stamps']
-                stream_channels = stream['info']['channels']
+                
+                stream_channels = stream['info']['channels'][0]
+                
+                stream_channels = stream_channels.replace("'", '"')
+
+                stream_channels = json.loads(stream_channels)
+
+                print(stream_channels)
                 
                 labels = stream_channels.keys()
                 cached_labels = (
@@ -153,9 +163,9 @@ class XDFImportingNode(Node):
                     name = stream_name,
                     type = stream_type,
                     channel_count = stream_channel_count,
-                    nominal_srate = stream_srate,
+                    nominal_srate = float(stream_srate),
                     channel_format = stream_format,
-                    source_id = stream_id
+                    source_id = str(stream_id)
                 ) 
                 
                 stream_info = LSLSignalInfo(info)
