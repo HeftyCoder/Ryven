@@ -211,6 +211,7 @@ class WindowNode(Node):
     class Config(NodeTraitsConfig):
         mode: str = Enum('buffer', 'segment', 'overlap', desc='the operation mode of the Window Node')
         window_length: float = CX_Float(0.5, desc='length of the window in seconds')
+        error_margin: float = CX_Float(0.05, desc='error margin for when the segment is slightly smaller than requested')
         overlap: float = CX_Float(0, visible_when='mode=="overlap"', desc='overlap between the windows')
         debug: bool = Bool(False, desc='debug message when data is segmented')
     
@@ -273,27 +274,31 @@ class WindowNode(Node):
             data_inp = [data_inp]
         
         # TODO check this again if segmentation is better
-        wnd_dur = self.config.window_length - 0.025
+        wnd_dur = self.config.window_length
         results: list[StreamSignal] = []
         buffer = CircularBuffer.create_empty()
+        err_margin = self.config.error_margin
         for i in range(len(data_inp)):
             inp_signal = data_inp[i]
-            inp_dur = inp_signal.tms[-1] - inp_signal.tms[0]
+            global_dur = inp_signal.tms[-1] - inp_signal.tms[0]
             
-            if inp_dur < wnd_dur:
+            if wnd_dur - err_margin > global_dur:
                 if self.config.debug:
-                    self.logger.warning(f'Incoming signal had smaller duration than Window Length')
+                    self.logger.warning(f'Incoming signal had smaller duration than Window Length - error margin')
                 continue
             
             buffer.reset(inp_signal.data, inp_signal.timestamps)
             
-            wnd_num = int(inp_dur / wnd_dur)
+            wnd_num = int((global_dur + err_margin) / wnd_dur)
             for w in range(wnd_num):
                 
                 start = w*wnd_dur
+                if w == wnd_num - 1 and wnd_dur + start > global_dur:
+                    wnd_dur -= self.config.error_margin
+                    
                 segment, times = buffer.find_segment(
-                    timestamp=0,
-                    offsets=(start, start + wnd_dur)
+                    timestamp=start,
+                    offsets=(0, wnd_dur)
                 )
                 
                 results.append(
@@ -323,17 +328,26 @@ class WindowNode(Node):
         for sig in data_inp:
             buffer.reset(sig.data, sig.timestamps)
             
-            current_seg = 0.0
-            while current_seg + wnd_dur < buffer.buffer_duration:
+            current_seg = sig.timestamps[0]
+            global_dur = buffer.buffer_duration + sig.timestamps[0]
+            while current_seg + wnd_dur - self.config.error_margin < global_dur:
+                
+                # if the time was exceeded due to the segment being slightly
+                # smaller than the window, then reduce the window by a configurable
+                # by the user error margin
+                new_wnd_dur = wnd_dur
+                if current_seg + wnd_dur > global_dur:
+                    new_wnd_dur -= self.config.error_margin
+                    
                 segment, times = buffer.find_segment(
                     current_seg,
-                    (0, wnd_dur)
+                    (0, new_wnd_dur)
                 )
-                self.logger.info(f"{current_seg} {(0, wnd_dur)}")
+                
                 current_seg += overlap
-                if not segment:
+                if segment is None:
                     if self.config.debug:
-                        self.logger.warn(f"Found no segment in overlap mode")
+                        self.logger.warn(f"Found no segment in overlap mode. Global Dur: {global_dur}")
                     continue
                 
                 results.append(
@@ -344,9 +358,10 @@ class WindowNode(Node):
                         sig.info,
                     )
                 )
+            
         
         if results:
-            print(results)
+            print(len(results))
             self.set_output(0, results)
  
 class LabeledSignalSelectionNode(Node):
