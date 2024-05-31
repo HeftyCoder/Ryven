@@ -112,8 +112,6 @@ class LSLInputNode(FrameNode):
         self.search_action = self.config.search_action
         self.processing_flag_mode = self.config.processing_flag_mode
         
-        self.logger.warn(f'buffer_size:{self.buffer_size},define_buffer:{self.define_buffer}')
-        
         flags = 0
         for flag in self.processing_flag_mode:
             flags |= flag

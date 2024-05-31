@@ -10,6 +10,11 @@ class Timestamped:
     @property
     def timestamps(self):
         return self._timestamps
+    
+    @property
+    def tms(self):
+        """Shorthand for self.timestamps"""
+        return self._timestamps
 
 class Labeled:
     """An object that provides label data"""

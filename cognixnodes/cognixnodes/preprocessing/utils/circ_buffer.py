@@ -4,12 +4,23 @@ from collections.abc import Sequence
 class CircularBuffer:
     """An implementation of a circular buffer for handling data and timestamps"""
     
+    @classmethod
+    def create(cls, data: np.ndarray, timestamps: np.ndarray):
+        result = CircularBuffer(1, 1, 1, 1, False)
+        result.reset(data, timestamps)
+        return result
+    
+    @classmethod
+    def create_empty(cls):
+        return CircularBuffer(1, 1, 1, 1, False)
+        
     def __init__(
         self,
         sampling_frequency: float, 
         buffer_duration: float, 
         start_time: float,
-        channels_count: int
+        channels_count: int,
+        init_buffers=True
     ):
         self.nominal_srate = sampling_frequency
         self.effective_srate = 0
@@ -20,13 +31,23 @@ class CircularBuffer:
         self.tloop = start_time
         self.dts = 1 / self.nominal_srate
 
-        self.buffer_data = np.full((channels_count,self.size),-1.0,dtype=float)
-        self.buffer_timestamps = np.full(self.size,-1.0,dtype=float)
-        self.tc = self.buffer_timestamps[self.current_index]
+        if init_buffers:
+            self.buffer_data = np.full((channels_count,self.size), -1.0, dtype=float)
+            self.buffer_timestamps = np.full(self.size, -1.0, dtype=float)
         
         # for calculating effective srate
-        self.total_timestamps = 0
-        self.time_passed = 0
+        self.interval_count = 0
+        self.total_intervals = 0
+        self.moving_dur = 0
+    
+    def reset(self, data: np.ndarray, timestamps: np.ndarray):
+        self.buffer_duration = timestamps[-1] - timestamps[0]
+        self.tloop = timestamps[-1]
+        self.size = len(timestamps)
+        self.current_index = self.size-1
+        self.effective_srate = 1/(timestamps[1] - timestamps[0])
+        self.buffer_timestamps = timestamps
+        self.buffer_data = data
         
     @property
     def effective_dts(self):
@@ -34,65 +55,85 @@ class CircularBuffer:
             return 0
         return 1 / self.effective_srate
         
-    def append(self, data: Sequence, timestamps: Sequence[float]):
-        """Appends data and corresponding timestamps to the buffer"""
-        assert data.shape[1] == len(timestamps), "Length of data and timestamps was not equal!"
+    def append(
+        self, 
+        data: Sequence, 
+        timestamps: Sequence[float],
+        get_looped_data=False
+    ) -> tuple[np.ndarray, np.ndarray] | tuple[None, None]:
+        """
+        Appends data and corresponding timestamps to the buffer
         
-        self.total_timestamps += len(timestamps)
-        self.time_passed += timestamps[-1] - timestamps[0]
-        self.effective_srate = self.total_timestamps / self.time_passed
-            
-        if self.current_index + len(timestamps) < self.size:
-            self.buffer_timestamps[self.current_index:len(timestamps) + self.current_index] = timestamps
-            self.buffer_data[:,self.current_index:len(timestamps)+self.current_index] = data
-            self.current_index = self.current_index + len(timestamps) - 1
-
-        elif self.current_index + len(timestamps) == self.size:
-            self.buffer_timestamps[self.current_index:self.size] = timestamps
-            self.buffer_data[:,self.current_index:self.size] = data
-
-            self.current_index = 0
-            self.tloop = timestamps[-1] 
-            
+        When get_looped_data=True, it returns a tuple of (data, timestamps) 
+        if the buffer has looped, else None.
+        """
+        ts_len = len(timestamps)
+        assert data.shape[1] == ts_len, "Length of data and timestamps was not equal!"
+        
+        # TODO validate this later
+        # Attempting to remove old timestamps influence
+        if self.moving_dur >= self.buffer_duration * 0.5:
+            self.moving_dur = 0
+            self.total_intervals = 0
+            self.interval_count = 0
+        
+        self.moving_dur += timestamps[-1]
+        self.total_intervals += np.mean(np.diff(timestamps))
+        self.interval_count +=1
+        self.effective_srate = self.interval_count / self.total_intervals
+         
+        if self.current_index + ts_len <= self.size:
+            self.buffer_timestamps[self.current_index :ts_len + self.current_index] = timestamps
+            self.buffer_data[:,self.current_index:ts_len + self.current_index] = data
+            self.current_index += ts_len - 1
+            return (None, None)
+        
         else:
-            extra = len(timestamps) - (self.size - self.current_index)
-            breakpoint = len(timestamps) - extra
+            extra = ts_len - (self.size - self.current_index)
+            breakpoint = ts_len - extra
+            
             self.buffer_timestamps[self.current_index:self.size] = timestamps[:breakpoint]
-            self.buffer_data[:,self.current_index:self.size] = data[:,:breakpoint]
-
-            self.tloop = timestamps[breakpoint]
-
+            self.buffer_data[:,self.current_index:self.size] = data[:, :breakpoint]
+            
             self.buffer_timestamps[0:extra] = timestamps[breakpoint:]
             self.buffer_data[:, 0:extra] = data[:, breakpoint:]
+            
+            self.tloop = timestamps[breakpoint]
+
+            looped_result = (None, None)
+            if breakpoint != 0:
+                #loop result
+                looped_result = (
+                    (self.buffer_data.copy(), self.buffer_timestamps.copy())
+                    if get_looped_data else (None, None)
+                )
 
             self.current_index = extra - 1
+            
+            return looped_result
     
     def find_index(self, timestamp: float):
         """Finds closest index of the buffer based on a timestamp"""
-        dts = self.effective_dts
-        
+
         tc = self.buffer_timestamps[self.current_index]
         tx = timestamp
         
         if (tx > tc) or ((tc - tx) > self.buffer_duration): 
             return (-1, False)
 
-        tl = self.tloop
-        if tx <= tc:
-            index = int((tx - tl)/dts)
-            overflow = False
-            if index < 0:
-                index = self.size - (-index)
-                overflow = True
-            
-            # indexes and timestamps have errors between them
-            # if we get a correct timestamp but the index exists
-            # the current, clamp it
-            if index > self.current_index:
-                index = self.current_index
-            return index, overflow
+        tl = self.buffer_timestamps[0]
+        index = int((tx - tl) * self.effective_srate)
+        overflow = False
+        if index < 0:
+            index = self.size - (-index)
+            overflow = True
         
-        return (-1, False)
+        # indexes and timestamps have errors between them
+        # if we get a correct timestamp but the index exceeds
+        # the current, clamp it
+        if index > self.current_index:
+            index = self.current_index
+        return index, overflow
     
     def find_segment(self, timestamp: float, offsets: tuple[float, float]):
         """Extracts a segment of the buffer based around a timestamp and offsets"""
@@ -113,15 +154,36 @@ class CircularBuffer:
             buffer_tm[y_index] < 0 or 
             x>y
         ): 
-            return False, False
+            return None, None
     
         if not (x_overflow or y_overflow) or (x_overflow and y_overflow):
+            start = x_index
+            end = y_index
+            print(
+            f"""Segment SAME SIDE:
+                    Nominal: {self.nominal_srate}
+                    Effective: {self.effective_srate}
+                    Indices: {start} {end}
+                    Wanted: [{tm+x}:{tm+y}]
+                    Actual: [{buffer_tm[start]}:{buffer_tm[end]}]
+                    Error: [{buffer_tm[start]-tm-x}:{buffer_tm[end]-tm-y}]
+             """)
             return buffer[:, x_index:y_index], buffer_tm[x_index:y_index]
     
         else:
             start, end = (x_index, y_index) if x_overflow else (y_index, x_index)
+            print(
+            f"""Segment OVERFLOW:
+                    Nominal: {self.nominal_srate}
+                    Effective: {self.effective_srate}
+                    Overflows: {x_overflow} {y_overflow}
+                    Indices: {start} {end}
+                    Wanted: [{tm+x}:{tm+y}]
+                    Actual: [{buffer_tm[start]}:{buffer_tm[end]}]
+                    Error: [{buffer_tm[start]-tm-x}:{buffer_tm[end]-tm-y}]
+             """)
             return (
-                np.concatenate((buffer[:,start:size], buffer[:, 0:end]), axis=1),
+                np.concatenate((buffer[:, start:size], buffer[:, 0:end]), axis=1),
                 np.concatenate((buffer_tm[start:size], buffer_tm[0:end]))
             )
     
@@ -135,7 +197,7 @@ class CircularBuffer:
             x_index > self.size or 
             m_index > self.size
         )
-    
+        
     def __print_segment(self, tm:float, x: float, y: float, start: bool, end: bool):
         buffer_tm = self.buffer_timestamps
         print(

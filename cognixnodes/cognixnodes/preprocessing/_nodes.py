@@ -102,9 +102,10 @@ class SegmentationNode(Node):
             ]
             
             if self.config.debug:
-                msg = f"Found {len(signal)} Segments</br></br>"
+                msg = f"ERATE: {self.buffer.effective_dts} Found {len(signal)} Segments</br></br>"
                 for s in signal:
-                    msg += f"\t[{s.timestamps[0]} : {s.timestamps[-1]}]</br>"
+                    s_dur = s.timestamps[-1] - s.timestamps[0]
+                    msg += f"\t[{s.timestamps[0]} : {s.timestamps[-1]}] dur:[{s_dur}]</br>"
                 self.logger.info(msg)
                 
             if len(signal) == 1:
@@ -130,7 +131,7 @@ class SegmentationNode(Node):
             buffer_duration = self.config.buffer_duration
             if self.config.mode == 'input':
                 tms = self.data_signal.timestamps
-                buffer_duration = tms[-1] - tms[0]
+                buffer_duration = tms[-1] - tms[0] + 0.1
                 
             self.buffer = CircularBuffer(
                 sampling_frequency=self.data_signal.info.nominal_srate,
@@ -176,81 +177,133 @@ class SegmentationNode(Node):
         return True
 
 
-class WindowingNode(Node):
+class WindowNode(Node):
     """
-    Segments a StreamSignal into sequencial, non-overlapping windows
-    of a given duration.
+    The Window Node has two functions.
+    
+    buffer:
+        In the buffer mode, it acts as a buffer. Incoming data
+        must be of type StreamSignal. Each time the node updates,
+        it adds the input to the buffer and outputs the Window
+        if it is detected.
+    
+    segment:
+        In the segment mode, it acts as a segmentation mechanism.
+        Incoming data can be a StreamSignal or a list of StreamSignals.
+        In its update, it will receive the data, attempt to segment it
+        into the requested window size and return the results as a 
+        list of StreamSignals. If the data is less than the window,
+        there will be no output.
+        
+        This mode has an optional overlap parameter, where the resulting
+        windows can be overlapped. This value is clamped to the window size.
     """
+    
     title = 'Window'
     version = '0.1'
 
+    buffer_mode = 'buffer'
+    segment_mode = 'segment'
+    
     class Config(NodeTraitsConfig):
-        window_length: float = CX_Float(5.0, desc='length of the window in seconds')
-        mode: str = Enum(
-            'input', 
-            'buffer', 
-            desc='Whether to use the input to decide buffer size (offline) or manually (online)'
-        )
-        buffer_duration: float = CX_Float(10.0, desc = 'Duration of the buffer in seconds', visible_when='mode=="buffer"')
+        mode: str = Enum('buffer', 'segment', desc='the operation mode of the Window Node')
+        window_length: float = CX_Float(0.5, desc='length of the window in seconds')
+        overlap: float = CX_Float(0, visible_when='mode=="segment"', desc='overlap between the windows')
         debug: bool = Bool(False, desc='debug message when data is segmented')
     
     init_inputs = [
         PortConfig(
             label='in',
-            allowed_data=StreamSignal
+            allowed_data=StreamSignal | Sequence[StreamSignal]
         )
     ]
     init_outputs = [
         PortConfig(
             label='out',
-            allowed_data=StreamSignal | Sequence[StreamSignal]
+            allowed_data=Sequence[StreamSignal]
         )
     ]
  
     def init(self):
         self.buffer: CircularBuffer = None
-        self.current_duration = 0
     
     @property
-    def config(self) -> WindowingNode.Config:
+    def config(self) -> WindowNode.Config:
         return self._config
         
     def update_event(self, inp=-1):
         
-        update_result = self.call_update_event(inp)
-        
-        if not (update_result and self.buffer):
+        self.data_inp: StreamSignal | Sequence[StreamSignal] = self.input(inp)
+        if not self.data_inp:
             return
         
-        window,timestamps = self.buffer.find_segment(self.config.window_length)
-        
-        if len(timestamps)!=0:
-            signal = TimeSignal(timestamps, window, self.data_signal.info)
-        
-            self.set_output(0, signal)
+        if self.config.mode == self.buffer_mode:
+            self.update_buffer_mode(self.data_inp)
+        else:
+            self.update_segment_mode(self.data_inp)    
     
-    def call_update_event(self, inp):
-        self.data_signal: StreamSignal = self.input(inp)
-        if not self.data_signal:
-            return False
-        
-        buffer_duration = self.config.buffer_duration
-        if self.config.mode == 'input':
-            tms = self.data_signal.timestamps
-            buffer_duration = tms[-1] - tms[0]
-                
-        # create buffer if it doesn't exist
+    def update_buffer_mode(self, data_inp: StreamSignal):
         if not self.buffer:
             self.buffer = CircularBuffer(
-                sampling_frequency=self.data_signal.info.nominal_srate,
-                buffer_duration=buffer_duration,
-                start_time=self.data_signal.timestamps[0],
-                channels_count=len(self.data_signal.labels),
+                data_inp.info.nominal_srate,
+                self.config.window_length,
+                data_inp.timestamps[0],
+                len(data_inp.labels)
             )
         
-        self.buffer.append(self.data_signal.data.T, self.data_signal.timestamps)
-        self.current_duration += self.data_signal.time
-        return True
+        # TODO if the incoming signal is bigger than the window,
+        # segment it and return multiple windows :D
+        data, timestamps = self.buffer.append(data_inp.data, data_inp.timestamps, True)
+        if data:
+            result_signal = StreamSignal(
+                timestamps,
+                data_inp.labels,
+                data,
+                data_inp.info
+            )
+            self.set_output(0, result_signal)
+        
+    def update_segment_mode(self, data_inp: StreamSignal | Sequence[StreamSignal]):
+        if isinstance(data_inp, StreamSignal):
+            data_inp = [data_inp]
+        
+        wnd_dur = self.config.window_length
+        overlap = min(self.config.overlap, wnd_dur)
+        results: list[StreamSignal] = []
+        buffer = CircularBuffer.create_empty()
+        for i in range(len(data_inp)):
+            inp_signal = data_inp[i]
+            inp_dur = inp_signal.tms[-1] - inp_signal.tms[0]
+            
+            if inp_dur < wnd_dur:
+                if self.config.debug:
+                    self.logger.warning(f'Incoming signal had smaller duration than Window Length')
+                continue
+            
+            buffer.reset(inp_signal.data, inp_signal.timestamps)
+            
+            wnd_num = int(inp_dur / wnd_dur)
+            for w in range(wnd_num):
+                wnd_length = wnd_dur
+                if w != wnd_num - 1:
+                    wnd_length += overlap
+                
+                start = w*wnd_dur
+                segment, times = buffer.find_segment(
+                    timestamp=0,
+                    offsets=(start, start + wnd_length)
+                )
+                
+                results.append(
+                    StreamSignal(
+                        timestamps=times,
+                        labels=inp_signal.labels,
+                        data=inp_signal.data,
+                        signal_info=inp_signal.info
+                    )
+                )
+        if results:
+            self.set_output(0, results) 
  
 class LabeledSignalSelectionNode(Node):
     """
@@ -374,7 +427,7 @@ class FIRFilterNode(Node):
         fir_design:str = Enum('firwin','firwin2',desc='the design of the FIR filter')
             
     init_inputs = [PortConfig(label='data',allowed_data=StreamSignal)]
-    init_outputs = [PortConfig(label='filtered data',allowed_data=LabeledSignal)]
+    init_outputs = [PortConfig(label='filtered data',allowed_data=StreamSignal)]
     
     @property
     def config(self) -> FIRFilterNode.Config:
@@ -411,7 +464,8 @@ class FIRFilterNode(Node):
         
         print(filtered_data)
 
-        filtered_signal = LabeledSignal(
+        filtered_signal = StreamSignal(
+            signal.timestamps,
             signal.labels,
             filtered_data,
             signal.info,
