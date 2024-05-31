@@ -151,8 +151,6 @@ class XDFImportingNode(Node):
 
                 stream_channels = json.loads(stream_channels)
 
-                print(stream_channels)
-                
                 labels = stream_channels.keys()
                 cached_labels = (
                     list(labels) if not self.config.lowercase_labels
@@ -176,15 +174,41 @@ class XDFImportingNode(Node):
                     labels = cached_labels,
                     signal_info= stream_info
                 )
-            print(stream_collection)
-            
+
             self.set_output(0,stream_collection)
             
     def update_event(self, inp=-1):
         pass
             
                             
-                
+class SelectStreamNode(Node):
+    title = 'Select Stream'
+    version = '0.1' 
+
+    class Config(NodeTraitsConfig):
+        stream_name: str = CX_Str('stream name',desc='the stream name to get data')
+
+    init_inputs = [PortConfig(label = 'streams')]
+    init_outputs = [PortConfig(label = 'selected stream')]
+
+    @property
+    def config(self) -> SelectStreamNode.Config:
+        return self._config
+    
+    def init(self):
+        self.dict_streams = None
+        self.stream_name = self.config.stream_name
+        
+    def update_event(self, inp=-1):
+
+        self.dict_streams = self.input(inp)
+
+        if self.dict_streams and self.stream_name in self.dict_streams.keys():
+            self.set_output(0,self.dict_streams[self.stream_name])
+        
+        
+    
+
                 
             
             
