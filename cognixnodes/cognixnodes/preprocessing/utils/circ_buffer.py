@@ -72,19 +72,17 @@ class CircularBuffer:
         
         # TODO validate this later
         # Attempting to remove old timestamps influence
-        if self.moving_dur >= self.buffer_duration * 0.5:
-            self.moving_dur = 0
-            self.total_intervals = 0
-            self.interval_count = 0
         
-        self.moving_dur += timestamps[-1]
-        self.total_intervals += np.mean(np.diff(timestamps))
-        self.interval_count +=1
-        self.effective_srate = self.interval_count / self.total_intervals
+        self.moving_dur = timestamps[-1]
+        intervals = np.mean(np.diff(timestamps))
+        
+        # exponential moving average
+        self.current_erate = 1 / intervals
+        self.effective_srate = self.effective_srate + 0.65*(self.current_erate - self.effective_srate)
          
         if self.current_index + ts_len <= self.size:
             self.buffer_timestamps[self.current_index :ts_len + self.current_index] = timestamps
-            self.buffer_data[:,self.current_index:ts_len + self.current_index] = data
+            self.buffer_data[:, self.current_index:ts_len + self.current_index] = data
             self.current_index += ts_len - 1
             return (None, None)
         
@@ -101,6 +99,7 @@ class CircularBuffer:
             self.tloop = timestamps[breakpoint]
 
             looped_result = (None, None)
+            # might not be needed
             if breakpoint != 0:
                 #loop result
                 looped_result = (
@@ -127,12 +126,12 @@ class CircularBuffer:
         if index < 0:
             index = self.size - (-index)
             overflow = True
-        
-        # indexes and timestamps have errors between them
-        # if we get a correct timestamp but the index exceeds
-        # the current, clamp it
-        if index > self.current_index:
+        elif index > self.current_index:
             index = self.current_index
+        
+        if index >= self.size:
+            print('OK')
+            index = self.size-1
         return index, overflow
     
     def find_segment(self, timestamp: float, offsets: tuple[float, float]):
@@ -157,31 +156,10 @@ class CircularBuffer:
             return None, None
     
         if not (x_overflow or y_overflow) or (x_overflow and y_overflow):
-            start = x_index
-            end = y_index
-            print(
-            f"""Segment SAME SIDE:
-                    Nominal: {self.nominal_srate}
-                    Effective: {self.effective_srate}
-                    Indices: {start} {end}
-                    Wanted: [{tm+x}:{tm+y}]
-                    Actual: [{buffer_tm[start]}:{buffer_tm[end]}]
-                    Error: [{buffer_tm[start]-tm-x}:{buffer_tm[end]-tm-y}]
-             """)
             return buffer[:, x_index:y_index], buffer_tm[x_index:y_index]
     
         else:
             start, end = (x_index, y_index) if x_overflow else (y_index, x_index)
-            print(
-            f"""Segment OVERFLOW:
-                    Nominal: {self.nominal_srate}
-                    Effective: {self.effective_srate}
-                    Overflows: {x_overflow} {y_overflow}
-                    Indices: {start} {end}
-                    Wanted: [{tm+x}:{tm+y}]
-                    Actual: [{buffer_tm[start]}:{buffer_tm[end]}]
-                    Error: [{buffer_tm[start]-tm-x}:{buffer_tm[end]-tm-y}]
-             """)
             return (
                 np.concatenate((buffer[:, start:size], buffer[:, 0:end]), axis=1),
                 np.concatenate((buffer_tm[start:size], buffer_tm[0:end]))

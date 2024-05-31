@@ -194,9 +194,11 @@ class WindowNode(Node):
         into the requested window size and return the results as a 
         list of StreamSignals. If the data is less than the window,
         there will be no output.
-        
-        This mode has an optional overlap parameter, where the resulting
-        windows can be overlapped. This value is clamped to the window size.
+    
+    overlap:
+        In the overlap mode, it acts as a segmentation mechanism, quite
+        similarly to the segment mode. However, the overlap value is the
+        step in which the windows will be overlapped.
     """
     
     title = 'Window'
@@ -204,11 +206,12 @@ class WindowNode(Node):
 
     buffer_mode = 'buffer'
     segment_mode = 'segment'
+    overlap_mode = 'overlap'
     
     class Config(NodeTraitsConfig):
-        mode: str = Enum('buffer', 'segment', desc='the operation mode of the Window Node')
+        mode: str = Enum('buffer', 'segment', 'overlap', desc='the operation mode of the Window Node')
         window_length: float = CX_Float(0.5, desc='length of the window in seconds')
-        overlap: float = CX_Float(0, visible_when='mode=="segment"', desc='overlap between the windows')
+        overlap: float = CX_Float(0, visible_when='mode=="overlap"', desc='overlap between the windows')
         debug: bool = Bool(False, desc='debug message when data is segmented')
     
     init_inputs = [
@@ -239,8 +242,10 @@ class WindowNode(Node):
         
         if self.config.mode == self.buffer_mode:
             self.update_buffer_mode(self.data_inp)
+        elif self.config.mode == self.segment_mode:
+            self.update_segment_mode(self.data_inp)
         else:
-            self.update_segment_mode(self.data_inp)    
+            self.update_overlap_mode(self.data_inp)    
     
     def update_buffer_mode(self, data_inp: StreamSignal):
         if not self.buffer:
@@ -267,8 +272,8 @@ class WindowNode(Node):
         if isinstance(data_inp, StreamSignal):
             data_inp = [data_inp]
         
-        wnd_dur = self.config.window_length
-        overlap = min(self.config.overlap, wnd_dur)
+        # TODO check this again if segmentation is better
+        wnd_dur = self.config.window_length - 0.025
         results: list[StreamSignal] = []
         buffer = CircularBuffer.create_empty()
         for i in range(len(data_inp)):
@@ -284,26 +289,65 @@ class WindowNode(Node):
             
             wnd_num = int(inp_dur / wnd_dur)
             for w in range(wnd_num):
-                wnd_length = wnd_dur
-                if w != wnd_num - 1:
-                    wnd_length += overlap
                 
                 start = w*wnd_dur
                 segment, times = buffer.find_segment(
                     timestamp=0,
-                    offsets=(start, start + wnd_length)
+                    offsets=(start, start + wnd_dur)
                 )
                 
                 results.append(
                     StreamSignal(
                         timestamps=times,
                         labels=inp_signal.labels,
-                        data=inp_signal.data,
+                        data=segment,
                         signal_info=inp_signal.info
                     )
                 )
         if results:
             self.set_output(0, results) 
+    
+    def update_overlap_mode(self, data_inp: StreamSignal | Sequence[StreamSignal]):
+        if isinstance(data_inp, StreamSignal):
+            data_inp = [data_inp]
+            
+        wnd_dur = self.config.window_length
+        overlap = self.config.overlap
+        if overlap == 0:
+            if self.config.debug:
+                self.logger.warning(f'Overlap value cannot be 0 in overlap mode')
+                return
+        
+        buffer = CircularBuffer.create_empty()
+        results = []
+        for sig in data_inp:
+            buffer.reset(sig.data, sig.timestamps)
+            
+            current_seg = 0.0
+            while current_seg + wnd_dur < buffer.buffer_duration:
+                segment, times = buffer.find_segment(
+                    current_seg,
+                    (0, wnd_dur)
+                )
+                self.logger.info(f"{current_seg} {(0, wnd_dur)}")
+                current_seg += overlap
+                if not segment:
+                    if self.config.debug:
+                        self.logger.warn(f"Found no segment in overlap mode")
+                    continue
+                
+                results.append(
+                    StreamSignal(
+                        times,
+                        sig.labels,
+                        segment,
+                        sig.info,
+                    )
+                )
+        
+        if results:
+            print(results)
+            self.set_output(0, results)
  
 class LabeledSignalSelectionNode(Node):
     """
