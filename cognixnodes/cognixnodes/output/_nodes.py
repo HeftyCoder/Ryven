@@ -24,7 +24,7 @@ from .utils import xdfwriter
 from cognixcore import ProgressState
 from traitsui.api import CheckListEditor
 from threading import Thread
-from ..core import Signal
+from ..core import Signal,StreamSignal
 import os
 
 class XDFWriterNode(Node):
@@ -34,7 +34,7 @@ class XDFWriterNode(Node):
     class Config(NodeTraitsConfig):
         file_name = CX_Str('file name',desc='the name of the XDF file')
         
-    init_inputs = [PortConfig(label='data stream'), PortConfig(label='marker stream'), PortConfig(label='path')]
+    init_inputs = [PortConfig(label='data stream',allowed_data=StreamSignal), PortConfig(label='marker stream',allowed_data=StreamSignal), PortConfig(label='path')]
     
     def __init__(self, flow: Flow):
         super().__init__(flow)
@@ -61,7 +61,7 @@ class XDFWriterNode(Node):
     def config(self) -> XDFWriterNode.Config:
         return self._config
     
-    def start(self):
+    def init(self):
         self.start_time = pylsl.local_clock()
         self.write_header = [False for _ in range(len(self._inputs)-1)]
         self.timestamps = [[] for _ in range(len(self._inputs)-1)]
@@ -69,7 +69,6 @@ class XDFWriterNode(Node):
     
     def stop(self):
         import time
-        
         for i in range(len(self.inlets)):
             creation_of_xdf(self.xdfile,i,self.inlets[i],None,None,False,False,True,first_time=self.timestamps[i][0][0],last_time=self.timestamps[i][-1][-1],samples_count=self.samples_count[i])  
     
@@ -87,13 +86,13 @@ class XDFWriterNode(Node):
         if not self.write_header[inp]:
 
             if inp!=len(self._inputs)-1:
-                signal: Signal = self.input(inp)
+                signal: StreamSignal = self.input(inp)
                 if not signal:
                     return False
                 if 'Marker' in signal.info.signal_type and (signal.info.nominal_srate != pylsl.IRREGULAR_RATE or signal.info.data_format != pylsl.cf_string):
                         return 
                 else:
-                    self.inlets[inp] = {'stream_name':signal.info.name,'stream_type':signal.info.signal_type,'channel_count':signal.info.channel_count,\
+                    self.inlets[inp] = {'stream_name':signal.info.name,'stream_type':signal.info.signal_type,'channel_count':len(signal.labels),\
                         'nominal_srate':signal.info.nominal_srate,'channel_format':self.formats[signal.info.data_format],'time_created':self.start_time,'channels':signal.info.channels}
                     creation_of_xdf(self.xdfile,inp,self.inlets[inp],None,None,True,False,False,0,0,0)
 
