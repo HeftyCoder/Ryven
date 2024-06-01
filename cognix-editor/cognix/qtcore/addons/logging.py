@@ -23,10 +23,9 @@ from qtpy.QtWidgets import (
     QLabel, 
     QPlainTextEdit,
     QSplitter,
-    QScrollArea,
+    QPushButton,
     QListView,
     QStyledItemDelegate,
-    QStyleOptionViewItem,
     QStyle,
 )
 
@@ -182,6 +181,10 @@ class LogWidget(QWidget):
             
         self.header_layout.addWidget(title_label)
 
+        # for clearing purposes
+        self.clear_button = QPushButton('Clear')
+        self.clear_button.clicked.connect(self.clear)
+        self.main_layout.addWidget(self.clear_button)
         # for messages + big message
         self.splitter = QSplitter()
         self.splitter.setOrientation(Qt.Orientation.Vertical)
@@ -219,3 +222,7 @@ class LogWidget(QWidget):
         self.model.appendRow(
             LogItem(record=record, formatter=formatter)
         )
+    
+    def clear(self):
+        self.model.clear()
+        self.text_edit.clear()
