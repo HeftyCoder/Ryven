@@ -141,14 +141,14 @@ class CircularBuffer:
         # to narrow down a better index
         search_boundary = int(err / self.effective_dts)
         if search_boundary > 0:
-            if index - search_boundary >=0:
-                search_boundary = min(search_boundary, index)
+            if index >= search_boundary or index + search_boundary < self.size:
                 search_arr = self.timestamps[index-search_boundary:index]
                 search_diff = np.abs(search_arr - timestamp)
                 found_index = np.argmax(search_diff <= err_margin)
                 if search_diff[found_index] <= err_margin:
                     index = index - search_boundary + found_index
-                    
+                    if index > self.current_index:
+                        overflow = True
             else:
                 leftover = index - search_boundary
                 begin = max(self.size - leftover, self.current_index)
@@ -166,12 +166,31 @@ class CircularBuffer:
                        index = self.size - begin + found_index
         
         elif search_boundary < 0:
-            search_boundary = min(abs(search_boundary), self.current_index)
-            search_arr = self.timestamps[index:index+search_boundary]
-            search_diff = search_arr - timestamp
-            found_index = np.argmax(search_diff <= err_margin)
-            if search_diff[found_index] <= err_margin:
-                index += found_index
+            search_boundary = abs(search_boundary)
+            if index <= self.current_index or index + search_boundary < self.size:
+                search_boundary = min(search_boundary, self.current_index)
+                search_arr = self.timestamps[index:index+search_boundary]
+                search_diff = search_arr - timestamp
+                found_index = np.argmax(search_diff <= err_margin)
+                if search_diff[found_index] <= err_margin:
+                    index += found_index
+                    if index > self.current_index:
+                        overflow = True
+                        
+            elif index + search_boundary >= self.size:
+                search_boundary = max(search_boundary - (self.size - index), 0)
+                search_arr = np.concatenate(
+                    self.timestamps[index:self.size],
+                    self.timestamps[0:search_boundary]
+                )
+                search_diff = search_arr - timestamp
+                found_index = np.argmax(search_diff <= err_margin)
+                if search_diff[found_index] <= err_margin:
+                    if found_index + index < self.size:
+                        overflow = True
+                        index += found_index
+                    else:
+                        index = found_index - (self.size - index)
                                  
         return index, overflow
     
