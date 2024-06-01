@@ -329,7 +329,7 @@ class WindowNode(Node):
             buffer.reset(sig.data, sig.timestamps)
             
             current_seg = sig.timestamps[0]
-            global_dur = buffer.buffer_duration + sig.timestamps[0]
+            global_dur = buffer.duration + sig.timestamps[0]
             while current_seg + wnd_dur - self.config.error_margin < global_dur:
                 
                 # if the time was exceeded due to the segment being slightly

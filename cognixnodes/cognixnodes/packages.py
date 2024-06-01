@@ -32,7 +32,6 @@ from .stream import _nodes as stream
 from .utility import _nodes as utility
 from .test import _nodes as test
 from .preprocessing import _nodes as preprocessing
-from .output import _nodes as output
 from .feature_extraction import _nodes as feature_extraction
 
 cognix_package: dict[str, list[type[Node]]] = {
@@ -42,6 +41,5 @@ cognix_package: dict[str, list[type[Node]]] = {
     'test': get_package_nodes(test),
     'preprocessing': get_package_nodes(preprocessing),
     'feature_extration': get_package_nodes(feature_extraction),
-    'classification': get_package_nodes(classification),
-    'output': get_package_nodes(output)
+    'classification': get_package_nodes(classification)
 }
