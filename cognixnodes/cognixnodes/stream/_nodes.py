@@ -159,7 +159,7 @@ class LSLInputNode(FrameNode):
                         
                         self.buffer = []
     
-                self.progress = ProgressState(1, 1, 'Streaming!')
+                self.set_progress_msg('Streaming!')
             
         self.t = Thread(target=_search_stream)
         self.t.start()
