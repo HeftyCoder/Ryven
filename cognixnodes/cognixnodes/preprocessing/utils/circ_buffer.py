@@ -130,7 +130,7 @@ class CircularBuffer:
         
         found_time = self.timestamps[index]
         err = found_time - timestamp
-        err_margin = 2.2 * self.dts
+        err_margin = 2.5 * self.effective_dts
         
         if abs(err) <= err_margin:
             return index, overflow
@@ -139,7 +139,7 @@ class CircularBuffer:
         # but still far off from good precision. Hence, we're
         # attempting a local search close to the found index 
         # to narrow down a better index
-        search_boundary = int(err / self.dts)
+        search_boundary = int(err / self.effective_dts)
         if search_boundary > 0:
             if index - search_boundary >=0:
                 search_boundary = min(search_boundary, index)
