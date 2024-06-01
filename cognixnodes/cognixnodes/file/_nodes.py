@@ -26,7 +26,7 @@ from traitsui.api import CheckListEditor
 from threading import Thread
 from ..core import Signal,StreamSignal
 from ..stream import LSLSignalInfo
-from collections.abc import Sequence
+from collections.abc import Mapping
 import os
 import pyxdf
 import json
@@ -120,7 +120,7 @@ class XDFImportingNode(Node):
         file: str = File('Some path',desc='path of the model to import')
         lowercase_labels: bool = Bool(False, desc="if checked, makes all the incoming labels into lowercase")
 
-    init_outputs = [PortConfig(label='streams')]
+    init_outputs = [PortConfig(label='streams',allowed_data=Mapping[str,StreamSignal])]
         
     @property
     def config(self) -> XDFImportingNode.Config:
@@ -188,8 +188,8 @@ class SelectStreamNode(Node):
     class Config(NodeTraitsConfig):
         stream_name: str = CX_Str('stream name',desc='the stream name to get data')
 
-    init_inputs = [PortConfig(label = 'streams')]
-    init_outputs = [PortConfig(label = 'selected stream')]
+    init_inputs = [PortConfig(label = 'streams',allowed_data=Mapping[str,StreamSignal])]
+    init_outputs = [PortConfig(label = 'selected stream',allowed_data=StreamSignal)]
 
     @property
     def config(self) -> SelectStreamNode.Config:

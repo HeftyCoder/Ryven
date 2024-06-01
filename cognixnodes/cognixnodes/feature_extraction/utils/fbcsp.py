@@ -27,6 +27,8 @@ class FBCSP:
             fbcsp_filters=get_csp(x_train_fb,y_train_cls)
             self.fbcsp_filters_multi.append(fbcsp_filters)
 
+            print(len(self.fbcsp_filters_multi))
+
     def transform(self,x_data,class_idx=0):
         n_fbanks, n_trials, n_channels, n_samples = x_data.shape
         x_features = np.zeros((n_trials,self.m_filters*2*len(x_data)),dtype=np.float32)

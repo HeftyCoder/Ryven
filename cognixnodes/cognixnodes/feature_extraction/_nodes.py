@@ -13,7 +13,7 @@ from cognixcore.config.traits import *
 
 import numpy as np
 from traitsui.api import CheckListEditor
-from collections.abc import Sequence
+from collections.abc import Sequence,Mapping
 from .utils.stats_helper import *
 from .utils.fbcsp import FBCSP
 from .utils.filterbank import FilterBank
@@ -168,7 +168,7 @@ class FBCSPTransformNode(Node):
 
 class FBCSPTrainOnlineVersionNode(Node):
     title = 'FBCSP Training'
-    version = '0.1'
+    
     
     class Config(NodeTraitsConfig):
         n_filters: int = CX_Int(2,desc='the number of windows used for FBSCP')
@@ -257,7 +257,7 @@ class FBCSPTrainOnlineVersionNode(Node):
             
 class FBCSPTransformOnlineNode(Node):
     title = 'FBCSP Transform'
-    version = '0.1'
+    
     
     class Config(NodeTraitsConfig):
         n_filters: int = CX_Int(2,desc='the number of windows used for FBSCP')
@@ -335,8 +335,143 @@ class FBCSPTransformOnlineNode(Node):
             
             self.set_output(0,signal_features)
      
-     
-     
+#---------------------------------------------------------------------------------------
+class FBCSPTrainRealTimeNode(Node):
+    title = 'FBCSP Training'
+    version = '0.1'
+    
+    class Config(NodeTraitsConfig):
+        n_filters: int = CX_Int(2,desc='the number of windows used for FBSCP')
+        srate: float = CX_Float(2048.0,desc='sampling frequency of the signal')
+        min_freq: float = CX_Float(0.0,desc='the minimum frequency in Hz in which the FBSCP functions -')
+        max_freq: float = CX_Float(0.0,desc='the maximum frequency in Hz in which the FBSCP functions -')
+        freq_bands_split: int = CX_Int(10,desc='how to split the frequency band')
+    
+    init_inputs = [PortConfig(label='data_class1',allowed_data=Sequence[LabeledSignal]),PortConfig(label='data_class2',allowed_data=Sequence[LabeledSignal])]
+    init_outputs = [PortConfig(label='spatial filters',allowed_data=Mapping)]
+    
+    @property
+    def config(self) -> FBCSPTrainRealTimeNode.Config:
+        return self._config 
+        
+    def init(self):
+        self.dict = dict()
+
+        self.srate = self.config.srate
+        self.min_freq = self.config.min_freq if self.config.min_freq != 0.0 else None
+        self.max_freq = self.config.max_freq if self.config.min_freq != 0.0 else None
+        self.freq_splits = self.config.freq_bands_split if self.config.freq_bands_split!=0 else None
+        self.n_filters = self.config.n_filters
+        self.fbank = None
+
+        self.signal1 = None
+        self.signal2 = None
+
+    def update_event(self, inp=-1):
+        if inp==0: self.signal1: Sequence[LabeledSignal] = self.input(inp)
+        if inp==1: self.signal2: Sequence[LabeledSignal] = self.input(inp)
+
+        if self.signal1 and self.signal2:
+
+            if not self.fbank:       
+                self.fbank = FilterBank(
+                            fs = self.srate,
+                            fmin = self.min_freq,
+                            fmax = self.max_freq,
+                            splits = self.freq_splits
+                        )
+                fbank_coeff = self.fbank.get_filter_coeff()
+                self.dict['fbank'] = self.fbank
+            
+            data = [sig1.data for sig1 in self.signal1] + [sig2.data for sig2 in self.signal2]
+            data = np.array(data)
+            
+            classes = {
+                '0':(0,len(self.signal1)),
+                '1':(len(self.signal1),len(self.signal1)+len(self.signal2)),
+            }
+            
+            class_labels = []
+            
+            for class_label, (start_idx, end_idx) in classes.items():
+                for i in range(start_idx,end_idx):
+                    class_labels.append(class_label)
+            
+            filtered_data = self.fbank.filter_data(data)
+
+            self.fbcsp_feature_extractor = FBCSP(self.n_filters)
+            
+            self.fbcsp_feature_extractor.fit(filtered_data,class_labels)
+
+            self.dict['fbcsp_filters'] = self.fbcsp_feature_extractor
+
+            self.signal1,self.signal2 = None,None
+
+            self.set_output(0,self.dict)
+            
+            
+class FBCSPTransformRealTimeNode(Node):
+    title = 'FBCSP Transform'
+    version = '0.1'
+    
+    init_inputs = [PortConfig(label='data_class1',allowed_data=Sequence[LabeledSignal]),PortConfig(label='data_class2',allowed_data=Sequence[LabeledSignal]),PortConfig(label='spatial filters',allowed_data=Mapping)]
+    init_outputs = [PortConfig(label='features',allowed_data=FeatureSignal)]
+    
+    @property
+    def config(self) -> FBCSPTransformRealTimeNode.Config:
+        return self._config 
+        
+    def init(self):
+        self.fbank = None
+        self.fbcsp_feature_extractor = None
+        self.signal1 = None
+        self.signal2 = None
+        self.dict = None
+
+    def update_event(self, inp=-1):
+        if inp==0: self.signal1: Sequence[LabeledSignal] = self.input(inp)
+        if inp==1: self.signal2: Sequence[LabeledSignal] = self.input(inp)
+        if inp==2: self.dict: Mapping = self.input(inp)
+
+        if self.signal1 and self.signal2 and self.dict:
+            
+            print(self.dict)      
+            self.fbank = self.dict['fbank']
+            
+            # fbank_coeff = self.fbank.get_filter_coeff()
+            self.fbcsp_feature_extractor = self.dict['fbcsp_filters']
+
+            data = [sig1.data for sig1 in self.signal1] + [sig2.data for sig2 in self.signal2]
+            data = np.array(data)            
+            
+            classes = {
+                '0':(0,len(self.signal1)),
+                '1':(len(self.signal1),len(self.signal1)+len(self.signal2)),
+            }
+                        
+            class_labels = []
+            
+            for class_label, (start_idx, end_idx) in classes.items():
+                for i in range(start_idx,end_idx):
+                    class_labels.append(class_label)
+            
+            filtered_data = self.fbank.filter_data(data)
+            
+            features = self.fbcsp_feature_extractor.transform(filtered_data)
+            label_features = [f'feature_{i}' for i in range(features.shape[1])]
+            
+            signal_features = FeatureSignal(
+                labels=label_features,
+                class_dict = classes,
+                data = features,
+                signal_info = None
+            )
+
+            print(features)
+
+            self.signal1,self.signal2,self.dict = None,None,None
+            
+            self.set_output(0,signal_features)
      
      
      
