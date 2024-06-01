@@ -25,6 +25,7 @@ from traits.observation.events import (
     DictChangeEvent, 
     SetChangeEvent
 )
+from traits.api import Button
 from qtpy.QtWidgets import QVBoxLayout, QWidget
 
 
@@ -125,8 +126,7 @@ class NodeTraitsConfigInspector(NodeConfigInspector[NodeTraitsConfig], QWidget):
         
         gr_label = self.inspected_label()
         
-        insp_traits = inspected_obj.serializable_traits()
-        
+        insp_traits = inspected_obj.inspected_traits()
         # custom user view
         if self.inspected.traits_view:
             self.view = self.inspected.traits_view
@@ -139,7 +139,12 @@ class NodeTraitsConfigInspector(NodeConfigInspector[NodeTraitsConfig], QWidget):
                     item_trait = getattr(internal_tr, item_trait_name, None)
                     if item_trait:
                         metadata[item_trait_name] = item_trait
-                item = Item(tr, **metadata) if metadata else Item(tr)
+                
+                t_type = internal_tr.trait_type
+                if isinstance(t_type, Button):
+                    item = Item(tr, **metadata, show_label=False) if metadata else Item(tr, show_label=False)
+                else:
+                    item = Item(tr, **metadata) if metadata else Item(tr)
                 items.append(item)
                 
             config_group = VGroup (

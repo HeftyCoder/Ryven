@@ -138,9 +138,12 @@ class TestLogNode(Node):
             ),
             desc="The logging level."
         )
-        # TODO check why the custom style procs changes every time we enter a new letter
-        # msg: str = CX_Str('some message', desc="The message to be sent", style="custom")
         msg: str = CX_Str('some message', desc="The message to be sent")
+        log_button = Button('LOG')
+        
+        @observe('log_button')
+        def on_click(self, e):
+            self.node.logger.log(self.msg_lvl, self.msg)
         
     @property
     def config(self) -> TestLogNode.Config:
