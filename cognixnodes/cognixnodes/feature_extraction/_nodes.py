@@ -169,7 +169,6 @@ class FBCSPTransformNode(Node):
 class FBCSPTrainOnlineVersionNode(Node):
     title = 'FBCSP Training'
     
-    
     class Config(NodeTraitsConfig):
         n_filters: int = CX_Int(2,desc='the number of windows used for FBSCP')
         srate: float = CX_Float(2048.0,desc='sampling frequency of the signal')
@@ -258,7 +257,6 @@ class FBCSPTrainOnlineVersionNode(Node):
 class FBCSPTransformOnlineNode(Node):
     title = 'FBCSP Transform'
     
-    
     class Config(NodeTraitsConfig):
         n_filters: int = CX_Int(2,desc='the number of windows used for FBSCP')
         srate: float = CX_Float(2048.0,desc='sampling frequency of the signal')
@@ -290,13 +288,13 @@ class FBCSPTransformOnlineNode(Node):
             
         self.signal1 = None
         self.signal2 = None
-
+    
     def update_event(self, inp=-1):
         if inp==0: self.signal1: Sequence[LabeledSignal] = self.input(inp)
         if inp==1: self.signal2: Sequence[LabeledSignal] = self.input(inp)
 
         if self.signal1 and self.signal2 and self.file_exists:
-
+    
             if not self.fbank:          
                 self.fbank = FilterBank(
                             fs = self.srate,
@@ -306,7 +304,7 @@ class FBCSPTransformOnlineNode(Node):
                         )
                 fbank_coeff = self.fbank.get_filter_coeff()
                 self.fbcsp_feature_extractor = joblib.load(self.path_file)
-
+        
             data = [sig1.data for sig1 in self.signal1] + [sig2.data for sig2 in self.signal2]
             data = np.array(data)            
             
@@ -346,6 +344,9 @@ class FBCSPTrainRealTimeNode(Node):
         min_freq: float = CX_Float(0.0,desc='the minimum frequency in Hz in which the FBSCP functions -')
         max_freq: float = CX_Float(0.0,desc='the maximum frequency in Hz in which the FBSCP functions -')
         freq_bands_split: int = CX_Int(10,desc='how to split the frequency band')
+        filename:str = CX_Str('filename',desc='the name of the model in which to save')
+        f: str = File('Some path',desc='path of the model to import')
+        save_button: bool = Bool()
     
     init_inputs = [PortConfig(label='data_class1',allowed_data=Sequence[LabeledSignal]),PortConfig(label='data_class2',allowed_data=Sequence[LabeledSignal])]
     init_outputs = [PortConfig(label='spatial filters',allowed_data=Mapping)]
@@ -364,8 +365,18 @@ class FBCSPTrainRealTimeNode(Node):
         self.n_filters = self.config.n_filters
         self.fbank = None
 
+        self.filename = self.config.filename
+        self.path_file = self.config.f
+        self.save_button = self.config.save_button
+
         self.signal1 = None
         self.signal2 = None
+        
+    def stop(self):
+        print(self.fbank)
+        if self.save_button and self.fbank:
+            joblib.dump(value=self.dict,filename=f'{self.filename}.joblib')
+        self.fbcsp_feature_extractor = None
 
     def update_event(self, inp=-1):
         if inp==0: self.signal1: Sequence[LabeledSignal] = self.input(inp)
@@ -382,6 +393,10 @@ class FBCSPTrainRealTimeNode(Node):
                         )
                 fbank_coeff = self.fbank.get_filter_coeff()
                 self.dict['fbank'] = self.fbank
+                
+                self.fbcsp_feature_extractor = FBCSP(self.n_filters)
+                if os.path.exists(self.path_file):
+                    self.fbcsp_feature_extractor = joblib.load(self.path_file)
             
             data = [sig1.data for sig1 in self.signal1] + [sig2.data for sig2 in self.signal2]
             data = np.array(data)
@@ -398,8 +413,6 @@ class FBCSPTrainRealTimeNode(Node):
                     class_labels.append(class_label)
             
             filtered_data = self.fbank.filter_data(data)
-
-            self.fbcsp_feature_extractor = FBCSP(self.n_filters)
             
             self.fbcsp_feature_extractor.fit(filtered_data,class_labels)
 
@@ -414,6 +427,9 @@ class FBCSPTransformRealTimeNode(Node):
     title = 'FBCSP Transform'
     version = '0.1'
     
+    class Config(NodeTraitsConfig):
+        f: str = File('Some path',desc='path of the model to import')
+    
     init_inputs = [PortConfig(label='data_class1',allowed_data=Sequence[LabeledSignal]),PortConfig(label='data_class2',allowed_data=Sequence[LabeledSignal]),PortConfig(label='spatial filters',allowed_data=Mapping)]
     init_outputs = [PortConfig(label='features',allowed_data=FeatureSignal)]
     
@@ -427,14 +443,27 @@ class FBCSPTransformRealTimeNode(Node):
         self.signal1 = None
         self.signal2 = None
         self.dict = None
-
+        self.path_file = self.config.f
+        
+        print(self.config.f)
+        
+        self.file_exists = False
+        if os.path.exists(self.path_file):
+            self.file_exists = True
+        
     def update_event(self, inp=-1):
         if inp==0: self.signal1: Sequence[LabeledSignal] = self.input(inp)
         if inp==1: self.signal2: Sequence[LabeledSignal] = self.input(inp)
         if inp==2: self.dict: Mapping = self.input(inp)
 
-        if self.signal1 and self.signal2 and self.dict:
+        if self.signal1 and self.signal2 and (self.dict or self.file_exists==True):
             
+            print(self.dict)
+            
+            if self.file_exists:
+                print("WHAT")
+                self.dict = joblib.load(self.path_file)
+                
             print(self.dict)      
             self.fbank = self.dict['fbank']
             
