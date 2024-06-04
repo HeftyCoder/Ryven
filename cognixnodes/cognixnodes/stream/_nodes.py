@@ -61,6 +61,10 @@ class LSLInputNode(FrameNode):
         define_buffer:bool = Bool(True, desc='the creation of a buffer for the saving of the data samples')
         buffer_size: int = CX_Int(3276, desc='the size of the buffer in which the data samples are stored')
         lowercase_labels: bool = Bool(False, desc="if checked, makes all the incoming labels into lowercase")
+        invert: bool = Bool(
+            False, 
+            desc='if checked, inverts the data i.e (channels x samples) => (samples x channels)'
+        )
         debug: bool = Bool(False, desc="when true, logs debug messages")
 
         #### configuration for buffer size of data received
@@ -206,6 +210,9 @@ class LSLInputNode(FrameNode):
         if not timestamps:
             return
         
+        if self.config.invert:
+            samples = samples.T
+            
         signal = StreamSignal(
             timestamps, 
             self.cached_labels,

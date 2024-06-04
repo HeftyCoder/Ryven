@@ -270,39 +270,36 @@ class SaveModel(Node):
     version = '0.1'
 
     class Config(NodeTraitsConfig):
-        filename: str = CX_String('file name',desc='the name of the model')
+        directory: str = Directory(desc='the saving directory')
+        default_filename: str = CX_Str("model", desc="the default file name")
+        var_name: str = CX_Str(
+            "model", 
+            desc="the file name will be extracted from this if there is a string variable"
+        )
 
     init_inputs = [PortConfig(label='model',allowed_data=SciKitClassifier)]
 
     def init(self):
-
-        real_path = os.path.realpath(__file__)
-        dir_path = os.path.dirname(real_path).split('\\')
-        self.path = ""
-
-        for i in range(len(dir_path)-1):
-            self.path = self.path + dir_path[i] + "\\"
-
-        self.define_path = False
-        self.classifier = None
-        self.other_path = None
-        self.filename = self.config.filename
+        
+        dir = self.config.directory
+        filename = self.var_val_get(self.config.var_name) 
+        if not filename or not isinstance(filename, str):
+            filename = self.config.default_filename
+            
+        self.path = os.path.join(dir, filename)
+        self.classifier: SciKitClassifier = None
         
     @property
     def config(self) -> SaveModel.Config:
         return self._config
 
+    def update_event(self, inp=-1):
+        if inp == 0:
+            self.classifier = self.input(0)      
+    
     def stop(self):
         if self.classifier:
-            self.classifier.save_model(self.path+self.filename+".joblib")
-
-    def update_event(self, inp=-1):
-        print(self.path)
-            
-        if inp == 0:self.classifier:SciKitClassifier = self.input(0)
-        if inp == 1:self.other_path = self.input(1) 
-        if self.other_path:self.path = self.other_path
-        
+            self.classifier.save_model(self.path)
             
 class LoadModel(FrameNode):
     title = 'Load Model'

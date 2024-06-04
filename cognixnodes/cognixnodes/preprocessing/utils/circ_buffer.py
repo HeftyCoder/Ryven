@@ -108,8 +108,7 @@ class CircularBuffer:
         if the buffer has looped, else None.
         """
         ts_len = len(timestamps)
-        data = data.T
-        assert data.shape[1] == ts_len, "Length of data and timestamps was not equal!"
+        assert data.shape[1] == ts_len, f"Length of data and timestamps was not equal! {data.shape[1]} != {ts_len}"
         
         # TODO validate this later
         # Attempting to remove old timestamps influence

@@ -431,13 +431,18 @@ class WindowNode(Node):
                 self.logger.debug(msg)
             self.set_output(0, result) 
  
-class LabeledSignalSelectionNode(Node):
+class StreamSignalSelectionNode(Node):
     """
-    Selects part of a signal based on its labels. An option
+    Selects part of a stream signal based on its channels. An option
     allows for the labels given to be forced to lowercase.
+    
+    Typical EEG labels for a 32 cap are:
+        fp1, af3, f7, f3, fc1, fc5, t7, c3, cp1, cp5, p7, p3,
+        pz, po3, o1, oz, o2, po4, p4, p8, cp6, cp2, c4, t8, fc6,
+        fc2, f4, f8, af4, fp2, fz, cz
     """
     
-    title = 'Select Labels'
+    title = 'Select Channels'
     version = '0.1'
     
     class Config(NodeTraitsConfig):
@@ -448,18 +453,18 @@ class LabeledSignalSelectionNode(Node):
             'Fp2', 'Fz', 'Cz'
         ]
         
-        force_lowercase: bool = Bool()
+        force_lowercase: bool = Bool(True)
         labels: list[str] = List(CX_Str())
     
     init_inputs = [
-        PortConfig(label='in', allowed_data=LabeledSignal)
+        PortConfig(label='in', allowed_data=StreamSignal)
     ]
     init_outputs = [
-        PortConfig(label='out', allowed_data=StreamSignal | LabeledSignal)
+        PortConfig(label='out', allowed_data=StreamSignal)
     ]
 
     @property
-    def config(self) -> LabeledSignalSelectionNode.Config:
+    def config(self) -> StreamSignalSelectionNode.Config:
         return self._config
     
     def init(self):
@@ -477,7 +482,7 @@ class LabeledSignalSelectionNode(Node):
         
     def update_event(self, inp=-1):
         
-        signal: LabeledSignal | StreamSignal = self.input(inp)
+        signal: StreamSignal = self.input(inp)
         if not signal:
             return 
         
@@ -490,21 +495,13 @@ class LabeledSignalSelectionNode(Node):
         else:
             subdata = signal.data[self.start_ind: self.stop_ind]
         
-        if isinstance(signal, StreamSignal):
-            subsignal = StreamSignal(
-                signal.timestamps,
-                self.selected_labels,
-                subdata,
-                signal.info,
-                False
-            )
-        elif isinstance(signal, LabeledSignal):
-            subsignal = LabeledSignal(
-                self.selected_labels,
-                subdata,
-                signal.info,
-                False
-            )
+        subsignal = StreamSignal(
+            signal.timestamps,
+            self.selected_labels,
+            subdata,
+            signal.info,
+            False
+        )
         
         self.set_output(0, subsignal)
     

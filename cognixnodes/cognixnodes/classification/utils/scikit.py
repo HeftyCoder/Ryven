@@ -162,7 +162,8 @@ class SciKitClassifier(BasePredictor):
         return train_signal,test_signal
       
     def save_model(self,path:str):
-        joblib.dump(self.model,filename=path)
+        path = f"{path}.joblib"
+        joblib.dump(self.model, filename=path)
 
     def load_model(self,path:str):
         return joblib.load(path)   
