@@ -10,7 +10,7 @@ from sklearn.model_selection import (
 )
 
 from ..core import Signal,TimeSignal,LabeledSignal,FeatureSignal
-
+import numpy as np
 
 # from Orange.data import Table
 # from Orange.classification import SVMLearner, LogisticRegressionLearner
@@ -54,7 +54,7 @@ class SVMNode(ModelNode):
         selection_of_gamma: bool = Bool('gamma value from choices?')
 
     init_inputs = []
-    init_outputs = [PortConfig(label='model', allowed_data=SVMClassifier)]
+    init_outputs = [PortConfig(label='model', allowed_data=SciKitClassifier)]
     
     @property
     def config(self) -> SVMNode.Config:
@@ -82,7 +82,7 @@ class RandomForestNode(ModelNode):
         max_features: str = Enum('sqrt','log2',0,desc='the number of features to consider when looking for the best split')       
         max_leaf_nodes: int = CX_Int(0,desc='grow trees with max_leaf_nodes in best-first fashion')
 
-    init_outputs = [PortConfig(label='model')]
+    init_outputs = [PortConfig(label='model',allowed_data=SciKitClassifier)]
     init_inputs = []
 
     @property
@@ -114,7 +114,7 @@ class LogisticRegressionNode(ModelNode):
         solver:str = Enum('lbfgs','liblinear','newton-cg','newton-cholesky','sag','saga',desc='algorithm to use in the optimization problem')
         max_iter:int = CX_Int(100,desc='maximum number of iterations taken for the solvers to converge')
 
-    init_outputs = [PortConfig(label='model')]
+    init_outputs = [PortConfig(label='model',allowed_data=SciKitClassifier)]
     init_inputs = []
 
     @property
@@ -138,19 +138,13 @@ class TrainNode(Node):
     title = 'Train Classifier'
     version = '0.1'
     
-    class Config(NodeTraitsConfig):
-        binary:bool = Bool('binary classification?',desc='if the classification is binary or multiclass')
-
     init_inputs = [
         PortConfig(label='data',allowed_data=FeatureSignal),
         PortConfig(label='model',  allowed_data=SciKitClassifier)
     ]
     init_outputs = [
         PortConfig(label='model',allowed_data=SciKitClassifier),
-        PortConfig(label='train accuracy'),
-        PortConfig(label='train precision'),
-        PortConfig(label='train recall'),
-        PortConfig(label='train f1_score')
+        PortConfig(label='train metrics',allowed_data=LabeledSignal)
     ]
 
     @property
@@ -177,15 +171,19 @@ class TrainNode(Node):
                 trained_model,
                 train_accuracy,
                 train_precision,
-                train_precision,
+                train_recall,
                 train_f1
-            ) = self.classifier.train(self.signal, self.config.binary)
+            ) = self.classifier.train(self.signal)
+            
+            metrics_signal = LabeledSignal(
+                labels=['train_accuracy','train_precision','train_recall','train_f1'],
+                data = np.array([train_accuracy,train_precision,train_recall,train_f1]),
+                signal_info = None
+            )
             
             self.set_output(0, self.classifier)
-            self.set_output(1, train_accuracy)
-            self.set_output(2, train_precision)
-            self.set_output(3, train_precision)
-            self.set_output(4, train_f1)
+            self.set_output(1, metrics_signal)
+            
 
 
 class TrainTestSplitNode(Node):
@@ -229,13 +227,9 @@ class CrossValidationNode(Node):
         folds: int = CX_Int(5,desc='the number of folds to split data for cross validation')
         splitter_type:str = Enum('KFold','Stratified','LeaveOneOut','ShuffleSplit')
         train_test_split:float= CX_Float(0.2,desc='split of data between train and test data')
-        binary:bool = Bool(desc='if the classification is binary or multiclass')
 
-    init_inputs = [PortConfig(label='data',allowed_data=FeatureSignal),PortConfig(label='model')]
-    init_outputs = [PortConfig(label='cv accuracy'),
-                    PortConfig(label='cv precision'),
-                    PortConfig(label='cv recall'),
-                    PortConfig(label='cv f1_score')]
+    init_inputs = [PortConfig(label='data',allowed_data=FeatureSignal),PortConfig(label='model',allowed_data=SciKitClassifier)]
+    init_outputs = [PortConfig(label = 'cv_metrics',allowed_data=LabeledSignal)]
 
     @property
     def config(self) -> CrossValidationNode.Config:
@@ -250,12 +244,9 @@ class CrossValidationNode(Node):
         cv_class = next((cls for name, cls in CrossValidation.subclasses.items() if self.config.splitter_type in name), None)
         self.cv_model: CrossValidation = cv_class(
             kfold=self.config.folds, 
-            train_test_split = self.config.train_test_split, 
-            binary_classification = self.config.binary
+            train_test_split = self.config.train_test_split
         )
         print(self.cv_model)
-        
-        self.cv_model.set_average_setting()
 
     def update_event(self, inp=-1):
 
@@ -264,12 +255,15 @@ class CrossValidationNode(Node):
 
         if self.signal and self.classifier:
 
-            cv_accuracy,cv_precision,cv_precision,cv_f1 = self.cv_model.calculate_cv_score(model=self.classifier.model,f_signal=self.signal)
+            cv_accuracy,cv_precision,cv_recall,cv_f1 = self.cv_model.calculate_cv_score(model=self.classifier.model,f_signal=self.signal)
             
-            self.set_output(0, cv_accuracy)
-            self.set_output(1, cv_precision)
-            self.set_output(2, cv_precision)
-            self.set_output(3, cv_f1)
+            metrics_signal = LabeledSignal(
+                labels=['cv_accuracy','cv_precision','cv_recall','cv_f1'],
+                data = np.array([cv_accuracy,cv_precision,cv_recall,cv_f1]),
+                signal_info = None
+            )
+            
+            self.set_output(0,metrics_signal)
 
 class SaveModel(Node):
     title = 'Save Model'
@@ -339,10 +333,7 @@ class TestNode(Node):
     version = '0.1'
 
     init_inputs = [PortConfig(label='data',allowed_data=FeatureSignal), PortConfig(label='model',allowed_data=SciKitClassifier)]
-    init_outputs = [PortConfig(label='test accuracy'),
-                    PortConfig(label='test precision'),
-                    PortConfig(label='test recall'),
-                    PortConfig(label='test f1_score')]
+    init_outputs = [PortConfig(label = 'test metrics',allowed_data=LabeledSignal)]
 
     def init(self):
 
@@ -357,10 +348,14 @@ class TestNode(Node):
 
         if self.signal and self.model:
             test_accuracy,test_precision,test_recall,test_f1 = self.model.test(f_signal_test=self.signal)
-            self.set_output(0, test_accuracy)
-            self.set_output(1, test_precision)
-            self.set_output(2, test_recall)
-            self.set_output(3, test_f1)
+            
+            metrics_signal = LabeledSignal(
+                labels=['test_accuracy','test_precision','test_recall','test_f1'],
+                data = np.array([test_accuracy,test_precision,test_recall,test_f1]),
+                signal_info = None
+            )
+            
+            self.set_output(0,metrics_signal)
 
 
 
@@ -369,7 +364,7 @@ class PredictNode(Node):
     version = '0.1'
 
     init_inputs = [PortConfig(label='data',allowed_data=FeatureSignal), PortConfig(label='model',allowed_data=SciKitClassifier)]
-    init_outputs = [PortConfig(label='predictions')]
+    init_outputs = [PortConfig(label='predictions',allowed_data=LabeledSignal)]
 
     def init(self):
 
@@ -384,4 +379,11 @@ class PredictNode(Node):
 
         if self.signal and self.model:
             predictions = self.model.predict(f_signal_test=self.signal)
-            self.set_output(0, predictions)
+            
+            metrics_signal = LabeledSignal(
+                labels=['prediction'],
+                data = np.array([predictions]),
+                signal_info = None
+            )
+            
+            self.set_output(0,metrics_signal)

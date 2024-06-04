@@ -10,7 +10,7 @@ from ...core import FeatureSignal
 class BasePredictor(ABC):
 
     @abstractmethod
-    def train(self, f_signal_train: FeatureSignal, binary_classification:bool):
+    def train(self, f_signal_train: FeatureSignal):
         pass
 
     @abstractmethod

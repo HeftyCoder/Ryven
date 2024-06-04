@@ -33,13 +33,16 @@ class SciKitClassifier(BasePredictor):
     def __init__(self,model):
         self.model = model
 
-    def train(self,f_signal_train: FeatureSignal,binary_classification:bool):
-        average_setting = 'binary'
-        if not binary_classification:
-            average_setting = 'macro'
-            
+    def train(self,f_signal_train: FeatureSignal):
+    
         X_train = f_signal_train.data
         classes = f_signal_train.classes
+        
+        len_classes = len(list(classes.keys()))
+        
+        average_setting = 'binary'
+        if len_classes > 2:
+            average_setting = 'macro'
 
         class_labels = {list(classes.keys())[_]:_ for _ in range(len(list(classes.keys())))}
         
@@ -188,20 +191,20 @@ class CrossValidation:
         super().__init_subclass__(**kwargs)
         cls.subclasses[cls.__name__] = cls
 
-    def __init__(self,kfold:int,train_test_split:float,binary_classification:bool):
+    def __init__(self,kfold:int,train_test_split:float):
         self.kfold = kfold
         self.train_test_split = train_test_split
-        self.binary_classification = binary_classification
         self.average_setting = ''
         self.cv_model = None
-
-    def set_average_setting(self):
-        if not self.binary_classification:
-            self.average_setting = '_macro'
         
     def calculate_cv_score(self,model,f_signal:FeatureSignal):
         X = f_signal.data
         classes = f_signal.classes
+        
+        len_classes = len(list(classes.keys()))
+        
+        if len_classes > 2:
+            self.average_setting = '_macro'
         
         Y = []
             
