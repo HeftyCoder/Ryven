@@ -344,8 +344,14 @@ class FBCSPTrainRealTimeNode(Node):
         min_freq: float = CX_Float(0.0,desc='the minimum frequency in Hz in which the FBSCP functions -')
         max_freq: float = CX_Float(0.0,desc='the maximum frequency in Hz in which the FBSCP functions -')
         freq_bands_split: int = CX_Int(10,desc='how to split the frequency band')
-        filename:str = CX_Str('filename',desc='the name of the model in which to save')
-        f: str = File('Some path',desc='path of the model to import')
+        
+        directory: str = Directory(desc='the saving directory')
+        default_filename: str = CX_Str("model", desc="the default file name")
+        varname: str = CX_Str(
+            "model", 
+            desc="the file name will be extracted from this if there is a string variable"
+        )
+        
         save_button: bool = Bool()
     
     init_inputs = [PortConfig(label='data_class1',allowed_data=Sequence[LabeledSignal]),PortConfig(label='data_class2',allowed_data=Sequence[LabeledSignal])]
@@ -365,26 +371,32 @@ class FBCSPTrainRealTimeNode(Node):
         self.n_filters = self.config.n_filters
         self.fbank = None
 
-        self.filename = self.config.filename
-        self.path_file = self.config.f
         self.save_button = self.config.save_button
 
         self.signal1 = None
         self.signal2 = None
         
+        dir = self.config.directory
+        filename = self.var_val_get(self.config.varname) 
+        if not filename or isinstance(filename, str) == False:
+            filename = self.config.default_filename
+        self.path = os.path.join(dir, filename)
+        
     def stop(self):
         print(self.fbank)
         if self.save_button and self.fbank:
-            joblib.dump(value=self.dict,filename=f'{self.filename}.joblib')
+            joblib.dump(value=self.dict,filename=f'{self.path}.joblib')
         self.fbcsp_feature_extractor = None
-
+        
     def update_event(self, inp=-1):
         if inp==0: self.signal1: Sequence[LabeledSignal] = self.input(inp)
         if inp==1: self.signal2: Sequence[LabeledSignal] = self.input(inp)
 
         if self.signal1 and self.signal2:
 
-            if not self.fbank:       
+            if not self.fbank: 
+                print(self.path,os.path.exists(self.path + '.joblib'))
+                      
                 self.fbank = FilterBank(
                             fs = self.srate,
                             fmin = self.min_freq,
@@ -395,8 +407,6 @@ class FBCSPTrainRealTimeNode(Node):
                 self.dict['fbank'] = self.fbank
                 
                 self.fbcsp_feature_extractor = FBCSP(self.n_filters)
-                if os.path.exists(self.path_file):
-                    self.fbcsp_feature_extractor = joblib.load(self.path_file)
             
             data = [sig1.data for sig1 in self.signal1] + [sig2.data for sig2 in self.signal2]
             data = np.array(data)
@@ -428,7 +438,11 @@ class FBCSPTransformRealTimeNode(Node):
     version = '0.1'
     
     class Config(NodeTraitsConfig):
-        f: str = File('Some path',desc='path of the model to import')
+        directory: str = Directory(desc='the saving directory')
+        varname: str = CX_Str(
+            "model", 
+            desc="the file name will be extracted from this if there is a string variable"
+        )
     
     init_inputs = [PortConfig(label='data_class1',allowed_data=Sequence[LabeledSignal]),PortConfig(label='data_class2',allowed_data=Sequence[LabeledSignal]),PortConfig(label='spatial filters',allowed_data=Mapping)]
     init_outputs = [PortConfig(label='features',allowed_data=FeatureSignal)]
@@ -443,28 +457,33 @@ class FBCSPTransformRealTimeNode(Node):
         self.signal1 = None
         self.signal2 = None
         self.dict = None
-        self.path_file = self.config.f
-        
-        print(self.config.f)
-        
         self.file_exists = False
-        if os.path.exists(self.path_file):
+        
+        self.path_file = None
+        self.dict_file = None
+        self.dict_node = None
+        
+        dir = self.config.directory
+        filename = self.var_val_get(self.config.varname) 
+        
+        if filename and dir and isinstance(filename, str)!=False:
+            self.path_file = f'{dir}/{filename}'
+        
+        if self.path_file and os.path.exists(self.path_file + '.joblib'):
             self.file_exists = True
+            self.dict_file = joblib.load(self.path_file + '.joblib')
+        else:
+            self.logger.error(msg='The path doenst exist')
         
     def update_event(self, inp=-1):
         if inp==0: self.signal1: Sequence[LabeledSignal] = self.input(inp)
         if inp==1: self.signal2: Sequence[LabeledSignal] = self.input(inp)
-        if inp==2: self.dict: Mapping = self.input(inp)
+        if inp==2: self.dict_node: Mapping = self.input(inp)
 
-        if self.signal1 and self.signal2 and (self.dict or self.file_exists==True):
-            
-            print(self.dict)
-            
-            if self.file_exists:
-                print("WHAT")
-                self.dict = joblib.load(self.path_file)
-                
-            print(self.dict)      
+        if self.signal1 and self.signal2 and (self.dict_file or self.dict_node):
+                        
+            self.dict = self.dict_node if self.dict_node else self.dict_file
+                             
             self.fbank = self.dict['fbank']
             
             # fbank_coeff = self.fbank.get_filter_coeff()
@@ -498,10 +517,10 @@ class FBCSPTransformRealTimeNode(Node):
 
             print(features)
 
-            self.signal1,self.signal2,self.dict = None,None,None
+            self.signal1,self.signal2,self.dict_node = None,None,None
             
             self.set_output(0,signal_features)
-     
+            
      
      
      

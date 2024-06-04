@@ -19,10 +19,12 @@ from cognixcore.config.traits import NodeTraitsConfig, NodeTraitsGroupConfig, In
 from .utils.scikit import (
     BasePredictor,
     SVMClassifier,
+    RFClassifier,
     SciKitClassifier,
     RandomForestClassifier,
     LogisticRegressionClassifier,
     CrossValidation,
+    LDAClassifier,
     KFoldClass,
     LeaveOneOutClass,
     ShuffleSplit,
@@ -68,6 +70,30 @@ class SVMNode(ModelNode):
                         }
         self.model = SVMClassifier(self.params)
         self.set_output(0, self.model)
+        
+class LDANode(ModelNode):
+    title = 'LDA Classifier'
+    version = '0.1'
+
+    class Config(NodeTraitsConfig):
+        solver: str = Enum('svd','lsqr','eigen',desc='solver to use')
+        shrinkage: float = CX_Float(0.5,desc='shrinkage parameter between 0 and 1')
+        shrinkage_default: bool = Bool()
+
+    init_inputs = []
+    init_outputs = [PortConfig(label='model', allowed_data=SciKitClassifier)]
+    
+    @property
+    def config(self) -> LDANode.Config:
+        return self._config
+
+    def init(self):
+        self.params = {'solver':self.config.solver,
+                        'shrinkage':self.config.shrinkage_default if self.config.shrinkage_default else self.config.shrinkage
+                        }
+        
+        self.model = LDAClassifier(self.params)
+        self.set_output(0, self.model)
     
 class RandomForestNode(ModelNode):
     title = 'Random Forest Classifier'
@@ -100,7 +126,9 @@ class RandomForestNode(ModelNode):
             'max_leaf_nodes':self.config.max_leaf_nodes if self.config.max_leaf_nodes !=0 else None,
         }
 
-        self.model =RandomForestClassifier(self.params)
+        print(self.params)
+        
+        self.model = RFClassifier(self.params)
         self.set_output(0, self.model)
 
 class LogisticRegressionNode(ModelNode):
@@ -272,7 +300,7 @@ class SaveModel(Node):
     class Config(NodeTraitsConfig):
         directory: str = Directory(desc='the saving directory')
         default_filename: str = CX_Str("model", desc="the default file name")
-        var_name: str = CX_Str(
+        varname: str = CX_Str(
             "model", 
             desc="the file name will be extracted from this if there is a string variable"
         )
@@ -280,14 +308,16 @@ class SaveModel(Node):
     init_inputs = [PortConfig(label='model',allowed_data=SciKitClassifier)]
 
     def init(self):
+        self.path = None
+        self.classifier: SciKitClassifier = None
         
         dir = self.config.directory
-        filename = self.var_val_get(self.config.var_name) 
-        if not filename or not isinstance(filename, str):
+        filename = self.var_val_get(self.config.varname) 
+        if not filename or isinstance(filename, str) == False:
             filename = self.config.default_filename
-            
-        self.path = os.path.join(dir, filename)
-        self.classifier: SciKitClassifier = None
+        
+        if dir:
+            self.path = os.path.join(dir, filename)
         
     @property
     def config(self) -> SaveModel.Config:
@@ -298,15 +328,19 @@ class SaveModel(Node):
             self.classifier = self.input(0)      
     
     def stop(self):
-        if self.classifier:
+        if self.classifier and self.path:
             self.classifier.save_model(self.path)
             
-class LoadModel(FrameNode):
+class LoadModel(Node):
     title = 'Load Model'
     version = '0.1'
 
     class Config(NodeTraitsConfig):
-        f: str = File('Some path',desc='path of the model to import')
+        directory: str = Directory(desc='the saving directory')
+        varname: str = CX_Str(
+            "model", 
+            desc="the file name will be extracted from this if there is a string variable"
+        )
 
     init_outputs = [PortConfig(label='model',allowed_data=SciKitClassifier)]
 
@@ -315,21 +349,37 @@ class LoadModel(FrameNode):
         return self._config
     
     def init(self):
-        self.path_file = self.config.f
-        self.define_model = False
-
-    def frame_update_event(self):
-        if not self.define_model:
+        
+        dir = self.config.directory
+        filename = self.var_val_get(self.config.varname) 
+        path_file = None
+        
+        print(path_file)
+        if filename and dir and isinstance(filename, str)!=False:
+            path_file = f'{dir}/{filename}'
+            
+        print(path_file,os.path.exists(path_file))
+        
+        if path_file:
             self.classifier = SciKitClassifier(None)
-            self.model = self.classifier.load_model(path=self.path_file)
-            self.set_output(0, SciKitClassifier(self.model))
-            self.define_model = True
+            self.model = self.classifier.load_model(path=path_file)
+            if self.model:
+                self.set_output(0, SciKitClassifier(self.model))
+            else:
+                self.logger.error(msg='The path doesnt exist')
+        
+    def update_event(self, inp=-1):
+        return super().update_event(inp)
+
 
 class TestNode(Node):
     title = 'Test Classifier'
     version = '0.1'
 
-    init_inputs = [PortConfig(label='data',allowed_data=FeatureSignal), PortConfig(label='model',allowed_data=SciKitClassifier)]
+    init_inputs = [
+        PortConfig(label='data',allowed_data=FeatureSignal),
+        PortConfig(label='model',allowed_data=SciKitClassifier)
+    ]
     init_outputs = [PortConfig(label = 'test metrics',allowed_data=LabeledSignal)]
 
     def init(self):

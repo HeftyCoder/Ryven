@@ -36,7 +36,12 @@ class XDFWriterNode(Node):
     version = '0.1'
     
     class Config(NodeTraitsConfig):
-        file_name = CX_Str('file name',desc='the name of the XDF file')
+        directory: str = Directory(desc='the saving directory')
+        default_filename: str = CX_Str("model", desc="the default file name")
+        varname: str = CX_Str(
+            "model", 
+            desc="the file name will be extracted from this if there is a string variable"
+        )
         
     init_inputs = [PortConfig(label='data stream',allowed_data=StreamSignal), PortConfig(label='marker stream',allowed_data=StreamSignal), PortConfig(label='path')]
     
@@ -51,13 +56,15 @@ class XDFWriterNode(Node):
         self.formats = ['double64','float32','int32','string','int16','int8','int64']
         self.stream_id = 0
         self.create_xdf = False
+        self.path = None
 
-        real_path = os.path.realpath(__file__)
-        dir_path = os.path.dirname(real_path).split('\\')
-        self.path = ""
-
-        for i in range(len(dir_path)-1):
-            self.path = self.path + dir_path[i] + "\\"
+        dir = self.config.directory
+        filename = self.var_val_get(self.config.varname) 
+        if not filename or isinstance(filename, str) == False:
+            filename = self.config.default_filename
+            
+        if dir: 
+            self.path = os.path.join(dir, filename)
     
         print(self.path)
     
@@ -78,13 +85,9 @@ class XDFWriterNode(Node):
     
     def update_event(self,inp:int):
         
-        if not self.create_xdf:
+        if not self.create_xdf and self.path:
 
-            path = self.input(len(self._inputs)-1)
-            if not path:
-                path = self.path
-
-            self.xdfile = xdfwriter.XDFWriter(f'{path}{self.config.file_name}.xdf',True)
+            self.xdfile = xdfwriter.XDFWriter(f'{self.path}.xdf',True)
             self.create_xdf = True
         
         if not self.write_header[inp]:
@@ -117,7 +120,11 @@ class XDFImportingNode(Node):
     version = '0.1'
     
     class Config(NodeTraitsConfig):
-        file: str = File('Some path',desc='path of the model to import')
+        directory: str = Directory(desc='the saving directory')
+        varname: str = CX_Str(
+            "model", 
+            desc="the file name will be extracted from this if there is a string variable"
+        )
         lowercase_labels: bool = Bool(False, desc="if checked, makes all the incoming labels into lowercase")
 
     init_outputs = [PortConfig(label='streams',allowed_data=Mapping[str,StreamSignal])]
@@ -127,20 +134,30 @@ class XDFImportingNode(Node):
         return self._config
     
     def init(self):
-
+        
+        dir = self.config.directory
+        filename = self.var_val_get(self.config.varname) 
+        path_file = None
+        
+        if filename and dir and isinstance(filename, str)!=False:
+            path_file = f'{dir}/{filename}.xdf'
+        
         formats = ['double64','float32','int32','string','int16','int8','int64']
         
         stream_collection = dict()
         
-        if os.path.exists(self.config.file):
-            streams , header = pyxdf.load_xdf(self.config.file)
+        print(path_file)
+        
+        if path_file and os.path.exists(path_file):
+            streams , header = pyxdf.load_xdf(path_file)
             
             for stream in streams:
+                print(stream)
                 stream_name = stream['info']['name'][0]
                 stream_type = stream['info']['type'][0]
                 stream_channel_count = stream['info']['channel_count'][0]
                 stream_srate = stream['info']['nominal_srate'][0]
-                stream_format = formats.index(stream['info']['channel_format'][0])
+                stream_format = stream['info']['channel_format'][0]
                 stream_id = stream['info']['stream_id']
                 stream_data = stream['time_series']
                 stream_timestamps = stream['time_stamps']
@@ -176,6 +193,10 @@ class XDFImportingNode(Node):
                 )
 
             self.set_output(0,stream_collection)
+        
+        else:
+            self.logger.error(msg='The path doesnt exist')
+        
             
     def update_event(self, inp=-1):
         pass

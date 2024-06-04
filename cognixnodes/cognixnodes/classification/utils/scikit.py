@@ -13,6 +13,7 @@ from sklearn.metrics import (
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.model_selection import (
     cross_val_score,
     KFold,
@@ -21,6 +22,7 @@ from sklearn.model_selection import (
     ShuffleSplit,
     train_test_split
 )
+import os
 from sklearn.preprocessing import LabelEncoder
 import joblib
 from ...core import FeatureSignal
@@ -166,14 +168,19 @@ class SciKitClassifier(BasePredictor):
         joblib.dump(self.model, filename=path)
 
     def load_model(self,path:str):
-        return joblib.load(path)   
+        path = f"{path}.joblib"
+        print(path,os.path.exists(path))
+        if os.path.exists(path):
+            return joblib.load(path)   
+        else:
+            return False
 
 class SVMClassifier(SciKitClassifier):
 
     def __init__(self,params:dict):
         super().__init__(model = SVC(**params))
         
-class RandomForestClassifier(SciKitClassifier):
+class RFClassifier(SciKitClassifier):
 
     def __init__(self,params:dict):
         super().__init__(model = RandomForestClassifier(**params))
@@ -182,7 +189,11 @@ class LogisticRegressionClassifier(SciKitClassifier):
 
     def __init__(self,params:dict):
         super().__init__(model = LogisticRegression(**params))
-   
+
+class LDAClassifier(SciKitClassifier):
+
+    def __init__(self,params:dict):
+        super().__init__(model = LinearDiscriminantAnalysis(**params))
    
 class CrossValidation:
     
