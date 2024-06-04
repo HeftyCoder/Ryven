@@ -42,11 +42,11 @@ class CircularBuffer:
         self.total_intervals = 0
     
     def reset(self, data: np.ndarray, timestamps: np.ndarray):
+        self.timestamps = timestamps
         self.duration = timestamps[-1] - timestamps[0]
         self.tloop = timestamps[-1]
         self.current_index = self.size-1
         self.effective_srate = len(timestamps)/(timestamps[-1] - timestamps[0])
-        self.timestamps = timestamps
         self.data = data
     
     @property
@@ -279,7 +279,7 @@ class CircularBuffer:
         offsets: tuple[float, float], 
         error_margin=0.0,
         dts_err_scale=_default_dts_err_scale
-    ):
+    ) -> tuple[np.ndarray, np.ndarray] | tuple[None, None]:
         """
         Extracts a segment around relative offsets of the buffer 
         using an index to locate the pivot timestamp. 

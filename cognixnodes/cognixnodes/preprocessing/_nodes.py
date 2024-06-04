@@ -208,12 +208,6 @@ class WindowNode(Node):
     step_mode = 'step'
     percent_mode = 'percent'
     
-    """
-    The buffer might cut some data if it is initialized with
-    enough data just to fit the window, so we're adding some
-    space.
-    """
-    
     class Config(NodeTraitsConfig):
         mode: str = Enum('input', 'buffer', desc='the operation mode of the Window Node')
         window_length: float = CX_Float(0.5, desc='length of the window in seconds')
@@ -285,6 +279,19 @@ class WindowNode(Node):
     @property
     def wnd_time(self):
         return self.config.window_length
+    
+    @property
+    def step(self):
+        if self.config.overlap_mode == self.step_mode:
+            step = min(self.wnd_time, self.config.overlap_step)
+        elif self.config.overlap_mode == self.percent_mode:
+            step = max(
+                0, 
+                (1-self.config.overlap_percent) * self.wnd_time 
+            )
+        else:
+            step = self.wnd_time
+        return step
         
     def update_event(self, inp=-1):
         
@@ -340,17 +347,10 @@ class WindowNode(Node):
             self.first_window = False
         
         # check for any residual windows by applying overlap
-        if self.config.overlap_mode == self.step_mode:
-            step = min(self.wnd_time, self.config.overlap_step)
-        elif self.config.overlap_mode == self.percent_mode:
-            step = max(
-                0, 
-                (1-self.config.overlap_percent) * self.wnd_time 
-            )
-        else:
-            step = self.wnd_time
         
         if not self.first_window and self.current_time >= step:
+            
+            step = self.step
             offset = self.current_time - step
             self.current_time -= offset
         
@@ -370,7 +370,7 @@ class WindowNode(Node):
                             data_inp.info,
                         )              
                     )
-                print(f"{-offset-self.wnd_time}, {-offset} [{tms[-1]}-{tms[0]}] = {tms[-1]-tms[0]}")
+                    
                 offset += step
                 self.current_time -= offset
                 
@@ -389,96 +389,48 @@ class WindowNode(Node):
         if isinstance(data_inp, StreamSignal):
             data_inp = [data_inp]
         
-        # TODO check this again if segmentation is better
-        wnd_dur = self.config.window_length
-        results: list[StreamSignal] = []
+        result: list[StreamSignal] = []
         buffer = CircularBuffer.create_empty()
-        err_margin = self.config.error_margin
-        for i in range(len(data_inp)):
-            inp_signal = data_inp[i]
-            global_dur = inp_signal.tms[-1] - inp_signal.tms[0]
-            
-            if wnd_dur - err_margin > global_dur:
-                if self.config.debug:
-                    self.logger.warning(f'Incoming signal had smaller duration than Window Length - error margin')
-                continue
-            
-            buffer.reset(inp_signal.data, inp_signal.timestamps)
-            
-            wnd_num = int((global_dur + err_margin) / wnd_dur)
-            for w in range(wnd_num):
+        
+        # we're assuming data comes ordered in time
+        # that means that the list of signals are segments
+        # of one bigger signal
+        # Reversing helps with adding the signals in order
+        # since the extraction algorithm works last to first
+        data_inp.reverse()
+        
+        step = self.step
+        for signal in data_inp:
+            buffer.reset(signal.data, signal.timestamps)
+            time = 0
+            while time <= signal.duration - self.wnd_time + self.config.error_margin:
                 
-                start = w*wnd_dur
-                if w == wnd_num - 1 and wnd_dur + start > global_dur:
-                    wnd_dur -= self.config.error_margin
-                    
-                segment, times = buffer.segment(
-                    timestamp=start,
-                    offsets=(0, wnd_dur)
+                seg, tms = buffer.segment(
+                    time + signal.tms[0],  
+                    (0, self.wnd_time),
+                    self.config.error_margin,
+                    self.config.dts_error_scale
                 )
                 
-                results.append(
-                    StreamSignal(
-                        timestamps=times,
-                        labels=inp_signal.labels,
-                        data=segment,
-                        signal_info=inp_signal.info
+                if seg is not None:
+                    result.append(
+                        StreamSignal(
+                            tms,
+                            signal.labels,
+                            seg,
+                            signal.info
+                        )
                     )
-                )
-        if results:
-            self.set_output(0, results) 
-    
-    def update_overlap_mode(self, data_inp: StreamSignal | Sequence[StreamSignal]):
-        if isinstance(data_inp, StreamSignal):
-            data_inp = [data_inp]
+                time += step
             
-        wnd_dur = self.config.window_length
-        overlap = self.config.overlap
-        if overlap == 0:
+        if result:
             if self.config.debug:
-                self.logger.warning(f'Overlap value cannot be 0 in overlap mode')
-                return
-        
-        buffer = CircularBuffer.create_empty()
-        results = []
-        for sig in data_inp:
-            buffer.reset(sig.data, sig.timestamps)
-            
-            current_seg = sig.timestamps[0]
-            global_dur = buffer.duration + sig.timestamps[0]
-            while current_seg + wnd_dur - self.config.error_margin < global_dur:
-                
-                # if the time was exceeded due to the segment being slightly
-                # smaller than the window, then reduce the window by a configurable
-                # by the user error margin
-                new_wnd_dur = wnd_dur
-                if current_seg + wnd_dur > global_dur:
-                    new_wnd_dur -= self.config.error_margin
-                    
-                segment, times = buffer.segment(
-                    current_seg,
-                    (0, new_wnd_dur)
-                )
-                
-                current_seg += overlap
-                if segment is None:
-                    if self.config.debug:
-                        self.logger.warn(f"Found no segment in overlap mode. Global Dur: {global_dur}")
-                    continue
-                
-                results.append(
-                    StreamSignal(
-                        times,
-                        sig.labels,
-                        segment,
-                        sig.info,
-                    )
-                )
-            
-        
-        if results:
-            print(len(results))
-            self.set_output(0, results)
+                msg = f'Signal of duration: {signal.duration}\nBegin:{signal.tms[0]}\nEnd:{signal.tms[-1]}\n\n'
+                msg += f'NUMBER OF WINDOWS: {len(result)}\n\n'
+                for s in result:
+                    msg += f"WINDOW: [{s.tms[0]}-{s.tms[-1]} : {s.duration}\n"
+                self.logger.debug(msg)
+            self.set_output(0, result) 
  
 class LabeledSignalSelectionNode(Node):
     """
