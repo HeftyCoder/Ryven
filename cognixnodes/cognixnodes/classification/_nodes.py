@@ -53,9 +53,9 @@ class SVMNode(ModelNode):
         gamma_float: float = CX_Float(0.0)
         selection_of_gamma: bool = Bool('gamma value from choices?')
 
-    init_outputs = [PortConfig(label='model')]
     init_inputs = []
-
+    init_outputs = [PortConfig(label='model', allowed_data=SVMClassifier)]
+    
     @property
     def config(self) -> SVMNode.Config:
         return self._config
@@ -141,12 +141,17 @@ class TrainNode(Node):
     class Config(NodeTraitsConfig):
         binary:bool = Bool('binary classification?',desc='if the classification is binary or multiclass')
 
-    init_inputs = [PortConfig(label='data',allowed_data=FeatureSignal),PortConfig(label='model',  allowed_data=BasePredictor)]
-    init_outputs = [PortConfig(label='model',allowed_data=SciKitClassifier),
-                    PortConfig(label='train accuracy'),
-                    PortConfig(label='train precision'),
-                    PortConfig(label='train recall'),
-                    PortConfig(label='train f1_score')]
+    init_inputs = [
+        PortConfig(label='data',allowed_data=FeatureSignal),
+        PortConfig(label='model',  allowed_data=SciKitClassifier)
+    ]
+    init_outputs = [
+        PortConfig(label='model',allowed_data=SciKitClassifier),
+        PortConfig(label='train accuracy'),
+        PortConfig(label='train precision'),
+        PortConfig(label='train recall'),
+        PortConfig(label='train f1_score')
+    ]
 
     @property
     def config(self) -> TrainNode.Config:

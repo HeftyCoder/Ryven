@@ -397,7 +397,6 @@ class WindowNode(Node):
         # of one bigger signal
         # Reversing helps with adding the signals in order
         # since the extraction algorithm works last to first
-        data_inp.reverse()
         
         step = self.step
         for signal in data_inp:
@@ -428,7 +427,7 @@ class WindowNode(Node):
                 msg = f'Signal of duration: {signal.duration}\nBegin:{signal.tms[0]}\nEnd:{signal.tms[-1]}\n\n'
                 msg += f'NUMBER OF WINDOWS: {len(result)}\n\n'
                 for s in result:
-                    msg += f"WINDOW: [{s.tms[0]}-{s.tms[-1]} : {s.duration}\n"
+                    msg += f"WINDOW: [{s.tms[0]}-{s.tms[-1]} : {s.duration}]\n"
                 self.logger.debug(msg)
             self.set_output(0, result) 
  
