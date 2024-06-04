@@ -17,6 +17,7 @@ from ..core import Signal,TimeSignal,LabeledSignal,FeatureSignal
 # from Orange.evaluation import CrossValidation, CA, AUC
 from cognixcore.config.traits import NodeTraitsConfig, NodeTraitsGroupConfig, Int, List, Instance
 from .utils.scikit import (
+    BasePredictor,
     SVMClassifier,
     SciKitClassifier,
     RandomForestClassifier,
@@ -140,7 +141,7 @@ class TrainNode(Node):
     class Config(NodeTraitsConfig):
         binary:bool = Bool('binary classification?',desc='if the classification is binary or multiclass')
 
-    init_inputs = [PortConfig(label='data',allowed_data=FeatureSignal),PortConfig(label='model')]
+    init_inputs = [PortConfig(label='data',allowed_data=FeatureSignal),PortConfig(label='model',  allowed_data=BasePredictor)]
     init_outputs = [PortConfig(label='model',allowed_data=SciKitClassifier),
                     PortConfig(label='train accuracy'),
                     PortConfig(label='train precision'),

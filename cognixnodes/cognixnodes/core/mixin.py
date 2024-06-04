@@ -15,6 +15,12 @@ class Timestamped:
     def tms(self):
         """Shorthand for self.timestamps"""
         return self._timestamps
+    
+    @property
+    def duration(self):
+        if len(self._timestamps) == 0:
+            return self._timestamps[0]
+        return self._timestamps[-1] - self._timestamps[0]
 
 class Labeled:
     """An object that provides label data"""

@@ -127,9 +127,11 @@ class NodeTraitsConfigInspector(NodeConfigInspector[NodeTraitsConfig], QWidget):
         gr_label = self.inspected_label()
         
         insp_traits = inspected_obj.inspected_traits()
-        # custom user view
-        if self.inspected.traits_view:
-            self.view = self.inspected.traits_view
+        custom_view = self.inspected.trait_view(
+            self.inspected.default_traits_view()
+        )
+        if custom_view:
+            self.view = custom_view
         else:
             items: list[Item] = []
             for tr in insp_traits:

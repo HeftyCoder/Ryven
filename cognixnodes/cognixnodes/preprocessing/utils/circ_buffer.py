@@ -1,6 +1,8 @@
 import numpy as np
 from collections.abc import Sequence
 
+_default_dts_err_scale=1.5
+
 class CircularBuffer:
     """An implementation of a circular buffer for handling data and timestamps"""
     
@@ -25,15 +27,15 @@ class CircularBuffer:
         self.nominal_srate = sampling_frequency
         self.effective_srate = 0
         self.duration = buffer_duration
-        self.size = int(buffer_duration * self.nominal_srate)
         self.current_index = 0
         
         self.tloop = start_time
         self.dts = 1 / self.nominal_srate
 
         if init_buffers:
-            self.data = np.full((channels_count,self.size), -1.0, dtype=float)
-            self.timestamps = np.full(self.size, -1.0, dtype=float)
+            size = int(buffer_duration * self.nominal_srate)
+            self.data = np.full((channels_count, size), -1.0, dtype=float)
+            self.timestamps = np.full(size, -1.0, dtype=float)
         
         # for calculating effective srate
         self.interval_count = 0
@@ -42,21 +44,60 @@ class CircularBuffer:
     def reset(self, data: np.ndarray, timestamps: np.ndarray):
         self.duration = timestamps[-1] - timestamps[0]
         self.tloop = timestamps[-1]
-        self.size = len(timestamps)
         self.current_index = self.size-1
-        self.effective_srate = 1/(timestamps[1] - timestamps[0])
+        self.effective_srate = len(timestamps)/(timestamps[-1] - timestamps[0])
         self.timestamps = timestamps
         self.data = data
-        
+    
+    @property
+    def size(self):
+        return len(self.timestamps)
+    
     @property
     def effective_dts(self):
         if self.effective_srate == 0:
             return 0
         return 1 / self.effective_srate
+    
+    @property
+    def current_time(self):
+        return self.timestamps[self.current_index]
+    
+    def append_expand(
+        self,
+        data: Sequence,
+        timestamps: Sequence[float],
+    ) -> bool:
+        """
+        Expands the current buffer with the data if the incoming data 
+        duration exceeds that of the buffer, else simply appends it.
+        
+        Returns True if the buffer has expanded.
+        """
+        # might be a single timestamp
+        data_dur = (
+            timestamps[0] if len(timestamps) == 0
+            else timestamps[-1] - timestamps[0]
+        )
+        
+        if data_dur > self.duration:
+            added_dur = data_dur - self.duration
+            self.duration += added_dur
+            self.data = np.concatenate(self.data, data)
+            self.timestamps = np.concatenate(self.timestamps, timestamps)
+            self.current_index = self.size - 1
+            self.effective_srate = (
+                len(self.timestamps) / 
+                (self.timestamps[-1] - self.timestamps[0])
+            )
+            return True
+        else:
+            self.append(data, timestamps)
+            return False
         
     def append(
         self, 
-        data: Sequence, 
+        data: np.ndarray, 
         timestamps: Sequence[float],
         get_looped_data=False
     ) -> tuple[np.ndarray, np.ndarray] | tuple[None, None]:
@@ -67,6 +108,7 @@ class CircularBuffer:
         if the buffer has looped, else None.
         """
         ts_len = len(timestamps)
+        data = data.T
         assert data.shape[1] == ts_len, "Length of data and timestamps was not equal!"
         
         # TODO validate this later
@@ -107,12 +149,20 @@ class CircularBuffer:
             
             return looped_result
     
-    def find_index(self, timestamp: float):
+    def find_index(
+        self, 
+        timestamp: float, 
+        error_margin=0.0,
+        dts_error_scale=_default_dts_err_scale,
+    ):
         """Finds closest index of the buffer based on a timestamp"""
 
         tc = self.timestamps[self.current_index]
         tx = timestamp
         
+        if tx > tc or tc - tx > self.duration:
+            tx -= error_margin
+         
         if (tx > tc) or ((tc - tx) > self.duration): 
             return (-1, False)
 
@@ -130,9 +180,10 @@ class CircularBuffer:
         
         found_time = self.timestamps[index]
         err = found_time - timestamp
-        err_margin = 2.5 * self.effective_dts
+        # error is based around effective dts
+        dts_err_margin = dts_error_scale * self.effective_dts
         
-        if abs(err) <= err_margin:
+        if abs(err) <= dts_err_margin:
             return index, overflow
         
         # At this point, we're pretty close to the time we want
@@ -144,8 +195,8 @@ class CircularBuffer:
             if index >= search_boundary or index + search_boundary < self.size:
                 search_arr = self.timestamps[index-search_boundary:index]
                 search_diff = np.abs(search_arr - timestamp)
-                found_index = np.argmax(search_diff <= err_margin)
-                if search_diff[found_index] <= err_margin:
+                found_index = np.argmax(search_diff <= dts_err_margin)
+                if search_diff[found_index] <= dts_err_margin:
                     index = index - search_boundary + found_index
                     if index > self.current_index:
                         overflow = True
@@ -157,8 +208,8 @@ class CircularBuffer:
                     self.timestamps[0, index]
                 )
                 search_diff = np.abs(search_arr - timestamp)
-                found_index = np.argmax(search_diff <= err_margin)
-                if search_diff[found_index] <= err_margin:
+                found_index = np.argmax(search_diff <= dts_err_margin)
+                if search_diff[found_index] <= dts_err_margin:
                     if found_index + begin < self.size:
                        index = found_index
                        overflow = True
@@ -168,11 +219,15 @@ class CircularBuffer:
         elif search_boundary < 0:
             search_boundary = abs(search_boundary)
             if index <= self.current_index or index + search_boundary < self.size:
-                search_boundary = min(search_boundary, self.current_index)
+                if index <= self.current_index:
+                    search_boundary = min(search_boundary, self.current_index)
+                else:
+                    search_boundary = min(search_boundary, self.size-1)
+                    
                 search_arr = self.timestamps[index:index+search_boundary]
-                search_diff = search_arr - timestamp
-                found_index = np.argmax(search_diff <= err_margin)
-                if search_diff[found_index] <= err_margin:
+                search_diff = np.abs(search_arr - timestamp)
+                found_index = np.argmax(search_diff <= dts_err_margin)
+                if search_diff[found_index] <= dts_err_margin:
                     index += found_index
                     if index > self.current_index:
                         overflow = True
@@ -183,28 +238,64 @@ class CircularBuffer:
                     self.timestamps[index:self.size],
                     self.timestamps[0:search_boundary]
                 )
-                search_diff = search_arr - timestamp
-                found_index = np.argmax(search_diff <= err_margin)
-                if search_diff[found_index] <= err_margin:
+                search_diff = np.abs(search_arr - timestamp)
+                found_index = np.argmax(search_diff <= dts_err_margin)
+                if search_diff[found_index] <= dts_err_margin:
                     if found_index + index < self.size:
                         overflow = True
                         index += found_index
                     else:
                         index = found_index - (self.size - index)
-                                 
+        
         return index, overflow
     
-    def find_segment(self, timestamp: float, offsets: tuple[float, float]):
-        """Extracts a segment of the buffer based around a timestamp and offsets"""
+    def segment_current(
+        self, 
+        offsets: tuple[float, float], 
+        error_margin=0.0,
+        dts_err_scale=_default_dts_err_scale
+    ):
+        """Extracts a segment around the current time"""
+        return self.segment_index(self.current_index, offsets, error_margin, dts_err_scale)
+    
+    def segment(
+        self, 
+        timestamp: float, 
+        offsets: tuple[float, float], 
+        error_margin=0.0,
+        dts_err_scale=_default_dts_err_scale
+    ):
+        """
+        Extracts a segment of the buffer based around a 
+        global timestamp and relative offsets.
+        """
+        
+        m_index, _ = self.find_index(timestamp, error_margin, dts_err_scale)
+        return self.segment_index(m_index, offsets, error_margin, dts_err_scale)
+    
+    def segment_index(
+        self, 
+        m_index: int, 
+        offsets: tuple[float, float], 
+        error_margin=0.0,
+        dts_err_scale=_default_dts_err_scale
+    ):
+        """
+        Extracts a segment around relative offsets of the buffer 
+        using an index to locate the pivot timestamp. 
+        """
+        
+        if m_index < 0 or m_index > self.size:
+            return None, None
+        
         x, y = offsets
-        tm = timestamp
-        buffer = self.data
         buffer_tm = self.timestamps
+        tm = buffer_tm[m_index]
+        buffer = self.data
         size = self.size
         
-        m_index, m_overflow = self.find_index(tm)
-        x_index, x_overflow = self.find_index(tm + x)
-        y_index, y_overflow = self.find_index(tm + y)   
+        x_index, x_overflow = self.find_index(tm + x, error_margin, dts_err_scale)
+        y_index, y_overflow = self.find_index(tm + y, error_margin, dts_err_scale)   
         
         if (
             self.__invalid_indices(m_index, x_index, y_index) or 
@@ -224,7 +315,7 @@ class CircularBuffer:
                 np.concatenate((buffer[:, start:size], buffer[:, 0:end]), axis=1),
                 np.concatenate((buffer_tm[start:size], buffer_tm[0:end]))
             )
-    
+        
     def __invalid_indices(self, m_index: int, x_index: int, y_index: int):
         """Checks if the indices are out of the buffer"""
         return (

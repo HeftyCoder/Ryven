@@ -8,7 +8,7 @@ from mne_icalabel import label_components
 from cognixcore.config.traits import *
 from typing import Union
 import numpy as np
-from traitsui.api import CheckListEditor
+from traitsui.api import *
 
 from pylsl import local_clock
 from collections.abc import Sequence
@@ -79,7 +79,7 @@ class SegmentationNode(Node):
         timestamps_out = 0
         
         for i in range(self.current_length):
-            segment, timestamps = self.buffer.find_segment(
+            segment, timestamps = self.buffer.segment(
                 self.marker_tm_cache[i], 
                 self.config.offset
             )
@@ -140,7 +140,7 @@ class SegmentationNode(Node):
                 channels_count=len(self.data_signal.labels)
             )
         
-        self.buffer.append(self.data_signal.data.T, self.data_signal.timestamps)
+        self.buffer.append(self.data_signal.data, self.data_signal.timestamps)
         return True
 
     def update_marker(self, inp: int):
@@ -181,40 +181,85 @@ class WindowNode(Node):
     """
     The Window Node has two functions.
     
+    input:
+        In the input mode, it accepts a StreamSignal as a whole
+        input and attempts to segment it into windows, depending
+        on the window length and overlap given.
     buffer:
         In the buffer mode, it acts as a buffer. Incoming data
         must be of type StreamSignal. Each time the node updates,
         it adds the input to the buffer and outputs the Window
-        if it is detected.
-    
-    segment:
-        In the segment mode, it acts as a segmentation mechanism.
-        Incoming data can be a StreamSignal or a list of StreamSignals.
-        In its update, it will receive the data, attempt to segment it
-        into the requested window size and return the results as a 
-        list of StreamSignals. If the data is less than the window,
-        there will be no output.
-    
-    overlap:
-        In the overlap mode, it acts as a segmentation mechanism, quite
-        similarly to the segment mode. However, the overlap value is the
-        step in which the windows will be overlapped.
+        if it is detected, depending on the overlap given.
+        
+        In the buffer mode, it is assumed that small chunks of a 
+        bigger signal are incoming to the buffer. In the case of 
+        a bigger chunk, to avoid data loss, the buffer is extended
+        to hold the additional data.
+        
+        Essentially, buffer mode is designed for real time processing.
     """
     
     title = 'Window'
     version = '0.1'
 
     buffer_mode = 'buffer'
-    segment_mode = 'segment'
-    overlap_mode = 'overlap'
+    input_mode = 'input'
+    
+    step_mode = 'step'
+    percent_mode = 'percent'
+    
+    """
+    The buffer might cut some data if it is initialized with
+    enough data just to fit the window, so we're adding some
+    space.
+    """
     
     class Config(NodeTraitsConfig):
-        mode: str = Enum('buffer', 'segment', 'overlap', desc='the operation mode of the Window Node')
+        mode: str = Enum('input', 'buffer', desc='the operation mode of the Window Node')
         window_length: float = CX_Float(0.5, desc='length of the window in seconds')
-        error_margin: float = CX_Float(0.05, desc='error margin for when the segment is slightly smaller than requested')
-        overlap: float = CX_Float(0, visible_when='mode=="overlap"', desc='overlap between the windows')
+        error_margin: float = CX_Float(0.01, desc='error margin for when the segment is slightly smaller than requested')
+        dts_error_scale: float = Range(
+            1.0, 
+            3.0, 
+            1.5, 
+            desc="how close to the effective sample rate we want to reduce the error to"
+        )
+        extra_buffer: float = CX_Float(0.5, desc="initialize the buffer with extra amount of seconds")
+        overlap_mode: str = Enum('none', 'step', 'percent', desc='how the segmented windows should be overlapped')
+        overlap_step: float = Range(0.01, None, 0.5, exclude_high=True, desc='overlap step between the windows, in seconds')
+        overlap_percent: float = Range(0.0, 0.99, desc='overlap percent between the windows')
+        # the 0.99 means that at max, 100 windos can be created with a step of x * window_time
         debug: bool = Bool(False, desc='debug message when data is segmented')
-    
+
+        # to show the borders correctly, the scrollable must be in an outside group
+        traits_view = View(
+            Group(
+                Group(
+                    Item('mode'),
+                    Item('window_length'),
+                    Item('error_margin'),
+                    Item('dts_error_scale'),
+                    Item('extra_buffer'),
+                    Item('overlap_mode'),
+                    Group(
+                        Item(
+                            'overlap_step', 
+                            label='step', 
+                            visible_when='overlap_mode=="step"',
+                        ),
+                        Item(
+                            'overlap_percent',
+                            label='percent',
+                            visible_when='overlap_mode=="percent"',
+                        ),
+                    ),
+                    Item('debug'),
+                ),
+                label='configuration',
+                scrollable=True,
+            )
+        )
+        
     init_inputs = [
         PortConfig(
             label='in',
@@ -230,46 +275,117 @@ class WindowNode(Node):
  
     def init(self):
         self.buffer: CircularBuffer = None
+        self.current_time = 0
+        self.first_window = True
     
     @property
     def config(self) -> WindowNode.Config:
         return self._config
+    
+    @property
+    def wnd_time(self):
+        return self.config.window_length
         
     def update_event(self, inp=-1):
         
-        self.data_inp: StreamSignal | Sequence[StreamSignal] = self.input(inp)
-        if not self.data_inp:
+        data_inp: StreamSignal | Sequence[StreamSignal] = self.input(inp)
+        if not data_inp:
             return
         
-        if self.config.mode == self.buffer_mode:
-            self.update_buffer_mode(self.data_inp)
-        elif self.config.mode == self.segment_mode:
-            self.update_segment_mode(self.data_inp)
-        else:
-            self.update_overlap_mode(self.data_inp)    
+        mode = self.config.mode
+        if mode == self.input_mode:
+            self.update_input_mode(data_inp)
+        elif mode == self.buffer_mode:
+            self.update_buffer_mode(data_inp)    
     
     def update_buffer_mode(self, data_inp: StreamSignal):
         if not self.buffer:
+            # create the window buffer
             self.buffer = CircularBuffer(
                 data_inp.info.nominal_srate,
-                self.config.window_length,
+                self.config.window_length + self.config.extra_buffer,
                 data_inp.timestamps[0],
                 len(data_inp.labels)
             )
         
-        # TODO if the incoming signal is bigger than the window,
-        # segment it and return multiple windows :D
-        data, timestamps = self.buffer.append(data_inp.data, data_inp.timestamps, True)
-        if data:
-            result_signal = StreamSignal(
-                timestamps,
-                data_inp.labels,
-                data,
-                data_inp.info
-            )
-            self.set_output(0, result_signal)
+        data_dur = data_inp.duration
+        self.current_time += data_dur
+        # the buffer is not large enough to hold all the incoming
+        # data, so we attempt to expand it
+        self.buffer.append_expand(
+            data_inp.data,
+            data_inp.timestamps
+        )
         
-    def update_segment_mode(self, data_inp: StreamSignal | Sequence[StreamSignal]):
+        result: list[StreamSignal] = []
+        # check for a first window
+        if self.first_window and self.current_time >= self.wnd_time:
+            extra = self.current_time - self.wnd_time
+            segment, tmps = self.buffer.segment_current(
+                (-self.wnd_time-extra, -extra),
+                self.config.error_margin,
+                self.config.dts_error_scale
+            )
+            if segment is not None:
+                result.append(
+                    StreamSignal(
+                        tmps,
+                        data_inp.labels,
+                        segment,
+                        data_inp.info
+                    )
+                )
+            
+            self.current_time -= self.wnd_time + extra
+            self.first_window = False
+        
+        # check for any residual windows by applying overlap
+        if self.config.overlap_mode == self.step_mode:
+            step = min(self.wnd_time, self.config.overlap_step)
+        elif self.config.overlap_mode == self.percent_mode:
+            step = max(
+                0, 
+                (1-self.config.overlap_percent) * self.wnd_time 
+            )
+        else:
+            step = self.wnd_time
+        
+        if not self.first_window and self.current_time >= step:
+            offset = self.current_time - step
+            self.current_time -= offset
+        
+            while True:
+                seg, tms = self.buffer.segment_current(
+                    (-offset-self.wnd_time, -offset),
+                    self.config.error_margin,
+                    self.config.dts_error_scale
+                )
+                if seg is not None:
+                    result.insert(
+                        1,
+                        StreamSignal(
+                            tms,
+                            data_inp.labels,
+                            seg,
+                            data_inp.info,
+                        )              
+                    )
+                print(f"{-offset-self.wnd_time}, {-offset} [{tms[-1]}-{tms[0]}] = {tms[-1]-tms[0]}")
+                offset += step
+                self.current_time -= offset
+                
+                if self.current_time <= 0:
+                    break
+        
+        if result:
+            if self.config.debug:
+                msg = ''
+                for s in result:
+                    msg += f"WINDOW: [{s.tms[0]}-{s.tms[-1]} : {s.duration}\n"
+                self.logger.debug(msg)
+            self.set_output(0, result)
+                
+    def update_input_mode(self, data_inp: StreamSignal | Sequence[StreamSignal]):
         if isinstance(data_inp, StreamSignal):
             data_inp = [data_inp]
         
@@ -296,7 +412,7 @@ class WindowNode(Node):
                 if w == wnd_num - 1 and wnd_dur + start > global_dur:
                     wnd_dur -= self.config.error_margin
                     
-                segment, times = buffer.find_segment(
+                segment, times = buffer.segment(
                     timestamp=start,
                     offsets=(0, wnd_dur)
                 )
@@ -339,7 +455,7 @@ class WindowNode(Node):
                 if current_seg + wnd_dur > global_dur:
                     new_wnd_dur -= self.config.error_margin
                     
-                segment, times = buffer.find_segment(
+                segment, times = buffer.segment(
                     current_seg,
                     (0, new_wnd_dur)
                 )
