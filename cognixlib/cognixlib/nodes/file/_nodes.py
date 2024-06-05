@@ -41,8 +41,7 @@ class XDFWriterNode(Node):
         
     init_inputs = [
         PortConfig(label='data stream', allowed_data=StreamSignal), 
-        PortConfig(label='marker stream',allowed_data=StreamSignal), 
-        PortConfig(label='path')
+        PortConfig(label='marker stream',allowed_data=StreamSignal)
     ]
     
     def __init__(self, flow: Flow):
@@ -97,35 +96,33 @@ class XDFWriterNode(Node):
         
         if not self.write_header[inp]:
 
-            if inp!=len(self._inputs)-1:
-                signal: StreamSignal = self.input(inp)
-                if not signal:
-                    return False
-                if 'Marker' in signal.info.signal_type and (signal.info.nominal_srate != IRREGULAR_RATE or signal.info.data_format != cf_string):
-                    return 
-                else:
-                    self.inlets[inp] = {'stream_name':signal.info.name,'stream_type':signal.info.signal_type,'channel_count':len(signal.labels),\
-                        'nominal_srate':signal.info.nominal_srate,'channel_format':self.formats[signal.info.data_format],'time_created':self.start_time,'channels':signal.info.channels}
-                    
-                    self.xdfile.write_header(inp, self.inlets[inp])
-                    # creation_of_xdf(self.xdfile,inp,self.inlets[inp],None,None,True,False,False,0,0,0)
-
-                self.write_header[inp] = True
-        
-        if inp!=len(self._inputs)-1:
             signal: StreamSignal = self.input(inp)
-            if signal.timestamps:
-                samples = np.array(signal.data)
-                timestamps = np.array(signal.timestamps)
-                self.timestamps[inp].append([timestamps[0],timestamps[-1]])
-                self.samples_count[inp] += len(timestamps)
+            if not signal:
+                return False
+            if 'Marker' in signal.info.signal_type and (signal.info.nominal_srate != IRREGULAR_RATE or signal.info.data_format != cf_string):
+                return 
+            else:
+                self.inlets[inp] = {'stream_name':signal.info.name,'stream_type':signal.info.signal_type,'channel_count':len(signal.labels),\
+                    'nominal_srate':signal.info.nominal_srate,'channel_format':self.formats[signal.info.data_format],'time_created':self.start_time,'channels':signal.info.channels}
                 
-                self.xdfile.write_data(
-                    inp,
-                    samples,
-                    timestamps,
-                    self.inlets[inp]['channel_count']
-                )
+                self.xdfile.write_header(inp, self.inlets[inp])
+                # creation_of_xdf(self.xdfile,inp,self.inlets[inp],None,None,True,False,False,0,0,0)
+
+            self.write_header[inp] = True
+        
+        signal: StreamSignal = self.input(inp)
+        if signal.timestamps:
+            samples = np.array(signal.data)
+            timestamps = np.array(signal.timestamps)
+            self.timestamps[inp].append([timestamps[0],timestamps[-1]])
+            self.samples_count[inp] += len(timestamps)
+            
+            self.xdfile.write_data(
+                inp,
+                samples,
+                timestamps,
+                self.inlets[inp]['channel_count']
+            )
                 # creation_of_xdf(self.xdfile,inp,self.inlets[inp],samples,timestamps,False,True,False,0,0,0)
         
             

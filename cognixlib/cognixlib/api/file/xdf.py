@@ -165,7 +165,7 @@ class XDFWriter:
         write_little_endian(self._file,tag,"uint16_t")
         if streamid_p!=None:
             write_little_endian(self._file,streamid_p,"uint32_t")
-         
+        
     def write_stream_header(self, streamid: int, content: str, fm = None):
         if not fm:
             try:
