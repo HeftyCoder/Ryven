@@ -348,9 +348,10 @@ class WindowNode(Node):
         
         # check for any residual windows by applying overlap
         
+        step = self.step
+        
         if not self.first_window and self.current_time >= step:
             
-            step = self.step
             offset = self.current_time - step
             self.current_time -= offset
         

@@ -210,6 +210,8 @@ class LSLInputNode(FrameNode):
         if not timestamps:
             return
         
+        timestamps = np.array(timestamps, dtype='float64')
+        
         if self.config.invert:
             samples = samples.T
             

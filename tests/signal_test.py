@@ -47,7 +47,7 @@ def run():
         "george": (0, 14), # EXCLUSIVE
         "john": (14, 25)
     }
-    a = FeatureSignal(
+    f1 = FeatureSignal(
         labels,
         classes,
         data,
@@ -55,12 +55,37 @@ def run():
     )
     
     assert np.array_equal(
-        a.cdm["george"].data, 
-        a[0:14]
+        f1.cdm["george"].data, 
+        f1[0:14]
     )
     assert np.array_equal(
-        a.cdm["john"].data, 
-        a[14:25]
+        f1.cdm["john"].data, 
+        f1[14:25]
+    )
+    
+    # CLASS MERGE TEST
+    data = np.random.rand(30, size)
+    classes = {
+        "george": (0, 10),
+        "john": (10, 20),
+        "dam": (20, 30)
+    }
+    f2 = FeatureSignal(
+        labels,
+        classes,
+        data,
+        None
+    )
+    
+    f_signal = FeatureSignal.concat_classes(f1, f2)
+
+    assert np.array_equal(
+        f_signal.cdm['george'].data[0:14],
+        f1.cdm['george'].data
+    )
+    assert np.array_equal(
+        f_signal.cdm['john'].data[11:21],
+        f2.cdm['john'].data
     )
     
 if __name__ == '__main__':

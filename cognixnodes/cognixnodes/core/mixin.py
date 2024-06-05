@@ -1,10 +1,12 @@
 """Defines interfaces important to various signals"""
 from collections.abc import Sequence
+from numpy.typing import NDArray
+from numpy import float64
 
 class Timestamped:
     """An object that provides timestamp data"""
     
-    def __init__(self, timestamps: Sequence[float]):
+    def __init__(self, timestamps: NDArray[float64]):
         self._timestamps = timestamps
     
     @property
