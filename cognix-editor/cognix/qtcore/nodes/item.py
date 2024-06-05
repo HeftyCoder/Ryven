@@ -40,7 +40,9 @@ from cognixcore import (
     Node,
     NodeInput,
     NodeOutput,
-    ProgressState
+    ProgressState,
+    IdentifiableGroups,
+    NodeAction,
 )
 
 from ..utils import (
@@ -85,37 +87,6 @@ class NodeErrorIndicator(GUIBase, QGraphicsPixmapItem):
             f'{error_msg}'
             f'</body></html>'
         )
-        
-class NodeItemAction(QAction):
-    """A custom implementation of QAction that additionally stores transmitted 'data' which can be intuitively used
-    in subclasses f.ex. to determine the exact source of the action triggered. For more info see GitHub docs.
-    It shall not be a must to use the data parameter though. For that reason, there are two different signals,
-    one that triggers with transmitted data, one without.
-    So, if a special action does not have 'data', the connected method does not need to have a data parameter.
-    Both signals get connected to the target method but only if data isn't None, the signal with the data parameter
-    is used."""
-
-    triggered_with_data = Signal(object, object)
-    triggered_without_data = Signal(object)
-
-    def __init__(self, node_gui, text, method, menu, data=None):
-        super(NodeItemAction, self).__init__(text=text, parent=menu)
-
-        self.node_gui = node_gui
-        self.data = data
-        self.method = method
-        self.triggered.connect(self.triggered_)
-
-    def triggered_(self):
-        if self.data is not None:
-            self.grab_method()(self.data)
-        else:
-            self.grab_method()()
-
-    def grab_method(self):
-        # the method object could have changed since the action was created
-        return getattr(self.node_gui, self.method.__name__)
-
 
 class NodeItem_CollapseButton(QGraphicsWidget):
     def __init__(self, node_gui: 'NodeGUI', node_item: 'NodeItem'):
@@ -460,12 +431,21 @@ class NodeItemWidget(QGraphicsWidget):
         if self.main_widget_proxy:
             self.main_widget_proxy.show()
 
+    def has_hidden_ports(self):
+        for inp in self.node_item.inputs:
+            if inp.isVisible():
+                return False
+        for out in self.node_item.outputs:
+            if out.isVisible():
+                return False
+        return True
+    
     def hide_unconnected_ports(self):
-        for inp in self.node_item.node.inputs:
-            if self.flow.connected_output(inp) is None:
+        for inp in self.node_item.inputs:
+            if self.flow.connected_output(inp.port) is None:
                 inp.hide()
-        for out in self.node_item.node.outputs:
-            if len(self.flow.connected_inputs(out)):
+        for out in self.node_item.outputs:
+            if len(self.flow.connected_inputs(out.port)) == 0:
                 out.hide()
 
     def show_unconnected_ports(self):
@@ -698,6 +678,15 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
         name = self.node.__class__.title if self.node else f'{NodeItem.__name__}'
         obj = self.node if self.node else self
         return generate_name(obj, name)
+    
+    def has_hidden_ports(self):
+        for inp in self.inputs:
+            if not inp.isVisible():
+                return False
+        for out in self.outputs:
+            if not out.isVisible():
+                return False
+        return True
     
     # EVENTS
     
@@ -1002,14 +991,43 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
         
     def get_context_menu(self):
         menu = QMenu(self.flow_view)
-
-        actions = self.get_actions(self.node_gui.actions, menu)
-        for a in actions:  # menu needed for 'parent'
-            if type(a) == NodeItemAction:
-                menu.addAction(a)
-            elif type(a) == QMenu:
-                menu.addMenu(a)
-
+        
+        def add_action(name: str, menu: QMenu, action: NodeAction):
+            action.update()
+            if action.status == NodeAction.Status.HIDDEN:
+                return
+            
+            menu_action = QAction(name, self)
+            if action.status == NodeAction.Status.DISABLED:
+                menu_action.setEnabled(False)
+                
+            menu_action.triggered.connect(action.invoke)
+            #menu.addAction(menu_action)
+            menu.addAction(menu_action)
+            
+                
+        actions = self.node.actions
+        submenu_dict: dict[str, QMenu] = {}
+        submenu_dict[IdentifiableGroups.NO_PREFIX_ROOT] = menu
+        
+        for group, id_dict in actions.groups.items():
+            if group not in submenu_dict:    
+                subgroups = group.split('.')
+                subgroup_name = ''
+                for sub in subgroups:
+                    if sub not in submenu_dict:
+                        continue
+                    subgroup_name = f"{subgroup_name}.{sub}" if subgroup_name else sub
+                    submenu = menu.addMenu(title=sub)
+                    submenu_dict[subgroup_name] = submenu
+                    menu.addMenu(submenu)
+            
+            for name, id_action in id_dict.items():
+                prefix = id_action.prefix if id_action.prefix else IdentifiableGroups.NO_PREFIX_ROOT
+                action = id_action.info
+                submenu = submenu_dict[prefix]
+                add_action(name, submenu, action)
+        
         return menu
 
     def itemChange(self, change, value):
@@ -1087,31 +1105,6 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
             )
         self.movement_state = None
         return QGraphicsItem.mouseReleaseEvent(self, event)
-
-    # ACTIONS
-
-    def get_actions(self, actions_dict, menu):
-        actions = []
-
-        for k in actions_dict:
-            v_dict = actions_dict[k]
-            try:
-                method = v_dict['method']
-                data = None
-                try:
-                    data = v_dict['data']
-                except KeyError:
-                    pass
-                action = NodeItemAction(node_gui=self.node_gui, text=k, method=method, menu=menu, data=data)
-                actions.append(action)
-            except KeyError:
-                action_menu = QMenu(k, menu)
-                sub_actions = self.get_actions(v_dict, action_menu)
-                for a in sub_actions:
-                    action_menu.addAction(a)
-                actions.append(action_menu)
-
-        return actions
 
     # DATA
 

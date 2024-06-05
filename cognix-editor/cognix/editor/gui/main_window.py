@@ -17,9 +17,8 @@ from qtpy.QtWidgets import (
     QProgressDialog,
     QDialog,
 )
-from qtpy.QtCore import Qt, QByteArray, QTimer, Signal
+from qtpy.QtCore import Qt, QByteArray, Signal
 
-from ..gui.main_console import MainConsole
 from ..gui.flow_ui import FlowUI, FlowView
 from ..main.config import Config
 from ..main.packages.nodes_package import NodesPackage
@@ -33,12 +32,13 @@ from .. import import_nodes_package
 from ..gui.dialogs import GetTextDialog, ChooseFlowDialog
 
 from ...qtcore import SessionGUI, NodeGUI
+from ...qtcore.console import Console
 from ...qtcore.flows.list_widget import FlowsListWidget
 from ...qtcore.nodes.list_widget import NodeListWidget
 from ...qtcore.addons.variables import VarTypeDialogue
 from ...qtcore.utils import connect_signal_event
 
-from cognixcore import InfoMsgs, Flow
+from cognixcore import InfoMsgs, Flow, NodeAction
 from threading import Thread
         
 class MainWindow(QMainWindow):
@@ -64,10 +64,12 @@ class MainWindow(QMainWindow):
         required_packages: set = None,  # only valid when project_content is provided
         project_content: dict = None,
         parent=None,
-        wnd_light_type = 'dark'
+        wnd_light_type = 'dark',
+        console: Console = None
     ):
         super().__init__(parent)
 
+        self.console = console
         self._requested_packages = requested_packages
         self._required_packages = required_packages
         self._project_content = project_content if project_content else None
@@ -138,22 +140,11 @@ class MainWindow(QMainWindow):
 
         # Setup Main Console
 
-        MainConsole.instance.session = self.session_gui
-        MainConsole.instance.reset_interpreter()
+        self.console.session = self.session_gui
+        self.console.reset_interpreter()
 
-        # very dirty hack to access nodes from the console
-        def console_ref_monkeypatch(self):
-            MainConsole.instance.add_obj_context(self.node)
-
-        NodeGUI.console_ref_monkeypatch = console_ref_monkeypatch
-        old_ac_init = NodeGUI._init_default_actions
-        NodeGUI._init_default_actions = lambda self: {
-            **old_ac_init(self),
-            'console ref': {'method': self.console_ref_monkeypatch},
-        }
-
-        if config.verbose and MainConsole.instance:
-            MainConsole.instance.writeoutput(
+        if config.verbose and self.console:
+            self.console.writeoutput(
                 '''Editor is in Verbose mode. 
 All output will be printed in the terminal, not the editor console.
 The editor console can still be used for commands.
@@ -340,13 +331,11 @@ CONTROLS
         self.setTabPosition(Qt.AllDockWidgetAreas, QTabWidget.North)
 
         # main console
-        if MainConsole.instance is not None:
-            self.ui.consoleDock.setWidget(MainConsole.instance)
+        if self.console:
+            self.ui.consoleDock.setWidget(self.console)
             self.ui.console_placeholder_widget.setParent(None)
-        # self.ui.right_vertical_splitter.setSizes([600, 0])
 
         # splitter sizes
-        # self.ui.left_vertical_splitter.setSizes([350, 350])
         self.ui.main_vertical_splitter.setSizes([700, 0])
 
         self.flows_list_widget = FlowsListWidget(self.session_gui)

@@ -21,6 +21,7 @@ from cognixcore import (
     Node,
     NodeConfig, 
     ProgressState,
+    NodeAction,
 )
 
 from typing import TYPE_CHECKING
@@ -102,9 +103,6 @@ class NodeGUI(QObject):
         self.inspector_widget = self.create_inspector()
         # create viewer widget
         self.viewer_widget = self.create_viewer()
-        
-        # init the default actions
-        self.actions = self._init_default_actions()
 
     @property
     def gui_env(self):
@@ -140,6 +138,7 @@ class NodeGUI(QObject):
         No connections have been made to ports of the node yet.
         """
         self.apply_conf_events()
+        self._init_default_actions()
 
     def apply_conf_events(self):
         """Creates the config changed GUI event based on config GUI class"""
@@ -250,59 +249,43 @@ class NodeGUI(QObject):
         """
         Returns the default actions every node should have
         """
-        result = {
-            'update shape': {'method': self.update_shape},
-            'hide unconnected ports': {'method': self.hide_unconnected_ports},
-            'change title': {'method': self.change_title},
-        }
+        node = self.node
+        self.update_shape_action = node.add_generic_action(
+            'update shape',
+            self.update_shape
+        )
+        self.collapse_action = node.add_generic_action(
+            'collapse ports',
+            self.collapse_ports
+        )
+        self.uncollapse_action = node.add_generic_action(
+            'uncollapse ports',
+            self.uncollapse_ports
+        )
+        if self.item.has_hidden_ports():
+            self.uncollapse_action.status = NodeAction.Status.ENABLED
+            self.collapse_action.status = NodeAction.Status.HIDDEN
+        else:
+            self.uncollapse_action.status = NodeAction.Status.HIDDEN
+            self.collapse_action.status = NodeAction.Status.ENABLED
         
-        if self.viewer_widget_class:
-            result['toggle viewer'] = {'method': self.toggle_viewer}
+        self.change_title_action = node.add_generic_action(
+            'change title',
+            self.change_title
+        )
+        self.toggle_viewer_action = node.add_generic_action(
+            'toggle viewer',
+            self.toggle_viewer
+        )
         
-        return result
-
-    def _deserialize_actions(self, actions_data):
-        """
-        Recursively reconstructs the actions dict from the serialized version
-        """
-
-        def _transform(actions_data: dict):
-            """
-            Mutates the actions_data argument by replacing the method names
-            with the actual methods. Doesn't modify the original dict.
-            """
-            new_actions = {}
-            for key, value in actions_data.items():
-                if key == 'method':
-                    try:
-                        value = getattr(self, value)
-                    except AttributeError:
-                        print(f'Warning: action method "{value}" not found in node "{self.node.title}", skipping.')
-                elif isinstance(value, dict):
-                    value = _transform(value)
-                new_actions[key] = value
-            return new_actions
-
-        return _transform(actions_data)
-
-    def _serialize_actions(self, actions):
-        """
-        Recursively transforms the actions dict into a JSON-compatible dict
-        by replacing methods with their name. Doesn't modify the original dict.
-        """
-
-        def _transform(actions: dict):
-            new_actions = {}
-            for key, value in actions.items():
-                if key == 'method':
-                    new_actions[key] = value.__name__
-                elif isinstance(value, dict):
-                    new_actions[key] = _transform(value)
-                else:
-                    new_actions[key] = value
-            return new_actions
-
-        return _transform(actions)
+        if self.session_gui.console:
+            def console_ref():
+                self.session_gui.console.add_obj_context(self.node)
+                
+            self.console_patch_action = node.add_generic_action(
+                'console ref',
+                console_ref    
+            )
 
     """
     serialization
@@ -310,18 +293,13 @@ class NodeGUI(QObject):
 
     def data(self):
         return {
-            'actions': self._serialize_actions(self.actions),
             'display title': self.display_title,
             'inspector widget': self.inspector_widget.get_state(),
         }
 
     def load(self, data):
-        if 'actions' in data:   # otherwise keep default
-            self.actions = self._deserialize_actions(data['actions'])
         if 'display title' in data:
             self.display_title = data['display title']
-        if 'special actions' in data:   # backward compatibility
-            self.actions = self._deserialize_actions(data['special actions'])
         if 'inspector widget' in data:
             self.inspector_widget.set_state(data['inspector widget'])
 
@@ -390,18 +368,18 @@ class NodeGUI(QObject):
 
         self.update_shape_triggered.emit()
 
-    def hide_unconnected_ports(self):
+    def collapse_ports(self):
         """Hides all ports that are not connected to anything."""
 
-        del self.actions['hide unconnected ports']
-        self.actions['show unconnected ports'] = {'method': self.show_unconnected_ports}
+        self.collapse_action.status = NodeAction.Status.HIDDEN
+        self.uncollapse_action.status = NodeAction.Status.ENABLED
         self.hide_unconnected_ports_triggered.emit()
 
-    def show_unconnected_ports(self):
+    def uncollapse_ports(self):
         """Shows all ports that are not connected to anything."""
 
-        del self.actions['show unconnected ports']
-        self.actions['hide unconnected ports'] = {'method': self.hide_unconnected_ports}
+        self.collapse_action.status = NodeAction.Status.ENABLED
+        self.uncollapse_action.status = NodeAction.Status.HIDDEN
         self.show_unconnected_ports_triggered.emit()
 
     def change_title(self):

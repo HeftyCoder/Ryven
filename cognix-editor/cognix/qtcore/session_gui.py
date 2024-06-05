@@ -26,6 +26,7 @@ from logging import (
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .env import GUIEnv
+    from .console import Console
 
 class SessionLogHandler(Handler):
     
@@ -56,7 +57,13 @@ class SessionGUI(GUIBase, QObject):
     
     flow_view_created = Signal(object, object)
 
-    def __init__(self, gui_parent: QWidget, gui_env: GUIEnv=None, log_level=DEBUG):
+    def __init__(
+        self, 
+        gui_parent: QWidget, 
+        gui_env: GUIEnv=None, 
+        log_level=DEBUG,
+        console: Console = None
+    ):
         GUIBase.__init__(self)
         QObject.__init__(self)
 
@@ -67,6 +74,7 @@ class SessionGUI(GUIBase, QObject):
             self.__gui_env = get_gui_env()
         
         self.__gui_env.load_env()
+        self.console = console
             
         self.core_session = Session(gui=True, load_optional_addons=True)
         self.core_session.logg_addon.log_level = log_level

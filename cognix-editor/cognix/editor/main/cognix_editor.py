@@ -78,7 +78,7 @@ def run(*args_,
     init_node_env()
 
     # Import GUI sources (must come after setting `os.environ['QT_API']`)
-    from ..gui.main_console import init_main_console
+    from ...qtcore.console import Console
     from ..gui.main_window import MainWindow
     from ..gui.styling.window_theme import apply_stylesheet
     
@@ -171,7 +171,8 @@ def run(*args_,
     #
 
     # Init main console
-    (console_stdout_redirect, console_errout_redirect) = init_main_console(ryven_palette)
+    console = Console(ryven_palette)
+    console_stdout_redirect, console_errout_redirect = console.redirect_output()
 
     # Init main window
     editor = MainWindow(
@@ -180,7 +181,8 @@ def run(*args_,
         required_packages=required_packages,
         project_content=project_content,
         parent=gui_parent,
-        wnd_light_type=wnd_light_type
+        wnd_light_type=wnd_light_type,
+        console=console
     )
     
     # Start application

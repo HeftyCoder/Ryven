@@ -1027,6 +1027,7 @@ class FlowView(GUIBase, QGraphicsView):
                 menu: QMenu = ni.get_context_menu()
                 menu.exec_(event.globalPos())
                 event.accept()
+                break
 
     # PAINTING
     def drawBackground(self, painter, rect):

@@ -12,13 +12,22 @@ from qtpy.QtWidgets import (
 from qtpy.QtCore import Signal, QEvent, Qt
 from qtpy.QtGui import QTextCharFormat, QBrush, QColor, QFont
 
-from ...qtcore.code_editor.widgets import CodeEditorWidget
+from .code_editor.widgets import CodeEditorWidget
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from ...qtcore.session_gui import SessionGUI
+    from .session_gui import SessionGUI
 
-class MainConsole(QWidget):
+class RedirectOutput:
+    """Redirects 'write()'-calls to a specified method"""
+
+    def __init__(self, func):
+        self.func = func
+
+    def write(self, line):
+        self.func(line)
+        
+class Console(QWidget):
     """
     Interpreter with interactive console.
     All console output will be redirected to this command line.
@@ -27,7 +36,7 @@ class MainConsole(QWidget):
     The input field below can also expand to a text edit to take whole code blocks.
     """
 
-    instance: MainConsole = None
+    instance: Console = None
     write_signal = Signal(str)
     error_write_signal = Signal(str)
     
@@ -38,7 +47,7 @@ class MainConsole(QWidget):
             blockcount: int = 5000,     # max lines in output buffer
     ):
 
-        super(MainConsole, self).__init__()
+        super(Console, self).__init__()
 
         self.session: SessionGUI = None  # set by MainWindow
         self.window_theme = window_theme
@@ -48,6 +57,10 @@ class MainConsole(QWidget):
         
         self.init_ui(history, blockcount)
 
+    def redirect_output(self):
+        console_stdout_redirect = RedirectOutput(self.write_signal.emit)
+        console_errout_redirect = RedirectOutput(self.error_write_signal.emit)
+        return console_stdout_redirect, console_errout_redirect
 
     def init_ui(self, history, blockcount):
         self.content_layout = QGridLayout(self)
@@ -311,23 +324,3 @@ class ConsoleDisplay(QPlainTextEdit):
         self.setMaximumBlockCount(max_block_count)
         self.setReadOnly(True)
         self.setFont(QFont('Source Code Pro', 12))
-
-
-class RedirectOutput:
-    """Redirects 'write()'-calls to a specified method"""
-
-    def __init__(self, func):
-        self.func = func
-
-    def write(self, line):
-        self.func(line)
-
-
-def init_main_console(window_theme):
-
-    MainConsole.instance = MainConsole(window_theme)
-
-    console_stdout_redirect = RedirectOutput(MainConsole.instance.write_signal.emit)
-    console_errout_redirect = RedirectOutput(MainConsole.instance.error_write_signal.emit)
-
-    return console_stdout_redirect, console_errout_redirect
