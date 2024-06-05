@@ -262,12 +262,8 @@ class NodeGUI(QObject):
             'uncollapse ports',
             self.uncollapse_ports
         )
-        if self.item.has_hidden_ports():
-            self.uncollapse_action.status = NodeAction.Status.ENABLED
-            self.collapse_action.status = NodeAction.Status.HIDDEN
-        else:
-            self.uncollapse_action.status = NodeAction.Status.HIDDEN
-            self.collapse_action.status = NodeAction.Status.ENABLED
+        # TODO store this in the node somewhere
+        self.uncollapse_action.status = NodeAction.Status.HIDDEN
         
         self.change_title_action = node.add_generic_action(
             'change title',

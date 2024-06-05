@@ -40,8 +40,8 @@ class XDFWriterNode(Node):
         )
         
     init_inputs = [
-        PortConfig(label='data stream', allowed_data=StreamSignal), 
-        PortConfig(label='marker stream',allowed_data=StreamSignal)
+        PortConfig(label='s0', allowed_data=StreamSignal), 
+        PortConfig(label='s1', allowed_data=StreamSignal)
     ]
     
     def __init__(self, flow: Flow):
@@ -64,8 +64,26 @@ class XDFWriterNode(Node):
             
         if dir: 
             self.path = os.path.join(dir, filename)
-    
-        print(self.path)
+
+        def add_stream():
+            self.create_input(
+                PortConfig(f's{len(self._inputs)}', allowed_data=StreamSignal)
+            )
+            
+        self.add_generic_action(
+            'add stream',
+            add_stream
+        )
+        
+        def remove_stream():
+            len_inp = len(self._inputs)
+            if len_inp > 1:
+                self.delete_input(len_inp - 1)
+            
+        self.add_generic_action(
+            'remove stream',
+            remove_stream
+        )
     
     @property
     def config(self) -> XDFWriterNode.Config:

@@ -392,7 +392,7 @@ class NodeItemWidget(QGraphicsWidget):
     def insert_input_into_layout(self, index: int, inp: InputPortItem):
         self.inputs_layout.insertItem(index * 2 + 1, inp)  # *2 bcs of the stretches
         self.inputs_layout.setAlignment(inp, Qt.AlignLeft)
-        if len(self.node_gui.node.inputs) > 1:
+        if len(self.node_gui.node._inputs) > 1:
             self.inputs_layout.insertStretch(index * 2 + 1)  # *2+1 because of the stretches, too
 
     def remove_input_from_layout(self, inp: InputPortItem):
