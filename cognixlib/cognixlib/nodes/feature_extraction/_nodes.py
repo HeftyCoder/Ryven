@@ -249,7 +249,7 @@ class FBCSPTrainOnlineVersionNode(Node):
             self.fbcsp_feature_extractor.fit(filtered_data,class_labels)
 
             features = self.fbcsp_feature_extractor.transform(filtered_data)
-            label_features = [f'feature_{i}' for i in range(features.shape[1])]
+            label_features = [f'fbcsp_{i}' for i in range(features.shape[1])]
             
             signal_features = FeatureSignal(
                 labels=label_features,
