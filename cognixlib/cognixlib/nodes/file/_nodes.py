@@ -2,34 +2,30 @@ from __future__ import annotations
 
 from cognixcore.api import (
     Node,
-    FrameNode,
     Flow,
     PortConfig,
+    ProgressState,
 )
 from cognixcore.config.traits import *
 
-from typing import Union
 import numpy as np
 from pylsl import (
-    resolve_stream,
-    resolve_bypred,
     StreamInlet, 
     StreamInfo,
+    local_clock,
+    IRREGULAR_RATE,
+    cf_string
 )
-import pylsl
 
-from .utils.function_for_creation_of_file import creation_of_xdf
-from .utils.utils_for_streams import Inlet,DataInlet,MarkerInlet
-from .utils import xdfwriter
-from cognixcore import ProgressState
-from traitsui.api import CheckListEditor
-from threading import Thread
-from ..core import Signal,StreamSignal
-from ..stream import LSLSignalInfo
-from collections.abc import Mapping
 import os
 import pyxdf
 import json
+
+from collections.abc import Mapping
+from ...api.file.xdf import XDFWriter, creation_of_xdf
+
+from ...api.data import StreamSignal
+from ..stream import LSLSignalInfo
 
 class XDFWriterNode(Node):
     title = 'XDF Writer'
@@ -73,13 +69,12 @@ class XDFWriterNode(Node):
         return self._config
     
     def init(self):
-        self.start_time = pylsl.local_clock()
+        self.start_time = local_clock()
         self.write_header = [False for _ in range(len(self._inputs)-1)]
         self.timestamps = [[] for _ in range(len(self._inputs)-1)]
         self.samples_count = [0 for i in range(len(self._inputs)-1)]
     
     def stop(self):
-        import time
         for i in range(len(self.inlets)):
             creation_of_xdf(self.xdfile,i,self.inlets[i],None,None,False,False,True,first_time=self.timestamps[i][0][0],last_time=self.timestamps[i][-1][-1],samples_count=self.samples_count[i])  
     
@@ -87,7 +82,7 @@ class XDFWriterNode(Node):
         
         if not self.create_xdf and self.path:
 
-            self.xdfile = xdfwriter.XDFWriter(f'{self.path}.xdf',True)
+            self.xdfile = XDFWriter(f'{self.path}.xdf',True)
             self.create_xdf = True
         
         if not self.write_header[inp]:
@@ -96,7 +91,7 @@ class XDFWriterNode(Node):
                 signal: StreamSignal = self.input(inp)
                 if not signal:
                     return False
-                if 'Marker' in signal.info.signal_type and (signal.info.nominal_srate != pylsl.IRREGULAR_RATE or signal.info.data_format != pylsl.cf_string):
+                if 'Marker' in signal.info.signal_type and (signal.info.nominal_srate != IRREGULAR_RATE or signal.info.data_format != cf_string):
                         return 
                 else:
                     self.inlets[inp] = {'stream_name':signal.info.name,'stream_type':signal.info.signal_type,'channel_count':len(signal.labels),\
@@ -106,7 +101,7 @@ class XDFWriterNode(Node):
                 self.write_header[inp] = True
         
         if inp!=len(self._inputs)-1:
-            signal:Signal = self.input(inp)
+            signal: StreamSignal = self.input(inp)
             if signal.timestamps:
                 samples = np.array(signal.data)
                 timestamps = np.array(signal.timestamps)
@@ -168,11 +163,7 @@ class XDFImportingNode(Node):
 
                 stream_channels = json.loads(stream_channels)
 
-                labels = stream_channels.keys()
-                cached_labels = (
-                    list(labels) if not self.config.lowercase_labels
-                    else [label.lower() for label in labels]
-                )
+                labels = list(stream_channels.keys())
                 
                 info = StreamInfo(
                     name = stream_name,
@@ -186,13 +177,14 @@ class XDFImportingNode(Node):
                 stream_info = LSLSignalInfo(info)
                 
                 stream_collection[stream_name] = StreamSignal(
-                    timestamps = stream_timestamps,
-                    data = stream_data,
-                    labels = cached_labels,
-                    signal_info= stream_info
+                    timestamps=stream_timestamps,
+                    data=stream_data,
+                    labels=labels,
+                    signal_info=stream_info,
+                    make_lowercase=self.config.lowercase_labels
                 )
 
-            self.set_output(0,stream_collection)
+            self.set_output(0, stream_collection)
         
         else:
             self.logger.error(msg='The path doesnt exist')

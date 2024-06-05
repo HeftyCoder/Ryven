@@ -1,4 +1,4 @@
-from cognixnodes.core.signals import *
+from cognixlib.api.data import *
 import numpy as np
 
 def run():

@@ -17,10 +17,17 @@ def find_python_list_format(format_:str):
         return '<d'
  
 
-formats = [np.int32,np.int64,np.float32,np.float64,np.int16,np.int8]
+formats = [
+    np.int32,
+    np.int64,
+    np.float32,
+    np.float64,
+    np.int16,
+    np.int8
+]
 
 
-def write_little_endian(dst:io.BytesIO,value:int|float,specific_type:str):
+def write_little_endian(dst: io.BytesIO, value: int|float, specific_type: str):
     binary_format = ''
     if isinstance(value,int)==True and specific_type == "uint16_t":
         binary_format = '<H'
@@ -32,12 +39,12 @@ def write_little_endian(dst:io.BytesIO,value:int|float,specific_type:str):
     binary_value = struct.pack(binary_format,value)
     dst.write(binary_value)
 
-def write_fixlen_int(dst:io.BytesIO,val:int):
+def write_fixlen_int(dst: io.BytesIO, val:int):
     binary_value_size = struct.pack('<b',struct.calcsize('i'))
     dst.write(binary_value_size)
      
-def write_varlen_int(dst,val):
-    if val<256:
+def write_varlen_int(dst, val):
+    if val < 256:
         dst.write(struct.pack('<b',1))
         dst.write(struct.pack('<B',val))
         

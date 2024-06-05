@@ -1,7 +1,15 @@
 from __future__ import annotations
 
-from ..core import Signal,TimeSignal,LabeledSignal,FeatureSignal
+import numpy as np
 import mne
+import os,joblib
+
+from ...api.data import (
+    Signal,
+    TimeSignal,
+    LabeledSignal,
+    FeatureSignal
+)
 
 from cognixcore.api import (
     Flow, 
@@ -11,13 +19,12 @@ from cognixcore.api import (
 )
 from cognixcore.config.traits import *
 
-import numpy as np
+
 from traitsui.api import CheckListEditor
 from collections.abc import Sequence,Mapping
 from .utils.stats_helper import *
 from .utils.fbcsp import FBCSP
 from .utils.filterbank import FilterBank
-import os,joblib
 
 class FBCSPTrainNode(Node):
     title = 'FBCSP Training'

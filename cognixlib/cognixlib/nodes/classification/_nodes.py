@@ -1,36 +1,25 @@
 from __future__ import annotations
-from cognixcore.api import Flow, Node, PortConfig, FrameNode
+from cognixcore.api import Flow, Node, PortConfig
 from cognixcore.config import NodeConfig
 from cognixcore.config.traits import *
+
 import os
-import joblib
-
-from sklearn.model_selection import (
-    train_test_split
-)
-
-from ..core import Signal,TimeSignal,LabeledSignal,FeatureSignal
 import numpy as np
 
-# from Orange.data import Table
-# from Orange.classification import SVMLearner, LogisticRegressionLearner
-# from Orange.evaluation import CrossValidation, CA, AUC
-from cognixcore.config.traits import NodeTraitsConfig, NodeTraitsGroupConfig, Int, List, Instance
-from .utils.scikit import (
-    BasePredictor,
+from ...api.data import LabeledSignal,FeatureSignal
+
+from ...api.prediction.core import BasePredictor
+from ...api.prediction.scikit import (
     SVMClassifier,
     RFClassifier,
     SciKitClassifier,
-    RandomForestClassifier,
     LogisticRegressionClassifier,
     CrossValidation,
     LDAClassifier,
     KFoldClass,
     LeaveOneOutClass,
-    ShuffleSplit,
-    StratifiedKFoldClass)
-
-from .utils.core import BasePredictor
+    StratifiedKFoldClass
+)
 
 class ModelNode(Node):
     """A node that outputs a model"""

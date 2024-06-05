@@ -23,7 +23,7 @@ from traitsui.api import CheckListEditor
 
 import numpy as np
 
-from ..core import StreamSignal, StreamSignalInfo
+from ...api.data import StreamSignal, StreamSignalInfo
 
 class LSLSignalInfo(StreamSignalInfo):
     

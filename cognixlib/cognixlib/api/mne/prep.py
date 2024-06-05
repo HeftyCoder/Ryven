@@ -58,7 +58,13 @@ def runline(y, n, dn):
         y[i] = y[i] - y_line[i]
     return y
 
-def remove_trend_data(data:np.ndarray,sample_rate:float,detrendType:str='high pass',detrendCutoff:float=1.0,detrendChannels:list=None) -> np.ndarray:
+def remove_trend_data(
+    data: np.ndarray,
+    sample_rate: float,
+    detrendType: str='high pass',
+    detrendCutoff=1.0,
+    detrendChannels: list = None
+) -> np.ndarray:
     """Remove trends (i.e., slow drifts in baseline) from an array of EEG data."""
     if len(data.shape) == 1:
         data = np.reshape(data, (1, data.shape[0]))
@@ -110,7 +116,7 @@ def remove_trend_data(data:np.ndarray,sample_rate:float,detrendType:str='high pa
     return data
 
 
-def line_noise_removal_prep(raw_eeg:mne.io.Raw,sfreq:float,linenoise:float):
+def line_noise_removal_prep(raw_eeg: mne.io.Raw, sfreq: float, linenoise: float):
     EEG_raw = raw_eeg.get_data()
     EEG_new = pyprep.removeTrend(EEG_raw, sfreq, matlab_strict=False)
 
@@ -129,7 +135,16 @@ def line_noise_removal_prep(raw_eeg:mne.io.Raw,sfreq:float,linenoise:float):
     raw_eeg._data = EEG
     return raw_eeg
 
-def referencing_prep(raw_eeg:mne.io.Raw,ref_chs:str|list,reref_chs:str|list,line_freqs:float|list,max_iterations:int=4,ransac:bool=True,channel_wise:bool=False,max_chunk_size:int=None):
+def referencing_prep(
+    raw_eeg: mne.io.Raw,
+    ref_chs: str | list,
+    reref_chs: str | list,
+    line_freqs: float | list,
+    max_iterations=4,
+    ransac=True,
+    channel_wise=False,
+    max_chunk_size:int = None
+):
 
     ch_names_all = raw_eeg.ch_names.copy()
     ch_types_all = raw_eeg.get_channel_types()

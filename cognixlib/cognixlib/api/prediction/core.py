@@ -1,11 +1,12 @@
 """Defines the base class fot classifiers of sklearn"""
+
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from cognixcore import PortConfig
 from abc import ABC
 import numpy as np
 
-from ...core import FeatureSignal
+from ..data.signals import FeatureSignal
 
 class BasePredictor(ABC):
 

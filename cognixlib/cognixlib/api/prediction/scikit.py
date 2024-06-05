@@ -25,7 +25,7 @@ from sklearn.model_selection import (
 import os
 from sklearn.preprocessing import LabelEncoder
 import joblib
-from ...core import FeatureSignal
+from ..data.signals import FeatureSignal
 
 ##### from .core import SignalInfo,Signal
 ### X_train and Y_train are to change to just a Signal object

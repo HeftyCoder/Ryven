@@ -18,7 +18,7 @@ from cognix.qtcore import (
 )
 from cognix.qtcore import std_input_widgets as inp_widgets
 
-from cognixnodes.utility import *
+from cognixlib.nodes.utility import *
 
 class Result_Node_MainWidget(NodeMainWidget, QLineEdit):
     

@@ -1,21 +1,29 @@
 from __future__ import annotations
 
-from cognixcore import Flow, PortConfig
 import mne
+import numpy as np
 
 from mne_icalabel import label_components  
 
+from cognixcore import PortConfig
 from cognixcore.config.traits import *
-from typing import Union
-import numpy as np
 from traitsui.api import *
 
-from pylsl import local_clock
 from collections.abc import Sequence
-from sys import maxsize
 
-from ..core import Signal, TimeSignal, StreamSignal, LabeledSignal
-from .utils.circ_buffer import CircularBuffer
+from ...api.data import (
+    Signal, 
+    StreamSignal, 
+    LabeledSignal,
+    CircularBuffer
+)
+
+from ...api.mne.prep import (
+    remove_trend_data,
+    line_noise_removal_prep,
+    referencing_prep,
+    noisychannelsprep
+)
 
 class SegmentationNode(Node):
     """
@@ -757,10 +765,6 @@ class ResamplingNode(Node):
         
         resampled_signal = Signal(resampled_data, None)
         self.set_output(0,resampled_signal)
-
-
-
-from .utils.prep_pipeline_functions import remove_trend_data,line_noise_removal_prep,referencing_prep,noisychannelsprep
           
 class RemoveTrendNode(Node):
     title = 'Remove Trend from EEG'

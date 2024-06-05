@@ -1,21 +1,16 @@
 from __future__ import annotations
 from random import randint
-from cognixcore.config import NodeConfig
-from cognixcore.flow import Flow
 from sklearn import datasets
-from sklearn.model_selection import train_test_split
-
 from cognixcore import Node, FrameNode, PortConfig
 from cognixcore.config.traits import *
 from traitsui.api import EnumEditor
 
 import logging
-from numbers import Number
 from random import randint
 import numpy as np
 from collections.abc import Sequence
 
-from ..core import Signal,TimeSignal,LabeledSignal,FeatureSignal
+from ...api.data import Signal, TimeSignal, LabeledSignal, FeatureSignal
 
 class TestStreamNode(FrameNode):
     
