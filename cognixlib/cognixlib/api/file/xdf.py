@@ -54,6 +54,49 @@ class XDFWriter:
         self._file.close()
         self._file = None
 
+    def write_header(self, streamid: int, stream_id_infos: dict):
+        header = ("<?xml version=\"1.0\"?><info><name>{}</name><type>{}</type><channel_count>{}</channel_count><channels>{}</channels><nominal_srate>{}</nominal_srate> \
+                <channel_format>{}</channel_format><created_at>{}</created_at></info>".format(stream_id_infos['stream_name'],stream_id_infos['stream_type'],stream_id_infos['channel_count'],\
+                    stream_id_infos['channels'],stream_id_infos['nominal_srate'],stream_id_infos['channel_format'],stream_id_infos['time_created']))
+        self.write_stream_header(streamid, header)
+        self.write_boundary_chunk()
+    
+    def write_data(
+        self,
+        streamid: int,
+        data_content: list | np.ndarray,
+        timestamps: list | np.ndarray,
+        channel_count: int=0
+    ):
+        if isinstance(data_content,list):
+            self.write_data_chunk(
+                streamid,
+                timestamps,
+                data_content, 
+                channel_count
+            )
+        else: 
+            self.write_data_chunk_nested(
+                streamid,
+                timestamps,
+                data_content
+            )
+            
+    def write_footer(
+        self, 
+        streamid: int,
+        first_time: float,
+        last_time: float,
+        samples_count: int
+    ):
+        footer = (
+                "<?xml version=\"1.0\"?><info><first_timestamp>{}</first_timestamp><last_timestamp>{}</last_timestamp><sample_count>{}</sample_count> \
+                <clock_offsets><offset><time>50979.7660030605</time><value>-3.436503902776167e-06</value></offset></clock_offsets></info>".format(first_time,last_time,samples_count)
+            )
+        self.write_boundary_chunk()
+        self.write_stream_offset(streamid, local_clock(),-0.5)
+        self.write_stream_footer(streamid, footer)
+    
     def _write_chunk(self,tag:ChunkTag,content:bytes,streamid_p:int):
         self.write_mut.acquire()
         self._write_chunk_header(tag,len(content),streamid_p)
@@ -122,7 +165,7 @@ class XDFWriter:
         write_little_endian(self._file,tag,"uint16_t")
         if streamid_p!=None:
             write_little_endian(self._file,streamid_p,"uint32_t")
-        
+         
     def write_stream_header(self, streamid: int, content: str, fm = None):
         if not fm:
             try:
@@ -139,7 +182,7 @@ class XDFWriter:
             self.stream_ids_formats["{}".format(streamid)] = fm
             print("HEADER",self.stream_ids_formats)
             self._write_chunk(ChunkTag.streamheader,content,streamid)
-        
+           
     def write_stream_footer(self, streamid: int, content: str):
         self._write_chunk(ChunkTag.streamfooter,content,streamid)
     

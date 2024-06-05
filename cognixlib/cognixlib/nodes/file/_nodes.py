@@ -39,7 +39,11 @@ class XDFWriterNode(Node):
             desc="the file name will be extracted from this if there is a string variable"
         )
         
-    init_inputs = [PortConfig(label='data stream',allowed_data=StreamSignal), PortConfig(label='marker stream',allowed_data=StreamSignal), PortConfig(label='path')]
+    init_inputs = [
+        PortConfig(label='data stream', allowed_data=StreamSignal), 
+        PortConfig(label='marker stream',allowed_data=StreamSignal), 
+        PortConfig(label='path')
+    ]
     
     def __init__(self, flow: Flow):
         super().__init__(flow)
@@ -76,13 +80,19 @@ class XDFWriterNode(Node):
     
     def stop(self):
         for i in range(len(self.inlets)):
-            creation_of_xdf(self.xdfile,i,self.inlets[i],None,None,False,False,True,first_time=self.timestamps[i][0][0],last_time=self.timestamps[i][-1][-1],samples_count=self.samples_count[i])  
+            self.xdfile.write_footer(
+                streamid=i,
+                first_time=self.timestamps[i][0][0],
+                last_time=self.timestamps[i][-1][-1],
+                samples_count=self.samples_count[i]
+            )
+            # creation_of_xdf(self.xdfile,i,self.inlets[i],None,None,False,False,True,first_time=self.timestamps[i][0][0],last_time=self.timestamps[i][-1][-1],samples_count=self.samples_count[i])  
     
     def update_event(self,inp:int):
         
         if not self.create_xdf and self.path:
 
-            self.xdfile = XDFWriter(f'{self.path}.xdf',True)
+            self.xdfile = XDFWriter(f'{self.path}.xdf', True)
             self.create_xdf = True
         
         if not self.write_header[inp]:
@@ -92,11 +102,13 @@ class XDFWriterNode(Node):
                 if not signal:
                     return False
                 if 'Marker' in signal.info.signal_type and (signal.info.nominal_srate != IRREGULAR_RATE or signal.info.data_format != cf_string):
-                        return 
+                    return 
                 else:
                     self.inlets[inp] = {'stream_name':signal.info.name,'stream_type':signal.info.signal_type,'channel_count':len(signal.labels),\
                         'nominal_srate':signal.info.nominal_srate,'channel_format':self.formats[signal.info.data_format],'time_created':self.start_time,'channels':signal.info.channels}
-                    creation_of_xdf(self.xdfile,inp,self.inlets[inp],None,None,True,False,False,0,0,0)
+                    
+                    self.xdfile.write_header(inp, self.inlets[inp])
+                    # creation_of_xdf(self.xdfile,inp,self.inlets[inp],None,None,True,False,False,0,0,0)
 
                 self.write_header[inp] = True
         
@@ -107,7 +119,14 @@ class XDFWriterNode(Node):
                 timestamps = np.array(signal.timestamps)
                 self.timestamps[inp].append([timestamps[0],timestamps[-1]])
                 self.samples_count[inp] += len(timestamps)
-                creation_of_xdf(self.xdfile,inp,self.inlets[inp],samples,timestamps,False,True,False,0,0,0)
+                
+                self.xdfile.write_data(
+                    inp,
+                    samples,
+                    timestamps,
+                    self.inlets[inp]['channel_count']
+                )
+                # creation_of_xdf(self.xdfile,inp,self.inlets[inp],samples,timestamps,False,True,False,0,0,0)
         
             
 class XDFImportingNode(Node):
