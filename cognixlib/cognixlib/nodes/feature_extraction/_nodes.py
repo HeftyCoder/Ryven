@@ -22,9 +22,9 @@ from cognixcore.config.traits import *
 
 from traitsui.api import CheckListEditor
 from collections.abc import Sequence,Mapping
-from .utils.stats_helper import *
-from .utils.fbcsp import FBCSP
-from .utils.filterbank import FilterBank
+from ...api.statistics import *
+from ...api.features.csp import FBCSP
+from ...api.features.filter_bank import FilterBank
 
 class FBCSPTrainNode(Node):
     title = 'FBCSP Training'

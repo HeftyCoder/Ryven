@@ -3,7 +3,13 @@ import scipy.signal as signal
 from scipy.signal import cheb2ord
 
 class FilterBank:
-    def __init__(self,fs:float,fmin:float=None,fmax:float=None,splits:int=None):
+    def __init__(
+        self, 
+        fs: float,
+        fmin: float = None,
+        fmax: float = None,
+        splits: int = None
+    ):
         self.fs = fs
         self.f_trans = 2
         self.f_pass = np.arange(4,100,4) if not fmin or not fmax or not splits else np.arange(fmin,fmax,splits)
