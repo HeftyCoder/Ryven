@@ -89,8 +89,8 @@ class FBCSPTrainRealTimeNode(Node):
         save_button: bool = Bool()
     
     init_inputs = [
-        PortConfig(label='data_class1', allowed_data=Sequence[LabeledSignal]),
-        PortConfig(label='data_class2',allowed_data=Sequence[LabeledSignal])
+        PortConfig(label='data_class1', allowed_data=Sequence[LabeledSignal] | LabeledSignal),
+        PortConfig(label='data_class2',allowed_data=Sequence[LabeledSignal] | LabeledSignal)
     ]
     init_outputs = [PortConfig(label='spatial filters',allowed_data=Mapping)]
     
@@ -151,14 +151,27 @@ class FBCSPTrainRealTimeNode(Node):
                 
                 self.fbcsp_feature_extractor = FBCSP(self.n_filters)
             
-            data = [sig1.data for sig1 in self.signal1] + [sig2.data for sig2 in self.signal2]
-            data = np.array(data)
+            data1 = [_ for sig1 in self.signal1 for _ in (sig1.data if sig1.data.ndim == 3 else [sig1.data])] 
+            data2 = [_ for sig2 in self.signal2 for _ in (sig2.data if sig2.data.ndim == 3 else [sig2.data])] 
+            data = np.array(data1 + data2)          
+            
+            sum_of_data_class1 = (
+                self.signal1[0].data.shape[0] if self.signal1[0].data.ndim == 3 else 1
+                    if len(self.signal1) == 1 
+                    else sum([sig1.data.shape[0] if sig1.data.ndim == 3 else 1 for sig1 in self.signal1])
+                )
+            
+            sum_of_data_class2 = (
+                self.signal2[0].data.shape[0] if self.signal2[0].data.ndim == 3 else 1
+                    if len(self.signal2) == 1 
+                    else sum([sig2.data.shape[0] if sig2.data.ndim == 3 else 1 for sig2 in self.signal2])
+                )
             
             classes = {
-                '0':(0, len(self.signal1)),
-                '1':(len(self.signal1), len(self.signal1) + len(self.signal2)),
+                '0' : (0,sum_of_data_class1),
+                '1' : (sum_of_data_class1,sum_of_data_class1 + sum_of_data_class2)
             }
-            
+                
             class_labels = []
             
             for class_label, (start_idx, end_idx) in classes.items():
@@ -187,7 +200,11 @@ class FBCSPTransformRealTimeNode(Node):
             desc="the file name will be extracted from this if there is a string variable"
         )
     
-    init_inputs = [PortConfig(label='data_class1',allowed_data=Sequence[LabeledSignal]),PortConfig(label='data_class2',allowed_data=Sequence[LabeledSignal]),PortConfig(label='spatial filters',allowed_data=Mapping)]
+    init_inputs = [
+        PortConfig(label='data_class1',allowed_data=Sequence[LabeledSignal] | LabeledSignal),
+        PortConfig(label='data_class2',allowed_data=Sequence[LabeledSignal] | LabeledSignal),
+        PortConfig(label='spatial filters',allowed_data=Mapping)
+    ]
     init_outputs = [PortConfig(label='features',allowed_data=FeatureSignal)]
     
     @property
@@ -219,27 +236,51 @@ class FBCSPTransformRealTimeNode(Node):
             self.logger.error(msg='The path doenst exist')
         
     def update_event(self, inp=-1):
-        if inp==0: self.signal1: Sequence[LabeledSignal] = self.input(inp)
-        if inp==1: self.signal2: Sequence[LabeledSignal] = self.input(inp)
-        if inp==2: self.dict_node: Mapping = self.input(inp)
+        if inp==0: 
+            self.signal1: Sequence[LabeledSignal] = self.input(inp)
+            if isinstance(self.signal1,LabeledSignal):
+                self.signal1 = [self.signal1]
+        
+        if inp==1: 
+            self.signal2: Sequence[LabeledSignal] = self.input(inp)
+            if isinstance(self.signal2,LabeledSignal):
+                self.signal2 = [self.signal2]
+                
+        if inp==2: 
+            self.dict_node: Mapping = self.input(inp)
 
+        print(type(self.signal1),type(self.signal2),type(self.dict_node),type(self.dict_file))
         if self.signal1 and self.signal2 and (self.dict_file or self.dict_node):
                         
             self.dict = self.dict_node if self.dict_node else self.dict_file
                              
             self.fbank = self.dict['fbank']
             
-            # fbank_coeff = self.fbank.get_filter_coeff()
             self.fbcsp_feature_extractor = self.dict['fbcsp_filters']
 
-            data = [sig1.data for sig1 in self.signal1] + [sig2.data for sig2 in self.signal2]
-            data = np.array(data)            
+            data1 = [_ for sig1 in self.signal1 for _ in (sig1.data if sig1.data.ndim == 3 else [sig1.data])] 
+            data2 = [_ for sig2 in self.signal2 for _ in (sig2.data if sig2.data.ndim == 3 else [sig2.data])] 
+            data = np.array(data1 + data2)          
+            
+            sum_of_data_class1 = (
+                self.signal1[0].data.shape[0] if self.signal1[0].data.ndim == 3 else 1
+                    if len(self.signal1) == 1 
+                    else sum([sig1.data.shape[0] if sig1.data.ndim == 3 else 1 for sig1 in self.signal1])
+                )
+            
+            sum_of_data_class2 = (
+                self.signal2[0].data.shape[0] if self.signal2[0].data.ndim == 3 else 1
+                    if len(self.signal2) == 1 
+                    else sum([sig2.data.shape[0] if sig2.data.ndim == 3 else 1 for sig2 in self.signal2])
+                )
             
             classes = {
-                '0':(0,len(self.signal1)),
-                '1':(len(self.signal1),len(self.signal1)+len(self.signal2)),
+                '0' : (0,sum_of_data_class1),
+                '1' : (sum_of_data_class1,sum_of_data_class1 + sum_of_data_class2)
             }
-                        
+            
+            print(classes)            
+            
             class_labels = []
             
             for class_label, (start_idx, end_idx) in classes.items():
@@ -257,7 +298,7 @@ class FBCSPTransformRealTimeNode(Node):
                 data = features,
                 signal_info = None
             )
-
+            
             print(features)
 
             self.signal1,self.signal2,self.dict_node = None,None,None
