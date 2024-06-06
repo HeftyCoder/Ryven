@@ -57,14 +57,6 @@ class XDFWriterNode(Node):
         self.create_xdf = False
         self.path = None
 
-        dir = self.config.directory
-        filename = self.var_val_get(self.config.varname) 
-        if not filename or isinstance(filename, str) == False:
-            filename = self.config.default_filename
-            
-        if dir: 
-            self.path = os.path.join(dir, filename)
-
         def add_stream():
             self.create_input(
                 PortConfig(f's{len(self._inputs)}', allowed_data=StreamSignal)
@@ -94,6 +86,14 @@ class XDFWriterNode(Node):
         self.write_header = [False for _ in range(len(self._inputs)-1)]
         self.timestamps = [[] for _ in range(len(self._inputs)-1)]
         self.samples_count = [0 for i in range(len(self._inputs)-1)]
+        
+        dir = self.config.directory
+        filename = self.var_val_get(self.config.varname) 
+        if not filename or isinstance(filename, str) == False:
+            filename = self.config.default_filename
+            
+        if dir: 
+            self.path = os.path.join(dir, filename)
     
     def stop(self):
         for i in range(len(self.inlets)):

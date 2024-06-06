@@ -225,4 +225,8 @@ class LSLInputNode(FrameNode):
 
 class LSLOutputNode(FrameNode):
     """An LSL Output Stream"""
-    pass
+    
+    title='LSL Output'
+    version='0.1'
+    
+    
