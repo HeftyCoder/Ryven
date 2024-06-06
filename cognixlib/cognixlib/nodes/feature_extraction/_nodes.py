@@ -88,7 +88,10 @@ class FBCSPTrainRealTimeNode(Node):
         
         save_button: bool = Bool()
     
-    init_inputs = [PortConfig(label='data_class1',allowed_data=Sequence[LabeledSignal]),PortConfig(label='data_class2',allowed_data=Sequence[LabeledSignal])]
+    init_inputs = [
+        PortConfig(label='data_class1', allowed_data=Sequence[LabeledSignal]),
+        PortConfig(label='data_class2',allowed_data=Sequence[LabeledSignal])
+    ]
     init_outputs = [PortConfig(label='spatial filters',allowed_data=Mapping)]
     
     @property
@@ -123,9 +126,15 @@ class FBCSPTrainRealTimeNode(Node):
         self.fbcsp_feature_extractor = None
         
     def update_event(self, inp=-1):
-        if inp==0: self.signal1: Sequence[LabeledSignal] = self.input(inp)
-        if inp==1: self.signal2: Sequence[LabeledSignal] = self.input(inp)
-
+        if inp==0: 
+            self.signal1: Sequence[LabeledSignal] = self.input(inp)
+            if isinstance(self.signal1, LabeledSignal):
+                self.signal1 = [self.signal1]
+        if inp==1: 
+            self.signal2: Sequence[LabeledSignal] = self.input(inp)
+            if isinstance(self.signal2, LabeledSignal):
+                self.signal2 = [self.signal2]
+            
         if self.signal1 and self.signal2:
 
             if not self.fbank: 
@@ -146,8 +155,8 @@ class FBCSPTrainRealTimeNode(Node):
             data = np.array(data)
             
             classes = {
-                '0':(0,len(self.signal1)),
-                '1':(len(self.signal1),len(self.signal1)+len(self.signal2)),
+                '0':(0, len(self.signal1)),
+                '1':(len(self.signal1), len(self.signal1) + len(self.signal2)),
             }
             
             class_labels = []
