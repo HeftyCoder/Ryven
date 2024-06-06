@@ -4,6 +4,7 @@ from collections.abc import Mapping, Sequence
 from .mixin import *
 from sys import maxsize
 from itertools import chain
+from copy import copy, deepcopy
 import numpy as np
 
 class SignalInfo:
@@ -65,6 +66,14 @@ class Signal:
     
     def __setitem__(self, key, newvalue):
         self.data[key] = newvalue
+    
+    def copy(self):
+        new_sig = copy(self)
+        new_sig.data = new_sig.data.copy()
+        return new_sig
+    
+    def deepcopy(self):
+        return deepcopy(self)
         
     @property
     def info(self):
@@ -156,6 +165,15 @@ class TimeSignal(Signal, Timestamped):
     def tdm(self):
         """Shorthand for time_datamap"""
         return self.time_datamap
+    
+    def copy(self):
+        new_sig = super().copy()
+        new_sig._time_datamap = TimeSignal.DataMap(
+            new_sig.data, 
+            new_sig.timestamps, 
+            new_sig.info
+        )
+        return new_sig
 
 class LabeledSignal(Signal, Labeled):
     """
@@ -271,6 +289,15 @@ class LabeledSignal(Signal, Labeled):
         """Shorthand for label_datamap"""
         return self.label_datamap
     
+    def copy(self):
+        new_sig = super().copy()
+        new_sig._label_datamap = LabeledSignal.DataMap(
+            new_sig.data,
+            new_sig.labels,
+            new_sig.info
+        )
+        return new_sig
+    
 class StreamSignalInfo(SignalInfo, StreamConfig):
     """Information regard a Stream Signal"""
     def __init__(
@@ -321,6 +348,20 @@ class StreamSignal(TimeSignal, LabeledSignal):
     @property
     def info(self):
         return self._info
+    
+    def copy(self):
+        new_sig: StreamSignal = Signal.copy(self)
+        new_sig._label_datamap = LabeledSignal.DataMap(
+            new_sig.data,
+            new_sig.labels,
+            new_sig.info
+        )
+        new_sig._time_datamap = TimeSignal.DataMap(
+            new_sig.data,
+            new_sig.timestamps,
+            new_sig.info
+        )
+        return new_sig
 
 class FeatureSignal(LabeledSignal):
     """

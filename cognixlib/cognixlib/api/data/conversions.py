@@ -27,3 +27,15 @@ __np_to_lsl = {
 }
 
 np_to_lsl = MappingProxyType(__np_to_lsl)
+
+__lsl_to_np = {
+    pylsl.cf_float32: np.float32,
+    pylsl.cf_double64: np.float64,
+    pylsl.cf_int8: np.int8,
+    pylsl.cf_int16: np.int16,
+    pylsl.cf_int32: np.int32,
+    pylsl.cf_int64: np.int64,
+    pylsl.cf_string: np.string_,
+}
+
+lsl_to_np = MappingProxyType(__lsl_to_np)

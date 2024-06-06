@@ -30,7 +30,7 @@ from ...api.data import (
     TimeSignal,
     Signal
 )
-from ...api.data.conversions import np_to_lsl
+from ...api.data.conversions import np_to_lsl, lsl_to_np
 
 class LSLSignalInfo(StreamSignalInfo):
     
@@ -159,16 +159,12 @@ class LSLInputNode(FrameNode):
                 
                 if self.define_buffer: 
                     
-                    if self.formats[self.inlet.channel_format]!=str:
-                    
-                        self.buffer = np.zeros(
+                    dtype = lsl_to_np[self.inlet.channel_format]
+                    print(self.inlet.channel_format, dtype)
+                    self.buffer = np.zeros(
                             (self.buffer_size * 2, int(self.inlet.channel_count)),
-                            dtype=self.formats[self.inlet.channel_format]
+                            dtype=dtype
                         )
-                    
-                    else:
-                        
-                        self.buffer = []
     
                 self.set_progress_msg('Streaming!')
             
