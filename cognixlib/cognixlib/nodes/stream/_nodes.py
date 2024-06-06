@@ -3,7 +3,8 @@ from __future__ import annotations
 from pylsl import (
     resolve_stream,
     resolve_bypred,
-    StreamInlet, 
+    StreamInlet,
+    StreamOutlet,
     StreamInfo,
     proc_clocksync , 
     proc_dejitter, 
@@ -22,8 +23,14 @@ from threading import Thread
 from traitsui.api import CheckListEditor
 
 import numpy as np
-
-from ...api.data import StreamSignal, StreamSignalInfo
+from ...api.data import (
+    StreamSignal, 
+    StreamSignalInfo, 
+    LabeledSignal,
+    TimeSignal,
+    Signal
+)
+from ...api.data.conversions import np_to_lsl
 
 class LSLSignalInfo(StreamSignalInfo):
     
@@ -224,9 +231,77 @@ class LSLInputNode(FrameNode):
         self.set_output(0, signal)
 
 class LSLOutputNode(FrameNode):
-    """An LSL Output Stream"""
+    """An LSL Output Stream. This is an irregular stream."""
     
     title='LSL Output'
     version='0.1'
     
+    class Config(NodeTraitsConfig):
+        name: str = CX_Str('stream_name')
+        type: str = CX_Str('')
+        unit_type: str = CX_Str('')
     
+    init_inputs = [
+        PortConfig('in', allowed_data=Signal)
+    ]
+    
+    @property
+    def config(self) -> LSLOutputNode.Config:
+        return self._config
+    
+    def init(self):
+        self.stream_info: StreamInfo = None
+        self.stream_out: StreamOutlet = None
+    
+    def update_event(self, inp=-1):
+        
+        signal: Signal = self.input(0)
+        if not signal:
+            return        
+        
+        is_time_sig = isinstance(signal, TimeSignal)
+        is_label_sig = isinstance(signal, LabeledSignal)
+        
+        if not self.stream_info:
+            dtype = signal.data.dtype
+            chann_count = (
+                len(signal.labels)
+                if is_label_sig
+                else signal.data.shape[1]
+            )
+            
+            self.stream_info = StreamInfo(
+                self.config.name,
+                self.config.type,
+                channel_count= chann_count,
+                channel_format=np_to_lsl[dtype],
+            )
+            
+            if is_label_sig:
+                desc = self.stream_info.desc()
+                chann_info = desc.append_child('channels')
+                for label in signal.labels:
+                    channel = chann_info.append_child('channel')
+                    channel.append_child('label', label)
+                    if self.config.type:
+                        channel.append_child('type', self.config.type)
+                    if self.config.unit_type:
+                        channel.append_child('unit', self.config.unit_type)
+            
+            self.stream_out = StreamOutlet(self.stream_info)
+            print(f"Created an outlet with {chann_count} channels")
+        
+        if is_time_sig:
+            self.stream_out.push_chunk(
+                signal.data,
+                signal.timestamps,
+            )
+        else:
+            
+            cols = signal.data.shape[1]
+            for i in range(cols):
+                data = signal.data[:,i]
+                self.stream_out.push_sample(data)
+        
+        
+        

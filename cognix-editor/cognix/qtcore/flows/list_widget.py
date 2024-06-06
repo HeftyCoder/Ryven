@@ -137,7 +137,7 @@ class FlowsListWidget(QWidget):
     """Convenience class for a QWidget to easily manage the flows of a session."""
 
     _flow_deleted_signal = Signal(Flow)
-    _flow_renamed_signal = Signal(Flow)
+    _flow_renamed_signal = Signal(Flow, str)
     
     def __init__(self, session_gui: SessionGUI):
         super().__init__()
@@ -210,7 +210,7 @@ class FlowsListWidget(QWidget):
         del self.flow_items[flow]
         self.list_layout.removeWidget(flow_item)
     
-    def _on_flow_renamed(self, flow: Flow):
+    def _on_flow_renamed(self, flow: Flow, name: str):
         flow_item = self.flow_items[flow]
         flow_item.title_line_edit.setText(flow.title)
 

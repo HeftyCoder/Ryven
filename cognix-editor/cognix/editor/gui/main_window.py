@@ -50,9 +50,8 @@ class MainWindow(QMainWindow):
     _loading_finished_signal = Signal()
     _module_error = Signal(Exception)
     _node_types_updated = Signal(list)
-    __flow_deleted_signal = Signal(Flow)
-    __flow_renamed_signal = Signal(Flow)
-    
+    _flow_deleted_signal = Signal(Flow)
+    _flow_renamed_signal = Signal(Flow, str)
     @classmethod
     def get_session_gui_instance(cls) -> SessionGUI:
         return cls.__session_gui_instance
@@ -100,13 +99,13 @@ class MainWindow(QMainWindow):
         self.session_gui.flow_view_created.connect(self.flow_created)
         
         connect_signal_event(
-            self.__flow_renamed_signal, 
+            self._flow_renamed_signal, 
             self.core_session.flow_renamed, 
             self.flow_renamed
             )
         
         connect_signal_event(
-            self.__flow_deleted_signal,
+            self._flow_deleted_signal,
             self.core_session.flow_deleted,
             self.flow_deleted
         )
@@ -633,7 +632,7 @@ CONTROLS
 
         self.focus_on_flow(flow)
 
-    def flow_renamed(self, flow: Flow):
+    def flow_renamed(self, flow: Flow, name: str):
         i = self.ui.flows_tab_widget.indexOf(self.flow_UIs[flow])
         self.ui.flows_tab_widget.setTabText(i, flow.title)
 
