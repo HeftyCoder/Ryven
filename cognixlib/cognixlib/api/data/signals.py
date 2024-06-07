@@ -74,6 +74,30 @@ class Signal:
     
     def deepcopy(self):
         return deepcopy(self)
+    
+    def withoutRows(self, rows: int | Sequence[int] | slice):
+        """
+        Returns a new Signal with the specified rows deleted.
+        
+        The original is left intact.
+        """
+        if isinstance(rows, int):
+            rows = [rows]
+        
+        new_data = np.delete(self.data, rows, 0)
+        return Signal(new_data, self.info)
+    
+    def withoutColumns(self, cols: int | Sequence[int] | slice):
+        """
+        Returns a new Signal with the specified columns deleted.
+        
+        The original is left intact.
+        """
+        if isinstance(cols, int):
+            cols = [cols]
+        
+        new_data = np.delete(self.data, cols, 1)
+        return Signal(new_data, self.info)            
         
     @property
     def info(self):
@@ -175,6 +199,21 @@ class TimeSignal(Signal, Timestamped):
         )
         return new_sig
 
+    def withoutRows(self, rows: int | Sequence[int] | slice):
+        if isinstance(rows, int):
+            rows = [rows]
+        
+        new_data = np.delete(self.data, rows, 0)
+        timestamps = np.delete(self.timestamps, rows)
+        return TimeSignal(timestamps, new_data, self.info)
+    
+    def withoutColumns(self, cols: int | Sequence[int] | slice):
+        if isinstance(cols, int):
+            cols = [cols]
+        
+        new_data = np.delete(self.data, cols, 1)
+        return TimeSignal(self.timestamps, new_data, self.info)
+
 class LabeledSignal(Signal, Labeled):
     """
     Represents signal data that is mapped to specific labels.
@@ -194,7 +233,7 @@ class LabeledSignal(Signal, Labeled):
         ]
         
         if axis==0:
-            data_conc = np.concatenate(datas, axis=0)
+            data_con = np.concatenate(datas, axis=0)
             label_conc = list(chain(*label_lists))
         else:
             for i in range(len(label_lists) - 1):
@@ -298,6 +337,30 @@ class LabeledSignal(Signal, Labeled):
         )
         return new_sig
     
+    def withoutRows(self, rows: int | Sequence[int] | slice):
+        if isinstance(rows, int):
+            rows = [rows]
+        
+        new_data = np.delete(self.data, rows, 0)
+        return LabeledSignal(self.labels, new_data, self.info)
+    
+    def withoutColumns(self, cols: int | Sequence[int] | slice):
+        if isinstance(cols, int):
+            cols = [cols]
+        
+        new_data = np.delete(self.data, cols, 1)
+        
+        if isinstance(cols, slice):
+            new_labels = self.labels[cols]
+        else:
+            set_cols = set(cols)
+            new_labels = [
+                self.labels[i] for i in range(len(self.labels))
+                if i in set_cols
+            ]
+            
+        return LabeledSignal(new_labels, new_data, self.info)
+    
 class StreamSignalInfo(SignalInfo, StreamConfig):
     """Information regard a Stream Signal"""
     def __init__(
@@ -362,6 +425,24 @@ class StreamSignal(TimeSignal, LabeledSignal):
             new_sig.info
         )
         return new_sig
+    
+    def withoutRows(self, rows: int | Sequence[int] | slice):
+        temp_sig = TimeSignal.withoutRows(self, rows)
+        return StreamSignal(
+            temp_sig.timestamps,
+            self.labels,
+            temp_sig.data,
+            self.info
+        )
+    
+    def withoutColumns(self, cols: int | Sequence[int] | slice):
+        temp_sig = LabeledSignal.withoutColumns(self, cols)
+        return StreamSignal(
+            self.timestamps,
+            temp_sig.labels,
+            temp_sig.data,
+            self.info
+        )
 
 class FeatureSignal(LabeledSignal):
     """
@@ -434,12 +515,16 @@ class FeatureSignal(LabeledSignal):
             labels: Sequence[str],
             class_dict: dict[str, tuple[int, int]],
             data: np.ndarray,
-            signal_info: SignalInfo
+            signal_info: SignalInfo,
+            in_succession=False,
         ):
             self.labels = labels
             self.classes = class_dict
             self.data = data
             self.info = signal_info
+            self.class_succession: dict[str, str] = None
+            self.in_succession=in_succession
+            self._build_succession(in_succession)
         
         def get(self, key):
             try:
@@ -456,6 +541,7 @@ class FeatureSignal(LabeledSignal):
                 subclasses = {key: class_range}
                 start, stop = class_range
                 subdata = self.data[start:stop]
+                in_succession=True
             elif isinstance(key, list):
                 minstart = maxsize
                 maxstop = -1
@@ -468,6 +554,17 @@ class FeatureSignal(LabeledSignal):
                     maxstop = max(maxstop, stop)
                 
                 subdata = self.data[start:stop]
+                
+                # find out if the classes are in succession
+                in_succession=True
+                class_offsets = list(subclasses.values())
+                for i in range(0, len(class_offsets) - 1):
+                    _, curr_end = class_offsets[i]
+                    next_start, _ = class_offsets[i + 1]
+                    if curr_end != next_start:
+                        in_succession = False
+                        break
+                    
             else:
                 raise KeyError(f"Incompatible Key Type. Must be {str} or {list}")
             
@@ -475,33 +572,70 @@ class FeatureSignal(LabeledSignal):
                 self.labels,
                 subclasses,
                 subdata,
-                self.info
+                self.info,
+                in_succession,
             )
         
         def signal(self):
             return FeatureSignal(
-                self.labels,
-                self.classes,
-                self.data,
-                self.info
+                None,
+                None,
+                None,
+                None,
+                classes_datamap=self,
             )
+        
+        def _build_succession(self, is_dict_sorted=False):
+            self.class_succession: dict[str, str] = {}
+            # Optimized
+            if is_dict_sorted:
+                classes = list(self.classes.keys())
+                for i in range(0, len(classes) - 1):
+                    klass, next_class = classes[i], classes[i + 1]
+                    self.class_succession[klass] = next_class
+            
+            # We cannot assume order. Bad performance
+            else:
+                for curr_class, cur_start_end in self.classes.items():
+                    curr_start, cur_end = cur_start_end
+                    if curr_start == 0 or curr_class in self.class_succession:
+                        continue
+                    for klass, start_end in self.classes.items():
+                        if curr_class == klass:
+                            continue
+                        start, _ = start_end
+                        if cur_end == start:
+                            self.class_succession[curr_class] = klass
+                            break
             
     def __init__(
         self, 
         labels: Sequence[str],
         class_dict: dict[str, tuple[int, int]],
         data: np.ndarray, 
-        signal_info: SignalInfo
+        signal_info: SignalInfo,
+        classes_in_succesion=False,
+        classes_datamap: FeatureSignal.DataMap=None
     ):
-        super().__init__(labels, data, signal_info)
-        self.classes = class_dict
-        self._class_datamap = FeatureSignal.DataMap(
-            labels, 
-            class_dict, 
-            data, 
-            signal_info
-        )
-    
+        if not classes_datamap:
+            super().__init__(labels, data, signal_info)
+            self.classes = class_dict
+            self._class_datamap = FeatureSignal.DataMap(
+                labels, 
+                class_dict, 
+                data, 
+                signal_info,
+                classes_in_succesion
+            )
+        else:
+            super().__init__(
+                classes_datamap.labels,
+                classes_datamap.data,
+                classes_datamap.info
+            )
+            self.classes = classes_datamap.classes
+            self._class_datamap = classes_datamap
+            
     @property
     def class_datamap(self):
         """Map from the classes to the portion of the signal"""
@@ -511,4 +645,27 @@ class FeatureSignal(LabeledSignal):
     def cdm(self):
         """Shorthand for class_datamap"""
         return self._class_datamap
+    
+    def withoutRows(self, rows: int | Sequence[int] | slice):
+        if isinstance(rows, int):
+            rows = [rows]
+        
+        rows_to_remove = rows
+        if isinstance(rows, slice):
+            rows_to_remove = [
+                i for i in range(slice.start, slice.stop, slice.step)
+            ]
+        
+        for i in rows_to_remove:
+            pass
+    
+    def withoutColumns(self, cols: int | Sequence[int] | slice):
+            
+        temp_sig = LabeledSignal.withoutColumns(self, cols)
+        return FeatureSignal(
+            temp_sig.labels,
+            self.classes,
+            temp_sig.data,
+            self.info
+        )
     
