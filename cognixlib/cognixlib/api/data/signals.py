@@ -466,8 +466,7 @@ class FeatureSignal(LabeledSignal):
             return signals[0]
         
         for i in range(len(signals) - 1):
-            assert (signals[i].labels == signals[i+1].labels,
-                   "Signal labels are not the same!")
+            assert signals[i].labels == signals[i+1].labels, "Signal labels are not the same!"
         
         # ideally, this should be implemented in cython
         # or as an external library
@@ -517,7 +516,7 @@ class FeatureSignal(LabeledSignal):
             class_dict: dict[str, tuple[int, int]],
             data: np.ndarray,
             signal_info: SignalInfo,
-            in_succession=False,
+            sort=True,
         ):
             self.labels = labels
             self.classes = class_dict
@@ -525,19 +524,12 @@ class FeatureSignal(LabeledSignal):
             self.info = signal_info
             
             self._succ_classes_list: list[str] = None
-            self._class_succession: dict[str, str] = None
-            self.in_succession=in_succession
-            self._build_succession(in_succession)
+            self._build_succession(sort)
         
         @property
         def successive_classes(self):
             """The class list in order of succession"""
             return self._succ_classes_list
-
-        @property
-        def class_succession(self):
-            """Maps a class to its successor"""
-            return self._class_succession
         
         def get(self, key):
             try:
@@ -554,7 +546,7 @@ class FeatureSignal(LabeledSignal):
                 subclasses = {key: class_range}
                 start, stop = class_range
                 subdata = self.data[start:stop]
-                in_succession=True
+                sort=False
             elif isinstance(key, list):
                 minstart = maxsize
                 maxstop = -1
@@ -567,16 +559,7 @@ class FeatureSignal(LabeledSignal):
                     maxstop = max(maxstop, stop)
                 
                 subdata = self.data[start:stop]
-                
-                # find out if the classes are in succession
-                in_succession=True
-                class_offsets = list(subclasses.values())
-                for i in range(0, len(class_offsets) - 1):
-                    _, curr_end = class_offsets[i]
-                    next_start, _ = class_offsets[i + 1]
-                    if curr_end != next_start:
-                        in_succession = False
-                        break
+                sort=True
                     
             else:
                 raise KeyError(f"Incompatible Key Type. Must be {str} or {list}")
@@ -586,7 +569,7 @@ class FeatureSignal(LabeledSignal):
                 subclasses,
                 subdata,
                 self.info,
-                in_succession,
+                sort,
             )
         
         def signal(self):
@@ -598,41 +581,17 @@ class FeatureSignal(LabeledSignal):
                 classes_datamap=self,
             )
         
-        def _build_succession(self, is_dict_sorted=False):
-            self._class_succession: dict[str, str] = {}
+        def _build_succession(self, sort=True):
             # Optimized
-            if is_dict_sorted:
-                self._succ_classes_list = list(self.classes.keys())
-                classes = list(self.classes.keys())
-                for i in range(0, len(classes) - 1):
-                    klass, next_class = classes[i], classes[i + 1]
-                    self._class_succession[klass] = next_class
+            if sort:
+                self.classes = dict(
+                    sorted(
+                        self.classes.items(), 
+                        key=lambda item:item[1][1] # sort by value and by the end of the indices
+                    )
+                )
             
-            # We cannot assume order. Bad performance
-            else:
-                start_class = None
-                for curr_class, cur_start_end in self.classes.items():
-                    curr_start, cur_end = cur_start_end
-                    if curr_start == 0:
-                        start_class = curr_class
-                    
-                    if curr_class in self._class_succession:
-                        continue
-                    
-                    for klass, start_end in self.classes.items():
-                        if curr_class == klass:
-                            continue
-                        start, _ = start_end
-                        if cur_end == start:
-                            self._class_succession[curr_class] = klass
-                            break
-                
-                self._succ_classes_list = [start_class]
-                curr_class = start_class
-                while curr_class:
-                    curr_class = self._class_succession.get(curr_class)
-                    if curr_class:
-                        self._succ_classes_list.append(curr_class)
+            self._succ_classes_list = list(self.classes.keys())
             
     def __init__(
         self, 
@@ -640,19 +599,19 @@ class FeatureSignal(LabeledSignal):
         class_dict: dict[str, tuple[int, int]],
         data: np.ndarray, 
         signal_info: SignalInfo,
-        classes_in_succesion=False,
+        sort=True,
         classes_datamap: FeatureSignal.DataMap=None
     ):
         if not classes_datamap:
             super().__init__(labels, data, signal_info)
-            self.classes = class_dict
             self._class_datamap = FeatureSignal.DataMap(
                 labels, 
                 class_dict, 
                 data, 
                 signal_info,
-                classes_in_succesion
+                sort
             )
+            self.classes = self._class_datamap.classes
         else:
             super().__init__(
                 classes_datamap.labels,

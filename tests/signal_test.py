@@ -75,7 +75,6 @@ def run():
         classes,
         data,
         None,
-        classes_in_succesion=False
     )
     
     f_signal = FeatureSignal.concat_classes(f1, f2)
