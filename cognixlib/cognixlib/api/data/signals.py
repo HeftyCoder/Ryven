@@ -69,7 +69,7 @@ class Signal:
     
     def copy(self):
         new_sig = copy(self)
-        new_sig.data = new_sig.data.copy()
+        new_sig._data = new_sig.data.copy()
         return new_sig
     
     def deepcopy(self):
@@ -612,9 +612,12 @@ class FeatureSignal(LabeledSignal):
                 start_class = None
                 for curr_class, cur_start_end in self.classes.items():
                     curr_start, cur_end = cur_start_end
-                    if curr_start == 0 or curr_class in self._class_succession:
+                    if curr_start == 0:
                         start_class = curr_class
+                    
+                    if curr_class in self._class_succession:
                         continue
+                    
                     for klass, start_end in self.classes.items():
                         if curr_class == klass:
                             continue
@@ -674,10 +677,14 @@ class FeatureSignal(LabeledSignal):
         
         rows_to_remove: Sequence[int] = rows
         if isinstance(rows, slice):
+            start = rows.start if rows.start else 0
+            end = rows.stop if rows.stop else len(self.data)
+            step = rows.step if rows.step else 1
+            
             rows_to_remove = [
-                i for i in range(slice.start, slice.stop, slice.step)
+                i for i in range(start, end, step)
             ]
-        
+            
         classes = self.classes
         class_remove_count: dict[str, int] = {}
         min_class_index = maxsize
@@ -695,8 +702,10 @@ class FeatureSignal(LabeledSignal):
                         class_remove_count[klass] = 0
                     class_remove_count[klass] += 1
         
+        print(class_remove_count)
         new_classes = {}
         
+        print(min_class_index, max_class_index)
         for i in range(min_class_index, max_class_index+1):
             klass = succ_classes_list[i]
             rem_count = class_remove_count[klass]

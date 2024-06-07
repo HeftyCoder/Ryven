@@ -66,15 +66,16 @@ def run():
     # CLASS MERGE TEST
     data = np.random.rand(30, size)
     classes = {
-        "george": (0, 10),
         "john": (10, 20),
+        "george": (0, 10),
         "dam": (20, 30)
     }
     f2 = FeatureSignal(
         labels,
         classes,
         data,
-        None
+        None,
+        classes_in_succesion=False
     )
     
     f_signal = FeatureSignal.concat_classes(f1, f2)
@@ -87,6 +88,14 @@ def run():
         f_signal.cdm['john'].data[11:21],
         f2.cdm['john'].data
     )
+    
+    # REMOVE TESTs
+    
+    # Class remove
+    print(f2.classes)
+    print(f2.cdm.successive_classes)
+    new_sig = f2.withoutRows(slice(10, 23))
+    print(new_sig.classes)
     
 if __name__ == '__main__':
     run()
