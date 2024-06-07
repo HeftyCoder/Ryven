@@ -1,6 +1,6 @@
 """Defines the core functionalities and data types for Cognix"""
 from __future__ import annotations
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from .mixin import *
 from sys import maxsize
 from itertools import chain
@@ -60,6 +60,7 @@ class Signal:
     ):
         self._data = data
         self._info = signal_info
+        
     
     def __getitem__(self, key):
         return self.data[key]
