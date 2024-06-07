@@ -1,5 +1,6 @@
 from cognixlib.api.data import *
 import numpy as np
+import time
 
 def run():
     
@@ -91,7 +92,10 @@ def run():
     # REMOVE TESTs
     
     # Class remove
-    new_sig = f2.withoutRows(slice(0, 15))
+    t0 = time.perf_counter()
+    new_sig = f2.withoutRows(slice(0, 15), True)
+    t1 = time.perf_counter()
+    print(t1-t0)
     assert np.array_equal(
         f2.cdm['john'].data[5:10],
         new_sig.cdm['john'].data
@@ -105,11 +109,10 @@ def run():
     
     # test for removing class
     new_data = np.random.rand(100000, 5)
-    import time
     t0 = time.perf_counter()
     labels = ['A', 'B', 'C', 'D', 'E']
     classes = {
-        "k0": (0,10000),
+        "k0": (0, 10000),
         "k1": (10000, 20000),
         "k2": (20000, 30000),
         "k3": (30000, 40000),
@@ -118,7 +121,7 @@ def run():
         "k6": (60000, 70000),
         "k7": (70000, 80000),
         "k8": (80000, 90000),
-        "k8": (90000, 100000)
+        "k9": (90000, 100000)
     }
     new_sig = FeatureSignal(
         labels,
@@ -126,10 +129,11 @@ def run():
         new_data,
         None
     )
+    
     t1 = time.perf_counter()
-    new_sig = new_sig.withoutRows(slice(15000, 46750))
+    new_sig = new_sig.withoutRows(slice(4532, 97500), True)
     t2 = time.perf_counter()
-    print(f"CREATION: {t1-t0}")
+    print(new_sig.classes)
     print(f"WITHOUT ROWS: {t2-t1}")
 if __name__ == '__main__':
     run()

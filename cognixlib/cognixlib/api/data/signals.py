@@ -631,7 +631,7 @@ class FeatureSignal(LabeledSignal):
         """Shorthand for class_datamap"""
         return self._class_datamap
     
-    def withoutRows(self, rows: int | Sequence[int] | slice | np.ndarray):
+    def withoutRows(self, rows: int | Sequence[int] | slice | np.ndarray, use_numpy=True):
         if isinstance(rows, int):
             rows = [rows]
         
@@ -640,10 +640,18 @@ class FeatureSignal(LabeledSignal):
             end = rows.stop if rows.stop else len(self.data)
             step = rows.step if rows.step else 1
             
-            rows_to_remove = np.arange(start, end, step)
+            if use_numpy:
+                rows_to_remove = np.arange(start, end, step)
+            else:
+                rows_to_remove = [
+                    i for i in range(start, end, step)
+                ]
         elif isinstance(rows, Sequence):
-            rows.sort()
-            rows_to_remove = rows
+            if use_numpy:
+                rows_to_remove = np.array(rows, dtype='int64')
+            else:
+                rows_to_remove = rows
+            rows_to_remove.sort()
         elif isinstance(rows, np.ndarray):
             rows.sort()
             rows_to_remove = rows
@@ -662,6 +670,8 @@ class FeatureSignal(LabeledSignal):
         # The classes are also sorted
         len_rem = len(rows_to_remove)
         last_found_index = 0
+        is_numpy = isinstance(rows_to_remove, np.ndarray)
+        
         for klass_index, klass in enumerate(succ_classes_list):
             start, end = classes[klass]
             min_class_index = min(min_class_index, klass_index)
@@ -671,22 +681,33 @@ class FeatureSignal(LabeledSignal):
             if end < min_remove_index:
                 continue
             
-            for i in range(last_found_index, len_rem):
-                r = rows_to_remove[i]
-                if start <= r and r < end:
-                    last_found_index = i
-                    if klass not in class_remove_count:
-                        class_remove_count[klass] = 0
-                    class_remove_count[klass] += 1
+            if is_numpy:
+                result = np.where(
+                    np.logical_and(
+                        start <= rows_to_remove,
+                        rows_to_remove < end
+                    )
+                )
+                if result:
+                    arr, = result
+                    class_remove_count[klass] = len(arr)
+            else:    
+                for i in range(last_found_index, len_rem):
+                    r = rows_to_remove[i]
+                    if start <= r and r < end:
+                        last_found_index = i
+                        if klass not in class_remove_count:
+                            class_remove_count[klass] = 0
+                        class_remove_count[klass] += 1
             
             # early exit after we processed the segment
             if end >= max_remove_index:
                 break
-            
+        
         new_classes = {}
         offset = 0
         
-        for _, klass in enumerate(succ_classes_list):
+        for index, klass in enumerate(succ_classes_list):
             rem_count = class_remove_count.get(klass)
             if not rem_count:
                 rem_count = 0
@@ -699,14 +720,19 @@ class FeatureSignal(LabeledSignal):
             if start < end:
                 new_classes[klass] = (start, end)
         
-        new_data = np.delete(self.data, rows_to_remove, 0)
+        rem_start = rows_to_remove[0]
+        rem_end = rows_to_remove[-1] + 1
+        if len(rows_to_remove) == rem_end - rem_start:
+            new_data = np.delete(self.data, slice(rem_start, rem_end), 0)
+        else:
+            new_data = np.delete(self.data, rows_to_remove, 0)
         
         return FeatureSignal(
             self.labels,
             new_classes,
             new_data,
             self.info,
-            True            
+            False,            
         )
         
     
