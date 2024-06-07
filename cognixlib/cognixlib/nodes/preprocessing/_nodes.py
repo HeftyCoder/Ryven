@@ -558,8 +558,8 @@ class FIRFilterNode(Node):
         fir_window:str = Enum('hamming','hann','blackman',desc='the window to use in the FIR filter')
         fir_design:str = Enum('firwin','firwin2',desc='the design of the FIR filter')
             
-    init_inputs = [PortConfig(label='data',allowed_data=StreamSignal)]
-    init_outputs = [PortConfig(label='filtered data',allowed_data=StreamSignal)]
+    init_inputs = [PortConfig(label='data',allowed_data=StreamSignal | Sequence[StreamSignal])]
+    init_outputs = [PortConfig(label='filtered data',allowed_data=StreamSignal | Sequence[StreamSignal])]
     
     @property
     def config(self) -> FIRFilterNode.Config:
@@ -579,32 +579,37 @@ class FIRFilterNode(Node):
         if not signal:
             return
         
-        filtered_data = mne.filter.filter_data(
-            data = signal.data,
-            sfreq = signal.info.nominal_srate,
-            l_freq = self.config.low_freq,
-            h_freq = self.config.high_freq,
-            filter_length = self.filter_length,
-            l_trans_bandwidth = self.config.l_trans_bandwidth if self.config.l_trans_bandwidth!=0.0 else 'auto',
-            h_trans_bandwidth = self.config.h_trans_bandwidth if self.config.h_trans_bandwidth!=0.0 else 'auto',
-            n_jobs = -1,
-            method = 'fir',
-            phase = self.config.phase,
-            fir_window = self.config.fir_window,
-            fir_design = self.config.fir_design
-            )
+        if not isinstance(signal,list):
+            signal = [signal]
         
-        print(filtered_data)
-
-        filtered_signal = StreamSignal(
-            signal.timestamps,
-            signal.labels,
-            filtered_data,
-            signal.info,
-            False,
-        )
+        list_of_filtered_sigs:Sequence = []
+        for sig in signal:
+            
+            filtered_signal:StreamSignal = sig.copy()
         
-        self.set_output(0, filtered_signal)
+            filtered_data = mne.filter.filter_data(
+                data = sig.data,
+                sfreq = sig.info.nominal_srate,
+                l_freq = self.config.low_freq,
+                h_freq = self.config.high_freq,
+                filter_length = self.filter_length,
+                l_trans_bandwidth = self.config.l_trans_bandwidth if self.config.l_trans_bandwidth!=0.0 else 'auto',
+                h_trans_bandwidth = self.config.h_trans_bandwidth if self.config.h_trans_bandwidth!=0.0 else 'auto',
+                n_jobs = -1,
+                method = 'fir',
+                phase = self.config.phase,
+                fir_window = self.config.fir_window,
+                fir_design = self.config.fir_design
+                )
+            
+            filtered_signal._data = filtered_data
+        
+            list_of_filtered_sigs.append(filtered_signal)
+        
+        if len(list_of_filtered_sigs) == 1:
+            self.set_output(0, list_of_filtered_sigs[0])
+        else:
+            self.set_output(0, list_of_filtered_sigs)
     
           
 class IIRFilterNode(Node):
@@ -619,8 +624,8 @@ class IIRFilterNode(Node):
         order: int = CX_Int(desc='the order of the filter')
         ftype: str = Enum('butter','cheby1','cheby2','ellip','bessel')
         
-    init_inputs = [PortConfig(label='data',allowed_data=StreamSignal)]
-    init_outputs = [PortConfig(label='filtered data',allowed_data=LabeledSignal)]
+    init_inputs = [PortConfig(label='data',allowed_data=StreamSignal | Sequence[StreamSignal])]
+    init_outputs = [PortConfig(label='filtered data',allowed_data=StreamSignal | Sequence[StreamSignal])]
     
     @property
     def config(self) -> IIRFilterNode.Config:
@@ -638,28 +643,47 @@ class IIRFilterNode(Node):
         if not signal:
             return
         
-        iir_params_dict = mne.filter.construct_iir_filter(
-            iir_params = self.params,
-            f_pass = self.config.f_pass,
-            f_stop =  self.config.f_stop,
-            sfreq = signal.info.nominal_srate,
-            type = self.config.btype,      
-        )
+        if not isinstance(signal,list):
+            signal = [signal]
         
-        filtered_data = mne.filter.filter_data(
-            data = signal.data,
-            sfreq = signal.info.nominal_srate,
-            method = 'iir',
-            iir_params = iir_params_dict
+        
+        list_of_filtered_sigs:Sequence = []
+        for sig in signal:
+            
+            filtered_signal:StreamSignal = sig.copy()
+            
+            iir_params_dict = mne.filter.construct_iir_filter(
+                iir_params = self.params,
+                f_pass = self.config.f_pass,
+                f_stop =  self.config.f_stop,
+                sfreq = sig.info.nominal_srate,
+                btype = self.config.btype,      
             )
+            
+            filtered_data = mne.filter.filter_data(
+                data = sig.data,
+                sfreq = sig.info.nominal_srate,
+                method = 'iir',
+                iir_params = iir_params_dict
+                )
 
-        filtered_signal = LabeledSignal(
-            signal.labels,
-            filtered_data,
-            signal.info    
-        )
-        
-        self.set_output(0, filtered_signal)
+            print(filtered_data,sig.data)
+            
+            filtered_signal._data = filtered_data
+            
+            print(filtered_signal._data,sig.data)
+            
+            list_of_filtered_sigs.append(filtered_signal)
+            
+        # filtered_signal = LabeledSignal(
+        #     signal.labels,
+        #     filtered_data,
+        #     signal.info    
+        # )
+        if len(list_of_filtered_sigs) == 1:
+            self.set_output(0, list_of_filtered_sigs[0])
+        else:
+            self.set_output(0, list_of_filtered_sigs)
             
             
 class NotchFilterNode(Node):
