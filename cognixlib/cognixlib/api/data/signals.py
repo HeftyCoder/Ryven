@@ -631,19 +631,25 @@ class FeatureSignal(LabeledSignal):
         """Shorthand for class_datamap"""
         return self._class_datamap
     
-    def withoutRows(self, rows: int | Sequence[int] | slice):
+    def withoutRows(self, rows: int | Sequence[int] | slice | np.ndarray):
         if isinstance(rows, int):
             rows = [rows]
         
-        rows_to_remove: Sequence[int] = rows
         if isinstance(rows, slice):
             start = rows.start if rows.start else 0
             end = rows.stop if rows.stop else len(self.data)
             step = rows.step if rows.step else 1
             
-            rows_to_remove = [
-                i for i in range(start, end, step)
-            ]
+            rows_to_remove = np.arange(start, end, step)
+        elif isinstance(rows, Sequence):
+            rows.sort()
+            rows_to_remove = rows
+        elif isinstance(rows, np.ndarray):
+            rows.sort()
+            rows_to_remove = rows
+            
+        min_remove_index = rows_to_remove[0]
+        max_remove_index = rows_to_remove[-1]
             
         classes = self.classes
         class_remove_count: dict[str, int] = {}
@@ -651,21 +657,36 @@ class FeatureSignal(LabeledSignal):
         max_class_index = -1
         succ_classes_list = self.cdm._succ_classes_list
         
-        # find how many elements are removed from each class
-        for r in rows_to_remove:
-            for klass_index, klass in enumerate(succ_classes_list):
-                start, end = classes[klass]
+        
+        # The rows to remove are sorted here
+        # The classes are also sorted
+        len_rem = len(rows_to_remove)
+        last_found_index = 0
+        for klass_index, klass in enumerate(succ_classes_list):
+            start, end = classes[klass]
+            min_class_index = min(min_class_index, klass_index)
+            max_class_index = max(max_class_index, klass_index)
+            
+            # avoid redundant checks
+            if end < min_remove_index:
+                continue
+            
+            for i in range(last_found_index, len_rem):
+                r = rows_to_remove[i]
                 if start <= r and r < end:
+                    last_found_index = i
                     if klass not in class_remove_count:
-                        min_class_index = min(min_class_index, klass_index)
-                        max_class_index = max(max_class_index, klass_index)
                         class_remove_count[klass] = 0
                     class_remove_count[klass] += 1
-        
+            
+            # early exit after we processed the segment
+            if end >= max_remove_index:
+                break
+            
         new_classes = {}
         offset = 0
         
-        for i, klass in enumerate(succ_classes_list):
+        for _, klass in enumerate(succ_classes_list):
             rem_count = class_remove_count.get(klass)
             if not rem_count:
                 rem_count = 0
