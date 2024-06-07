@@ -522,9 +522,21 @@ class FeatureSignal(LabeledSignal):
             self.classes = class_dict
             self.data = data
             self.info = signal_info
-            self.class_succession: dict[str, str] = None
+            
+            self._succ_classes_list: list[str] = None
+            self._class_succession: dict[str, str] = None
             self.in_succession=in_succession
             self._build_succession(in_succession)
+        
+        @property
+        def successive_classes(self):
+            """The class list in order of succession"""
+            return self._succ_classes_list
+
+        @property
+        def class_succession(self):
+            """Maps a class to its successor"""
+            return self._class_succession
         
         def get(self, key):
             try:
@@ -586,27 +598,37 @@ class FeatureSignal(LabeledSignal):
             )
         
         def _build_succession(self, is_dict_sorted=False):
-            self.class_succession: dict[str, str] = {}
+            self._class_succession: dict[str, str] = {}
             # Optimized
             if is_dict_sorted:
+                self._succ_classes_list = list(self.classes.keys())
                 classes = list(self.classes.keys())
                 for i in range(0, len(classes) - 1):
                     klass, next_class = classes[i], classes[i + 1]
-                    self.class_succession[klass] = next_class
+                    self._class_succession[klass] = next_class
             
             # We cannot assume order. Bad performance
             else:
+                start_class = None
                 for curr_class, cur_start_end in self.classes.items():
                     curr_start, cur_end = cur_start_end
-                    if curr_start == 0 or curr_class in self.class_succession:
+                    if curr_start == 0 or curr_class in self._class_succession:
+                        start_class = curr_class
                         continue
                     for klass, start_end in self.classes.items():
                         if curr_class == klass:
                             continue
                         start, _ = start_end
                         if cur_end == start:
-                            self.class_succession[curr_class] = klass
+                            self._class_succession[curr_class] = klass
                             break
+                
+                self._succ_classes_list = [start_class]
+                curr_class = start_class
+                while curr_class:
+                    curr_class = self._class_succession.get(curr_class)
+                    if curr_class:
+                        self._succ_classes_list.append(curr_class)
             
     def __init__(
         self, 
@@ -650,14 +672,63 @@ class FeatureSignal(LabeledSignal):
         if isinstance(rows, int):
             rows = [rows]
         
-        rows_to_remove = rows
+        rows_to_remove: Sequence[int] = rows
         if isinstance(rows, slice):
             rows_to_remove = [
                 i for i in range(slice.start, slice.stop, slice.step)
             ]
         
-        for i in rows_to_remove:
-            pass
+        classes = self.classes
+        class_remove_count: dict[str, int] = {}
+        min_class_index = maxsize
+        max_class_index = -1
+        succ_classes_list = self.cdm._succ_classes_list
+        
+        # find how many elements are removed from each class
+        for r in rows_to_remove:
+            for klass_index, klass in enumerate(succ_classes_list):
+                start, end = classes[klass]
+                if start <= r and r < end:
+                    if klass not in class_remove_count:
+                        min_class_index = min(min_class_index, klass_index)
+                        max_class_index = max(max_class_index, klass_index)
+                        class_remove_count[klass] = 0
+                    class_remove_count[klass] += 1
+        
+        new_classes = {}
+        
+        for i in range(min_class_index, max_class_index+1):
+            klass = succ_classes_list[i]
+            rem_count = class_remove_count[klass]
+            if not klass in new_classes:    
+                new_classes[klass] = classes[klass]
+                
+            start, end = new_classes[klass]
+            end -= rem_count
+            if start < end:
+                new_classes[klass] = (start, end)
+            elif klass in new_classes:
+                del new_classes[klass]
+            
+            successor = self.cdm._class_succession.get(klass)
+            if successor:
+                if successor not in new_classes:
+                    new_classes[successor] = classes[successor]
+                
+                start, end = new_classes[successor]
+                start -= rem_count
+                new_classes[successor] = (start, end)
+        
+        new_data = np.delete(self.data, rows_to_remove)
+        
+        return FeatureSignal(
+            self.labels,
+            new_classes,
+            new_data,
+            self.info,
+            True            
+        )
+        
     
     def withoutColumns(self, cols: int | Sequence[int] | slice):
             
