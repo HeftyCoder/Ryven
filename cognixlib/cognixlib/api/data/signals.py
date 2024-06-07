@@ -702,33 +702,23 @@ class FeatureSignal(LabeledSignal):
                         class_remove_count[klass] = 0
                     class_remove_count[klass] += 1
         
-        print(class_remove_count)
         new_classes = {}
+        offset = 0
         
-        print(min_class_index, max_class_index)
-        for i in range(min_class_index, max_class_index+1):
-            klass = succ_classes_list[i]
-            rem_count = class_remove_count[klass]
-            if not klass in new_classes:    
-                new_classes[klass] = classes[klass]
-                
-            start, end = new_classes[klass]
-            end -= rem_count
+        for i, klass in enumerate(succ_classes_list):
+            rem_count = class_remove_count.get(klass)
+            if not rem_count:
+                rem_count = 0
+            
+            start, end = classes[klass]
+            start -= offset
+            end -= offset + rem_count
+            offset += rem_count
+            
             if start < end:
                 new_classes[klass] = (start, end)
-            elif klass in new_classes:
-                del new_classes[klass]
-            
-            successor = self.cdm._class_succession.get(klass)
-            if successor:
-                if successor not in new_classes:
-                    new_classes[successor] = classes[successor]
-                
-                start, end = new_classes[successor]
-                start -= rem_count
-                new_classes[successor] = (start, end)
         
-        new_data = np.delete(self.data, rows_to_remove)
+        new_data = np.delete(self.data, rows_to_remove, 0)
         
         return FeatureSignal(
             self.labels,

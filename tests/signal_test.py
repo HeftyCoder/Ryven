@@ -92,10 +92,11 @@ def run():
     # REMOVE TESTs
     
     # Class remove
-    print(f2.classes)
-    print(f2.cdm.successive_classes)
-    new_sig = f2.withoutRows(slice(10, 23))
-    print(new_sig.classes)
+    new_sig = f2.withoutRows(slice(0, 15))
+    assert np.array_equal(
+        f2.cdm['john'].data[5:10],
+        new_sig.cdm['john'].data
+    )
     
 if __name__ == '__main__':
     run()
