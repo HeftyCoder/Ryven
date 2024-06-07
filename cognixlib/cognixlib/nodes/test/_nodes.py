@@ -10,6 +10,16 @@ from random import randint
 import numpy as np
 from collections.abc import Sequence
 
+from pylsl import (
+    StreamInlet, 
+    StreamInfo,
+    local_clock,
+    IRREGULAR_RATE,
+    cf_string
+)
+from ..stream import LSLSignalInfo
+from ...api.data import StreamSignal
+
 from ...api.data import Signal, TimeSignal, LabeledSignal, FeatureSignal
 
 class TestStreamNode(FrameNode):
@@ -30,6 +40,39 @@ class TestStreamNode(FrameNode):
     def frame_update_event(self) -> bool:
         self.set_output(0, self.X)
         self.set_output(1, self.y)
+
+class TestStreamSignalNode(FrameNode):
+    title = 'Test Signal Node'
+    version = '0.1'
+    
+    init_outputs = [PortConfig('stream signal',allowed_data=StreamSignal)]
+    
+    def init(self):
+        self.current_time = 0
+        
+        self.info = StreamInfo(
+                name = "Data Stream",
+                type = 'EEG',
+                channel_count = 32,
+                nominal_srate = float(2048),
+                channel_format = 'float32',
+                source_id = str(1)
+            )
+        
+        self.stream_info = LSLSignalInfo(self.info)
+        
+    def frame_update_event(self):
+        self.current_time += self.player.delta_time
+        if self.current_time >= 2:
+            self.current_time = 0
+            signal = StreamSignal(
+                timestamps = np.linspace(start=1.0,stop=5.0,num=100),
+                data = np.random.rand(32,100),
+                labels = [f'channel_{i}' for i in range(32)],
+                signal_info = self.stream_info,
+                make_lowercase = False
+            )
+            self.set_output(0,signal)
 
 class TestRandomGeneratorNode(FrameNode):
     
