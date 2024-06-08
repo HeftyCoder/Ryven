@@ -632,6 +632,10 @@ class FeatureSignal(LabeledSignal):
         return self._class_datamap
     
     def withoutRows(self, rows: int | Sequence[int] | slice | np.ndarray, use_numpy=True):
+        # The costs of this function are complementary. When deleting a small subsection,
+        # the deletion construction of the new array takes time. When deleting a large
+        # subsection, the reconstruction of the classes hierarchy takes time.
+        
         if isinstance(rows, int):
             rows = [rows]
         
@@ -672,6 +676,10 @@ class FeatureSignal(LabeledSignal):
         last_found_index = 0
         is_numpy = isinstance(rows_to_remove, np.ndarray)
         
+        rem_start = rows_to_remove[0]
+        rem_end = rows_to_remove[-1] + 1
+        search_space = rem_end - rem_start
+        
         for klass_index, klass in enumerate(succ_classes_list):
             start, end = classes[klass]
             min_class_index = min(min_class_index, klass_index)
@@ -681,16 +689,22 @@ class FeatureSignal(LabeledSignal):
             if end < min_remove_index:
                 continue
             
-            if is_numpy:
+            if len_rem == search_space:
+                remove_count = min(end, rem_end)-max(start, rem_start)
+                if remove_count > 0:
+                    class_remove_count[klass] = remove_count
+            elif is_numpy:
                 result = np.where(
                     np.logical_and(
                         start <= rows_to_remove,
                         rows_to_remove < end
                     )
                 )
+                
                 if result:
                     arr, = result
                     class_remove_count[klass] = len(arr)
+                
             else:    
                 for i in range(last_found_index, len_rem):
                     r = rows_to_remove[i]
@@ -720,12 +734,19 @@ class FeatureSignal(LabeledSignal):
             if start < end:
                 new_classes[klass] = (start, end)
         
-        rem_start = rows_to_remove[0]
-        rem_end = rows_to_remove[-1] + 1
-        if len(rows_to_remove) == rem_end - rem_start:
-            new_data = np.delete(self.data, slice(rem_start, rem_end), 0)
+        if len_rem == search_space:
+            new_data = np.concatenate(
+                [
+                    self.data[0:rem_start],
+                    self.data[rem_end:],
+                ],
+                axis=0
+            )
         else:
-            new_data = np.delete(self.data, rows_to_remove, 0)
+            mask = np.ones(self.data.shape[0], dtype=np.bool_)
+            mask[rows_to_remove] = False
+            new_data = self.data[mask, :]
+            # new_data = np.delete(self.data, rows_to_remove, 0)
         
         return FeatureSignal(
             self.labels,
@@ -735,7 +756,6 @@ class FeatureSignal(LabeledSignal):
             False,            
         )
         
-    
     def withoutColumns(self, cols: int | Sequence[int] | slice):
             
         temp_sig = LabeledSignal.withoutColumns(self, cols)

@@ -20,8 +20,8 @@ df['Metadata'] = ['meta1', 'meta2', 'meta2', 'meta3'] # this breaks contiguous s
 t2 = time.perf_counter()
 
 c_dict = {
-    'meta1': (0, 2),
-    'meta2': (2, 3),
+    'meta1': (0, 1),
+    'meta2': (1, 3),
     'meta3': (3, 4)
 }
 f = cl.FeatureSignal(
@@ -29,7 +29,6 @@ f = cl.FeatureSignal(
     c_dict,
     data,
     None,
-    classes_in_succesion=True
 )
 
 t3 = time.perf_counter()

@@ -130,10 +130,15 @@ def run():
         None
     )
     
+    test_size = 500
+    test_array = [i for i in range(0, 10000, 20)]
+    test_slice = slice(50, 50000)
     t1 = time.perf_counter()
-    new_sig = new_sig.withoutRows(slice(4532, 97500), True)
+    for i in range(test_size):
+        test_sig = new_sig.withoutRows(test_array)
     t2 = time.perf_counter()
-    print(new_sig.classes)
-    print(f"WITHOUT ROWS: {t2-t1}")
+    print(test_sig.data.shape)
+    print(test_sig.classes)
+    print(f"WITHOUT ROWS: {(t2-t1)/test_size}")
 if __name__ == '__main__':
     run()
