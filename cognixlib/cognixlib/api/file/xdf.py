@@ -133,13 +133,19 @@ class XDFWriter:
         self.write_data_chunk_(streamid,timestamps,chunk,len(timestamps),n_channels)
         
     def write_data_chunk_nested(self,streamid:int,timestamps:list,chunk:list|np.ndarray): ##### WRITE CHUNK DATA THAT ARE 2D ARRAY
-        if isinstance(chunk,list) and len(chunk) == 0:return 
-        if isinstance(chunk,np.ndarray) and chunk.size == 0: return 
+        if isinstance(chunk,list) and len(chunk) == 0:
+            return 
+        if isinstance(chunk,np.ndarray) and chunk.size == 0: 
+            return 
+        
         n_samples = len(timestamps)
-        if isinstance(chunk,np.ndarray) and len(timestamps)!=chunk.shape[0]:raise RuntimeError("TImestamp and sample count are not the same")
-        if isinstance(chunk,list) and len(timestamps)!=len(chunk):raise RuntimeError("TImestamp and sample count are not the same")
-        if isinstance(chunk,np.ndarray): n_channels = chunk.shape[1]
-        if isinstance(chunk,list) : n_channels = len(chunk[0])
+        if isinstance(chunk, (np.ndarray, list)) and len(timestamps) != chunk.shape[0]:
+            raise RuntimeError("Timestamp and sample count are not the same")
+        
+        if isinstance(chunk, np.ndarray):
+            n_channels = chunk.shape[1]
+        if isinstance(chunk,list): 
+            n_channels = len(chunk[0])
         ## generate [Samples] chunk contents...
         out = io.BytesIO()
         write_fixlen_int(out,0x0FFFFFFF)    

@@ -3,8 +3,14 @@ from collections.abc import Sequence
 
 _default_dts_err_scale=1.5
 
+# TODO Fifx this class to not need to transpose the data before it enters
 class CircularBuffer:
-    """An implementation of a circular buffer for handling data and timestamps"""
+    """
+    An implementation of a circular buffer for handling data and timestamps
+    
+    This buffer was made with data x times format, but since then, we have
+    decided on a times x data format. Hence, this might need to be changed.
+    """
     
     @classmethod
     def create(cls, data: np.ndarray, timestamps: np.ndarray):
@@ -47,7 +53,7 @@ class CircularBuffer:
         self.tloop = timestamps[-1]
         self.current_index = self.size-1
         self.effective_srate = len(timestamps)/(timestamps[-1] - timestamps[0])
-        self.data = data
+        self.data = data.T
     
     @property
     def size(self):
@@ -65,7 +71,7 @@ class CircularBuffer:
     
     def append_expand(
         self,
-        data: Sequence,
+        data: np.ndarray,
         timestamps: Sequence[float],
     ) -> bool:
         """
@@ -75,12 +81,14 @@ class CircularBuffer:
         Returns True if the buffer has expanded.
         """
         # might be a single timestamp
+        
         data_dur = (
             timestamps[0] if len(timestamps) == 0
             else timestamps[-1] - timestamps[0]
         )
         
         if data_dur > self.duration:
+            data = data.T
             added_dur = data_dur - self.duration
             self.duration += added_dur
             self.data = np.concatenate(self.data, data)
@@ -107,6 +115,9 @@ class CircularBuffer:
         When get_looped_data=True, it returns a tuple of (data, timestamps) 
         if the buffer has looped, else None.
         """
+        
+        data = data.T
+        
         ts_len = len(timestamps)
         assert data.shape[1] == ts_len, f"Length of data and timestamps was not equal! {data.shape[1]} != {ts_len}"
         
@@ -306,12 +317,12 @@ class CircularBuffer:
             return None, None
     
         if not (x_overflow or y_overflow) or (x_overflow and y_overflow):
-            return buffer[:, x_index:y_index], buffer_tm[x_index:y_index]
+            return buffer[:, x_index:y_index].T, buffer_tm[x_index:y_index]
     
         else:
             start, end = (x_index, y_index) if x_overflow else (y_index, x_index)
             return (
-                np.concatenate((buffer[:, start:size], buffer[:, 0:end]), axis=1),
+                np.concatenate((buffer[:, start:size], buffer[:, 0:end]), axis=1).T,
                 np.concatenate((buffer_tm[start:size], buffer_tm[0:end]))
             )
         
