@@ -129,18 +129,20 @@ class XDFWriterNode(Node):
             self.write_header[inp] = True
         
         signal: StreamSignal = self.input(inp)
-        if signal.timestamps:
-            samples = np.array(signal.data)
-            timestamps = np.array(signal.timestamps)
-            self.timestamps[inp].append([timestamps[0],timestamps[-1]])
-            self.samples_count[inp] += len(timestamps)
-            
-            self.xdfile.write_data(
-                inp,
-                samples,
-                timestamps,
-                self.inlets[inp]['channel_count']
-            )
+        if not signal:
+            return
+        
+        samples = np.array(signal.data)
+        timestamps = np.array(signal.timestamps)
+        self.timestamps[inp].append([timestamps[0], timestamps[-1]])
+        self.samples_count[inp] += len(timestamps)
+        
+        self.xdfile.write_data(
+            inp,
+            samples,
+            timestamps,
+            self.inlets[inp]['channel_count']
+        )
                 # creation_of_xdf(self.xdfile,inp,self.inlets[inp],samples,timestamps,False,True,False,0,0,0)
         
             

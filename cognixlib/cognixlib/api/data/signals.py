@@ -60,13 +60,44 @@ class Signal:
     ):
         self._data = data
         self._info = signal_info
-        
+    
+    def __str__(self):
+        return str(self.data)
     
     def __getitem__(self, key):
-        return self.data[key]
+        return Signal(self.data[key], self.info)
     
     def __setitem__(self, key, newvalue):
         self.data[key] = newvalue
+    
+    def __add__(self, other):
+        add = self._extract_data(other)
+        return Signal(self.data + add, self.info)
+    
+    def __sub__(self, other):
+        sub = self._extract_data(other)
+        return Signal(self.data - sub, self.info)
+    
+    def __eq__(self, other):
+        return self.data == self._extract_data(other)
+    
+    def __ne__(self, other):
+        return self.data != self._extract_data(other)
+    
+    def __lt__(self, other):
+        return self.data < self._extract_data(other)
+    
+    def __le__(self, other):
+        return self.data <= self._extract_data(other)
+    
+    def __gt__(self, other):
+        return self.data > self._extract_data(other)
+    
+    def __ge__(self, other):
+        return self.data >= self._extract_data(other)
+    
+    def _extract_data(other):
+        return other.data if isinstance(other, Signal) else other
     
     def copy(self):
         new_sig = copy(self)
@@ -76,29 +107,25 @@ class Signal:
     def deepcopy(self):
         return deepcopy(self)
     
-    def withoutRows(self, rows: int | Sequence[int] | slice):
+    def filter_rows(self, condition: np.ndarray):
         """
-        Returns a new Signal with the specified rows deleted.
+        Filters the rows based on a numpy condition
         
-        The original is left intact.
+        If the condition is not met, the whole row will be removed
         """
-        if isinstance(rows, int):
-            rows = [rows]
-        
-        new_data = np.delete(self.data, rows, 0)
+        rows_to_keep = np.where(np.all(condition, axis=1))[0]
+        new_data = self.data[rows_to_keep, :]
         return Signal(new_data, self.info)
     
-    def withoutColumns(self, cols: int | Sequence[int] | slice):
+    def filter_columns(self, condition: np.ndarray):
         """
-        Returns a new Signal with the specified columns deleted.
+        Filters the columns based on a numpy condition
         
-        The original is left intact.
+        If the condition is not met, the whole column will be removed
         """
-        if isinstance(cols, int):
-            cols = [cols]
-        
-        new_data = np.delete(self.data, cols, 1)
-        return Signal(new_data, self.info)            
+        cols_to_keep = np.where(np.all(condition, axis=0))[0]
+        new_data = self.data[:, cols_to_keep]
+        return Signal(new_data, self.info)           
         
     @property
     def info(self):
@@ -200,20 +227,22 @@ class TimeSignal(Signal, Timestamped):
         )
         return new_sig
 
-    def withoutRows(self, rows: int | Sequence[int] | slice):
-        if isinstance(rows, int):
-            rows = [rows]
-        
-        new_data = np.delete(self.data, rows, 0)
-        timestamps = np.delete(self.timestamps, rows)
-        return TimeSignal(timestamps, new_data, self.info)
+    def __getitem__(self, key):
+        return TimeSignal(
+            self._extract_timestamps(key),
+            self.data[key],
+            self.info
+        )
     
-    def withoutColumns(self, cols: int | Sequence[int] | slice):
-        if isinstance(cols, int):
-            cols = [cols]
-        
-        new_data = np.delete(self.data, cols, 1)
-        return TimeSignal(self.timestamps, new_data, self.info)
+    def _extract_timestamps(self, key):
+        if isinstance(key, (slice, Sequence, np.ndarray, int)):
+            new_times = self.timestamps[key]
+        elif isinstance(key, tuple):
+            left, _ = key
+            new_times = self.timestamps[left]
+        else:
+            new_times = self.timestamps
+        return new_times
 
 class LabeledSignal(Signal, Labeled):
     """
@@ -255,12 +284,12 @@ class LabeledSignal(Signal, Labeled):
         Since labels are column-related, a conversion must be made
         between label indices and data indices.
         """
-        def __init__(self, data: np.ndarray, labels: Sequence[str], info: SignalInfo):
+        def __init__(self, data: np.ndarray, labels: np.ndarray, info: SignalInfo):
             self.data = data
             self.labels = labels
             self.info = info
             self._label_to_index: dict[str, int] = {
-                label:index for index, label in enumerate(labels)
+                label:index for index, label in enumerate(labels.flat)
             }
         
         def __str__(self):
@@ -271,7 +300,7 @@ class LabeledSignal(Signal, Labeled):
             key = self.convert_to_indices(key)
             sub_data = self.data[:, key]
             if isinstance(key, list):
-                sub_labels = old_key
+                sub_labels = np.array(old_key)
             else:
                 sub_labels = self.labels[key]
             return LabeledSignal.DataMap(sub_data, sub_labels, self.info)
@@ -317,7 +346,7 @@ class LabeledSignal(Signal, Labeled):
     ):
         Signal.__init__(self, data, signal_info)
         Labeled.__init__(self, labels, make_lowercase)
-        self._label_datamap = LabeledSignal.DataMap(data, labels, signal_info)
+        self._label_datamap = LabeledSignal.DataMap(data, self.labels, signal_info)
 
     @property
     def label_datamap(self):
@@ -338,29 +367,22 @@ class LabeledSignal(Signal, Labeled):
         )
         return new_sig
     
-    def withoutRows(self, rows: int | Sequence[int] | slice):
-        if isinstance(rows, int):
-            rows = [rows]
-        
-        new_data = np.delete(self.data, rows, 0)
-        return LabeledSignal(self.labels, new_data, self.info)
+    def __getitem__(self, key):
+        return LabeledSignal(
+            self._extract_labels(key),
+            self.data[key],
+            self.info
+        )
     
-    def withoutColumns(self, cols: int | Sequence[int] | slice):
-        if isinstance(cols, int):
-            cols = [cols]
-        
-        new_data = np.delete(self.data, cols, 1)
-        
-        if isinstance(cols, slice):
-            new_labels = self.labels[cols]
+    def _extract_labels(self, key):
+        if isinstance(key, tuple):
+            _, right = key
+            if isinstance(right, (slice, Sequence, np.ndarray, int)):
+                new_labels = self.labels[right]
         else:
-            set_cols = set(cols)
-            new_labels = [
-                self.labels[i] for i in range(len(self.labels))
-                if i in set_cols
-            ]
-            
-        return LabeledSignal(new_labels, new_data, self.info)
+            new_labels = self.labels
+        
+        return new_labels
     
 class StreamSignalInfo(SignalInfo, StreamConfig):
     """Information regard a Stream Signal"""
@@ -426,22 +448,15 @@ class StreamSignal(TimeSignal, LabeledSignal):
             new_sig.info
         )
         return new_sig
-    
-    def withoutRows(self, rows: int | Sequence[int] | slice):
-        temp_sig = TimeSignal.withoutRows(self, rows)
+
+    def __getitem__(self, key):
+        new_timestamps = self._extract_timestamps(key)
+        new_labels = self._extract_labels(key)
+        new_data = self.data[key]
         return StreamSignal(
-            temp_sig.timestamps,
-            self.labels,
-            temp_sig.data,
-            self.info
-        )
-    
-    def withoutColumns(self, cols: int | Sequence[int] | slice):
-        temp_sig = LabeledSignal.withoutColumns(self, cols)
-        return StreamSignal(
-            self.timestamps,
-            temp_sig.labels,
-            temp_sig.data,
+            new_timestamps,
+            new_labels,
+            new_data,
             self.info
         )
 
@@ -465,8 +480,9 @@ class FeatureSignal(LabeledSignal):
         if len(signals) == 1:
             return signals[0]
         
-        for i in range(len(signals) - 1):
-            assert signals[i].labels == signals[i+1].labels, "Signal labels are not the same!"
+        label_arrs = [signal.labels for signal in signals]
+        for i in range(len(label_arrs)-1):
+            assert np.array_equal(label_arrs[i], label_arrs[i+1]), "Signal labels are not the same!"
         
         # ideally, this should be implemented in cython
         # or as an external library
@@ -631,7 +647,27 @@ class FeatureSignal(LabeledSignal):
         """Shorthand for class_datamap"""
         return self._class_datamap
     
-    def withoutRows(self, rows: int | Sequence[int] | slice | np.ndarray, use_numpy=True):
+    def __getitem__(self, key):
+        new_labels = self._extract_labels(key)
+        new_classes = self._extract_classes_by_key(key)
+        return FeatureSignal(
+            new_labels,
+            new_classes,
+            self.data[key],
+            self.info
+        )
+    
+    def _extract_classes_by_key(self, key):
+        if isinstance(key, (slice, Sequence, np.ndarray, int)):
+            new_classes = self._extract_classes(key)
+        elif isinstance(key, tuple):
+            left, _ = key
+            new_classes = self._extract_classes(left)
+        else:
+            new_classes = self.classes
+        return new_classes
+    
+    def _extract_classes(self, rows: int | Sequence[int] | slice | np.ndarray):
         # The costs of this function are complementary. When deleting a small subsection,
         # the deletion construction of the new array takes time. When deleting a large
         # subsection, the reconstruction of the classes hierarchy takes time.
@@ -644,27 +680,22 @@ class FeatureSignal(LabeledSignal):
             end = rows.stop if rows.stop else len(self.data)
             step = rows.step if rows.step else 1
             
-            if use_numpy:
-                rows_to_remove = np.arange(start, end, step)
-            else:
-                rows_to_remove = [
-                    i for i in range(start, end, step)
-                ]
-        elif isinstance(rows, Sequence):
-            if use_numpy:
-                rows_to_remove = np.array(rows, dtype='int64')
-            else:
-                rows_to_remove = rows
-            rows_to_remove.sort()
-        elif isinstance(rows, np.ndarray):
-            rows.sort()
-            rows_to_remove = rows
+            rows_to_include = np.arange(start, end, step)
             
-        min_remove_index = rows_to_remove[0]
-        max_remove_index = rows_to_remove[-1]
+        elif isinstance(rows, Sequence):
+            rows_to_include = np.array(rows, dtype='int64')
+            rows_to_include.sort()
+        elif isinstance(rows, np.ndarray):
+            if rows.dtype == np.bool_:
+                rows_to_include = np.where(rows)[0]
+            else:
+                rows_to_include = rows
+            
+        min_include_index = rows_to_include[0]
+        max_include_index = rows_to_include[-1]
             
         classes = self.classes
-        class_remove_count: dict[str, int] = {}
+        class_include_count: dict[str, int] = {}
         min_class_index = maxsize
         max_class_index = -1
         succ_classes_list = self.cdm._succ_classes_list
@@ -672,13 +703,14 @@ class FeatureSignal(LabeledSignal):
         
         # The rows to remove are sorted here
         # The classes are also sorted
-        len_rem = len(rows_to_remove)
+        len_inc = len(rows_to_include)
         last_found_index = 0
-        is_numpy = isinstance(rows_to_remove, np.ndarray)
+        # will always be true currently
+        is_numpy = isinstance(rows_to_include, np.ndarray)
         
-        rem_start = rows_to_remove[0]
-        rem_end = rows_to_remove[-1] + 1
-        search_space = rem_end - rem_start
+        inc_start = rows_to_include[0]
+        inc_end = rows_to_include[-1] + 1
+        search_space = inc_end - inc_start
         
         for klass_index, klass in enumerate(succ_classes_list):
             start, end = classes[klass]
@@ -686,83 +718,47 @@ class FeatureSignal(LabeledSignal):
             max_class_index = max(max_class_index, klass_index)
             
             # avoid redundant checks
-            if end < min_remove_index:
+            if end < min_include_index:
                 continue
             
-            if len_rem == search_space:
-                remove_count = min(end, rem_end)-max(start, rem_start)
-                if remove_count > 0:
-                    class_remove_count[klass] = remove_count
+            if len_inc == search_space:
+                include_count = min(end, inc_end)-max(start, inc_start)
+                if include_count > 0:
+                    class_include_count[klass] = include_count
             elif is_numpy:
                 result = np.where(
                     np.logical_and(
-                        start <= rows_to_remove,
-                        rows_to_remove < end
+                        start <= rows_to_include,
+                        rows_to_include < end
                     )
                 )
                 
                 if result:
                     arr, = result
-                    class_remove_count[klass] = len(arr)
-                
+                    class_include_count[klass] = len(arr)
+            
+            # this will never be used currently
             else:    
-                for i in range(last_found_index, len_rem):
-                    r = rows_to_remove[i]
+                for i in range(last_found_index, len_inc):
+                    r = rows_to_include[i]
                     if start <= r and r < end:
                         last_found_index = i
-                        if klass not in class_remove_count:
-                            class_remove_count[klass] = 0
-                        class_remove_count[klass] += 1
+                        if klass not in class_include_count:
+                            class_include_count[klass] = 0
+                        class_include_count[klass] += 1
             
             # early exit after we processed the segment
-            if end >= max_remove_index:
+            if end >= max_include_index:
                 break
         
         new_classes = {}
         offset = 0
         
-        for index, klass in enumerate(succ_classes_list):
-            rem_count = class_remove_count.get(klass)
-            if not rem_count:
-                rem_count = 0
-            
-            start, end = classes[klass]
-            start -= offset
-            end -= offset + rem_count
-            offset += rem_count
-            
-            if start < end:
-                new_classes[klass] = (start, end)
+        for klass, inc_count in class_include_count.items():
+            if inc_count <= 0:
+                continue
+            new_classes[klass] = (offset, offset + inc_count)
+            offset += inc_count
         
-        if len_rem == search_space:
-            new_data = np.concatenate(
-                [
-                    self.data[0:rem_start],
-                    self.data[rem_end:],
-                ],
-                axis=0
-            )
-        else:
-            mask = np.ones(self.data.shape[0], dtype=np.bool_)
-            mask[rows_to_remove] = False
-            new_data = self.data[mask, :]
-            # new_data = np.delete(self.data, rows_to_remove, 0)
-        
-        return FeatureSignal(
-            self.labels,
-            new_classes,
-            new_data,
-            self.info,
-            False,            
-        )
-        
-    def withoutColumns(self, cols: int | Sequence[int] | slice):
-            
-        temp_sig = LabeledSignal.withoutColumns(self, cols)
-        return FeatureSignal(
-            temp_sig.labels,
-            self.classes,
-            temp_sig.data,
-            self.info
-        )
+        return new_classes
     

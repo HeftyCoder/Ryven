@@ -2,6 +2,7 @@
 from collections.abc import Sequence
 from numpy.typing import NDArray
 from numpy import float64
+from numpy import array, str_, ndarray, char
 
 class Timestamped:
     """An object that provides timestamp data"""
@@ -27,10 +28,12 @@ class Timestamped:
 class Labeled:
     """An object that provides label data"""
     
-    def __init__(self, labels: Sequence[str], make_lowercase=False):
+    def __init__(self, labels: Sequence[str] | NDArray, make_lowercase=False):
         self._labels = labels
+        if not isinstance(labels, ndarray):
+            self._labels = array(labels, dtype=str_)
         if make_lowercase:
-            self._labels = [label.lower() for label in labels]
+            self._labels = char.lower(self._labels)
     
     @property
     def labels(self):

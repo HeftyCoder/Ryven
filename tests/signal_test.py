@@ -13,15 +13,15 @@ def run():
     
     assert np.array_equal(
         a.ldm['x1':'x3'].data, 
-        a[:, 1:4]
+        a[:, 1:4].data
     ) # x3 is inclusive
     assert np.array_equal(
         a.ldm['x2'].data, 
-        a[:, 2]
+        a[:, 2].data
     )
     assert np.array_equal(
         a.ldm[['x1', 'x2', 'x4']].data, 
-        a[:, [1, 2, 4]]
+        a[:, [1, 2, 4]].data
     )
 
     # TIMESTAMPS TEST
@@ -31,11 +31,11 @@ def run():
     
     assert np.array_equal(
         a.tdm[0:2].data, 
-        a[0:2]
+        a[0:2].data
     )
     assert np.array_equal(
         a.tdm[4].data, 
-        a[4]
+        a[4].data
     )
     
     # STREAM TEST - MUST BE USED IN LSL
@@ -57,11 +57,11 @@ def run():
     
     assert np.array_equal(
         f1.cdm["george"].data, 
-        f1[0:14]
+        f1[0:14].data
     )
     assert np.array_equal(
         f1.cdm["john"].data, 
-        f1[14:25]
+        f1[14:25].data
     )
     
     # CLASS MERGE TEST
@@ -93,15 +93,16 @@ def run():
     
     # Class remove
     t0 = time.perf_counter()
-    new_sig = f2.withoutRows(slice(0, 15), True)
+    new_sig = f2[5:15]
     t1 = time.perf_counter()
     print(t1-t0)
     assert np.array_equal(
-        f2.cdm['john'].data[5:10],
+        f2.cdm['john'].data[0:5],
         new_sig.cdm['john'].data
     )
     
-    new_sig = f2.withoutRows(slice(15, 23))
+    d_slice = np.r_[0:15, 23:30]
+    new_sig = f2[d_slice]
     assert np.array_equal(
         f2.cdm['dam'].data[3:10],
         new_sig.cdm['dam'].data
@@ -132,10 +133,10 @@ def run():
     
     test_size = 500
     test_array = [i for i in range(0, 10000, 20)]
-    test_slice = slice(50, 50000)
+    test_slice = slice(49500, 50000)
     t1 = time.perf_counter()
     for i in range(test_size):
-        test_sig = new_sig.withoutRows(test_array)
+        test_sig = new_sig[test_array]
     t2 = time.perf_counter()
     print(test_sig.data.shape)
     print(test_sig.classes)
