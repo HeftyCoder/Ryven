@@ -160,7 +160,6 @@ class LSLInputNode(FrameNode):
                 if self.define_buffer: 
                     
                     dtype = lsl_to_np[self.inlet.channel_format]
-                    print(self.inlet.channel_format, dtype)
                     self.buffer = np.zeros(
                             (self.buffer_size * 2, int(self.inlet.channel_count)),
                             dtype=dtype
@@ -226,7 +225,7 @@ class LSLInputNode(FrameNode):
         )
         self.set_output(0, signal)
 
-class LSLOutputNode(FrameNode):
+class LSLOutputNode(Node):
     """An LSL Output Stream. This is an irregular stream."""
     
     title='LSL Output'
@@ -258,7 +257,7 @@ class LSLOutputNode(FrameNode):
         is_time_sig = isinstance(signal, TimeSignal)
         is_label_sig = isinstance(signal, LabeledSignal)
         
-        if not self.stream_info:
+        if not self.stream_out:
             dtype = signal.data.dtype
             chann_count = (
                 len(signal.labels)
@@ -278,14 +277,15 @@ class LSLOutputNode(FrameNode):
                 chann_info = desc.append_child('channels')
                 for label in signal.labels:
                     channel = chann_info.append_child('channel')
-                    channel.append_child('label', label)
+                    channel.append_child_value('label', label)
                     if self.config.type:
-                        channel.append_child('type', self.config.type)
+                        channel.append_child_value('type', self.config.type)
                     if self.config.unit_type:
-                        channel.append_child('unit', self.config.unit_type)
+                        channel.append_child_value('unit', self.config.unit_type)
             
             self.stream_out = StreamOutlet(self.stream_info)
             print(f"Created an outlet with {chann_count} channels")
+        
         
         if is_time_sig:
             self.stream_out.push_chunk(
