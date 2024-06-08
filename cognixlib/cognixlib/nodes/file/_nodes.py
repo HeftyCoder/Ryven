@@ -110,8 +110,15 @@ class XDFWriterNode(Node):
             if 'Marker' in signal.info.signal_type and (signal.info.nominal_srate != IRREGULAR_RATE or signal.info.data_format != cf_string):
                 return 
             
-            self.inlets[inp] = {'stream_name':signal.info.name,'stream_type':signal.info.signal_type,'channel_count':len(signal.labels),\
-                'nominal_srate':signal.info.nominal_srate,'channel_format':self.formats[signal.info.data_format],'time_created':self.start_time,'channels':signal.labels}
+            self.inlets[inp] = {
+                'stream_name':signal.info.name,
+                'stream_type':signal.info.signal_type,
+                'channel_count':len(signal.labels),
+                'nominal_srate':signal.info.nominal_srate,
+                'channel_format':self.formats[signal.info.data_format],
+                'time_created':self.start_time,
+                'channels':signal.labels.tolist() # TODO should this be a list according to XDF and LSL standards?
+            }
             self.timestamps[inp] = []
             self.samples_count[inp] = 0
             self.xdfile.write_header(inp, self.inlets[inp])
@@ -144,6 +151,7 @@ class XDFImportingNode(Node):
     
     class Config(NodeTraitsConfig):
         directory: str = Directory(desc='the saving directory')
+        default_file_name: str = CX_Str("filename")
         varname: str = CX_Str(
             "model", 
             desc="the file name will be extracted from this if there is a string variable"
@@ -160,10 +168,13 @@ class XDFImportingNode(Node):
         
         dir = self.config.directory
         filename = self.var_val_get(self.config.varname) 
+        if not filename or not isinstance(filename, str):
+            self.logger.debug(f"Variable wasn't a string!")
+            filename = self.config.default_file_name
         path_file = None
         
-        if filename and dir and isinstance(filename, str)!=False:
-            path_file = f'{dir}/{filename}.xdf'
+        if filename and dir:
+            path_file = os.path.join(dir, f'{filename}.xdf')
         
         formats = ['double64','float32','int32','string','int16','int8','int64']
         
@@ -175,7 +186,7 @@ class XDFImportingNode(Node):
             streams , header = pyxdf.load_xdf(path_file)
             
             for stream in streams:
-                print(stream)
+                self.logger.debug(f"Found Stream: {stream}")
                 stream_name = stream['info']['name'][0]
                 stream_type = stream['info']['type'][0]
                 stream_channel_count = stream['info']['channel_count'][0]
@@ -186,13 +197,12 @@ class XDFImportingNode(Node):
                 stream_timestamps = stream['time_stamps']
                 
                 stream_channels = stream['info']['channels'][0]
+                self.logger.debug(stream_channels)
                 
                 stream_channels = stream_channels.replace("'", '"')
 
                 stream_channels = json.loads(stream_channels)
 
-                labels = list(stream_channels.keys())
-                
                 info = StreamInfo(
                     name = stream_name,
                     type = stream_type,
@@ -207,7 +217,7 @@ class XDFImportingNode(Node):
                 stream_collection[stream_name] = StreamSignal(
                     timestamps=stream_timestamps,
                     data=stream_data,
-                    labels=labels,
+                    labels=stream_channels,
                     signal_info=stream_info,
                     make_lowercase=self.config.lowercase_labels
                 )
@@ -215,7 +225,7 @@ class XDFImportingNode(Node):
             self.set_output(0, stream_collection)
         
         else:
-            self.logger.error(msg='The path doesnt exist')
+            self.logger.error(msg=f'The path {path_file} doesnt exist')
         
             
     def update_event(self, inp=-1):

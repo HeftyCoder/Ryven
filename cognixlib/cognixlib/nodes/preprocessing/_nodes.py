@@ -408,35 +408,45 @@ class WindowNode(Node):
         # since the extraction algorithm works last to first
         
         step = self.step
+        msg = ''
+        debug = self.config.debug
         for signal in data_inp:
+            if debug:
+                debug_arr: list[StreamSignal] = []
+                msg += f'Signal of duration: {signal.duration}\nBegin:{signal.tms[0]}\nEnd:{signal.tms[-1]}\n\n'
+                
             buffer.reset(signal.data, signal.timestamps)
             time = 0
-            while time <= signal.duration - self.wnd_time + self.config.error_margin:
+            sig_start = signal.tms[0]
+            while time <= (signal.duration - self.wnd_time + self.config.error_margin):
                 
                 seg, tms = buffer.segment(
-                    time + signal.tms[0],  
+                    time + sig_start,  
                     (0, self.wnd_time),
                     self.config.error_margin,
                     self.config.dts_error_scale
                 )
                 
                 if seg is not None:
-                    result.append(
-                        StreamSignal(
-                            tms,
-                            signal.labels,
-                            seg,
-                            signal.info
-                        )
+                    s_sig = StreamSignal(
+                        tms,
+                        signal.labels,
+                        seg,
+                        signal.info
                     )
+                    if debug:
+                        debug_arr.append(s_sig)   
+                    result.append(s_sig)
                 time += step
+            
+            if debug:
+                msg += f'NUMBER OF WINDOWS: {len(debug_arr)}\n\n'
+                for s in debug_arr:
+                    msg += f"WINDOW: [{s.tms[0]}-{s.tms[-1]} : {s.duration}]\n"
+                msg += "\n"
             
         if result:
             if self.config.debug:
-                msg = f'Signal of duration: {signal.duration}\nBegin:{signal.tms[0]}\nEnd:{signal.tms[-1]}\n\n'
-                msg += f'NUMBER OF WINDOWS: {len(result)}\n\n'
-                for s in result:
-                    msg += f"WINDOW: [{s.tms[0]}-{s.tms[-1]} : {s.duration}]\n"
                 self.logger.debug(msg)
             self.set_output(0, result) 
  

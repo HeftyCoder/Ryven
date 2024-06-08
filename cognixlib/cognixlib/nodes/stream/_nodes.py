@@ -248,6 +248,11 @@ class LSLOutputNode(Node):
         self.stream_info: StreamInfo = None
         self.stream_out: StreamOutlet = None
     
+    def stop(self):
+        if self.stream_out:
+            del self.stream_out
+            self.stream_out = None
+    
     def update_event(self, inp=-1):
         
         signal: Signal = self.input(0)
