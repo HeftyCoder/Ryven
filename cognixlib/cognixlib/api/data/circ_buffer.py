@@ -126,7 +126,10 @@ class CircularBuffer:
         
         # exponential moving average
         current_erate = len(timestamps) / (timestamps[-1] - timestamps[0])
-        self.effective_srate = self.effective_srate + 0.65*(current_erate - self.effective_srate)
+        if self.effective_srate == 0:
+            self.effective_srate = current_erate
+        else:
+            self.effective_srate = self.effective_srate + 0.65*(current_erate - self.effective_srate)
          
         if self.current_index + ts_len <= self.size:
             self.timestamps[self.current_index :ts_len + self.current_index] = timestamps

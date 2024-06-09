@@ -22,9 +22,10 @@ import pyxdf
 import json
 
 from collections.abc import Mapping
-from ...api.file.xdf import XDFWriter, creation_of_xdf
 
+from ...api.file.xdf import XDFWriter
 from ...api.data import StreamSignal
+from ...api.data.conversions import get_lsl_format
 from ..stream import LSLSignalInfo
 
 class XDFWriterNode(Node):
@@ -197,18 +198,16 @@ class XDFImportingNode(Node):
                 stream_timestamps = stream['time_stamps']
                 
                 stream_channels = stream['info']['channels'][0]
-                self.logger.debug(stream_channels)
-                
                 stream_channels = stream_channels.replace("'", '"')
-
                 stream_channels = json.loads(stream_channels)
+                self.logger.debug(stream_channels)
 
                 info = StreamInfo(
                     name = stream_name,
                     type = stream_type,
-                    channel_count = stream_channel_count,
+                    channel_count = int(stream_channel_count),
                     nominal_srate = float(stream_srate),
-                    channel_format = stream_format,
+                    channel_format = get_lsl_format(stream_format),
                     source_id = str(stream_id)
                 ) 
                 

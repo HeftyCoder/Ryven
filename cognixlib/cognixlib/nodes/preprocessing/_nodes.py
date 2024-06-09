@@ -43,6 +43,7 @@ class SegmentationNode(Node):
             desc='Whether to use the input to decide buffer size (offline) or manually (online)'
         )
         buffer_duration: float = CX_Float(10.0, desc = 'Duration of the buffer in seconds', visible_when='mode=="buffer"')
+        timestamp_buffer: int = CX_Int(1000, desc = 'Maximum amount of timestamps that can be processed')
         debug: bool = Bool(False, desc='debug message when data is segmented')
 
     init_inputs = [
@@ -68,7 +69,7 @@ class SegmentationNode(Node):
             0: self.update_data,
             1: self.update_marker
         }
-        self.marker_tm_cache = np.full(shape=1000,fill_value=np.nan,dtype='float64')
+        self.marker_tm_cache = np.full(shape=self.config.timestamp_buffer, fill_value=np.nan,dtype='float64')
         self.current_length = 0
              
     @property
@@ -92,13 +93,13 @@ class SegmentationNode(Node):
                 self.config.offset
             )
             
-            if isinstance(segment, np.ndarray):
+            if segment is not None:
                 output_timestamps.append(timestamps)
                 output_data.append(segment)
                 timestamps_out += 1
                 self.marker_tm_cache[i] = np.nan
         
-        if timestamps_out!=0:
+        if timestamps_out != 0:
             signal = [
                 StreamSignal(
                     output_timestamps[i],
@@ -134,21 +135,25 @@ class SegmentationNode(Node):
             return False
         
         # create buffer if it doesn't exist
-        if not self.buffer:
-            
-            buffer_duration = self.config.buffer_duration
-            if self.config.mode == 'input':
-                tms = self.data_signal.timestamps
-                buffer_duration = tms[-1] - tms[0] + 0.1
+        if self.config.mode == 'input':
+            self.buffer = CircularBuffer.create(
+                    self.data_signal.data,
+                    self.data_signal.timestamps,
+                )
+        else:    
+            if not self.buffer:
                 
-            self.buffer = CircularBuffer(
-                sampling_frequency=self.data_signal.info.nominal_srate,
-                buffer_duration=buffer_duration,
-                start_time=self.data_signal.timestamps[0],
-                channels_count=len(self.data_signal.labels)
-            )
+                buffer_duration = self.config.buffer_duration    
+                self.buffer = CircularBuffer(
+                    sampling_frequency=self.data_signal.info.nominal_srate,
+                    buffer_duration=buffer_duration,
+                    start_time=self.data_signal.timestamps[0],
+                    channels_count=len(self.data_signal.labels)
+                )
         
-        self.buffer.append(self.data_signal.data, self.data_signal.timestamps)
+            self.buffer.append(self.data_signal.data, self.data_signal.timestamps)
+        
+        print(self.buffer.effective_srate)
         return True
 
     def update_marker(self, inp: int):
@@ -177,9 +182,7 @@ class SegmentationNode(Node):
         if len(timestamps) == 0:
             return False
         
-        self.last_timestamps = timestamps
-        
-        self.marker_tm_cache[self.current_length : self.current_length + len(timestamps)] = timestamps
+        self.marker_tm_cache[self.current_length:self.current_length + len(timestamps)] = timestamps
         self.current_length += len(timestamps)
         self.marker_tm_cache[0:self.current_length].sort()
         return True
