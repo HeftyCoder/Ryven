@@ -624,18 +624,14 @@ class FIRFilterNode(Node):
         else:
             self.set_output(0, list_of_filtered_sigs)
     
-          
 class IIRFilterNode(Node):
     title = 'IIR Filter'
     version = '0.1'
     
     class Config(NodeTraitsConfig):
-        f_pass: float = CX_Float(desc='the low frequency of the filter')
-        f_stop: float = CX_Float(desc='the high frequency of the fitler')
+        l_freq: float = CX_Float(desc='the low frequency of the filter')
+        h_freq: float = CX_Float(desc='the high frequency of the fitler')
         phase:str = Enum('zero','zero-double','forward',desc='the phase of the filter')
-        btype: str = Enum('bandpass','lowpass','highpass','bandstop',desc='the type of filter')
-        order: int = CX_Int(desc='the order of the filter')
-        ftype: str = Enum('butter','cheby1','cheby2','ellip','bessel')
         
     init_inputs = [PortConfig(label='data',allowed_data=StreamSignal | Sequence[StreamSignal])]
     init_outputs = [PortConfig(label='filtered data',allowed_data=StreamSignal | Sequence[StreamSignal])]
@@ -645,10 +641,7 @@ class IIRFilterNode(Node):
         return self._config
     
     def init(self):
-        self.params = dict(
-            order = self.config.order,
-            ftype = self.config.ftype
-        )
+        pass
                 
     def update_event(self, inp=-1):
         
@@ -665,40 +658,24 @@ class IIRFilterNode(Node):
             
             filtered_signal:StreamSignal = sig.copy()
             
-            iir_params_dict = mne.filter.construct_iir_filter(
-                iir_params = self.params,
-                f_pass = self.config.f_pass,
-                f_stop =  self.config.f_stop,
-                sfreq = sig.info.nominal_srate,
-                btype = self.config.btype,      
-            )
-            
             filtered_data = mne.filter.filter_data(
                 data = sig.data,
                 sfreq = sig.info.nominal_srate,
-                method = 'iir',
-                iir_params = iir_params_dict
+                l_freq = self.config.l_freq,
+                h_freq = self.config.h_freq,
+                phase = self.config.phase,
+                method = 'iir'
                 )
-
-            print(filtered_data,sig.data)
             
             filtered_signal._data = filtered_data
             
-            print(filtered_signal._data,sig.data)
-            
             list_of_filtered_sigs.append(filtered_signal)
             
-        # filtered_signal = LabeledSignal(
-        #     signal.labels,
-        #     filtered_data,
-        #     signal.info    
-        # )
         if len(list_of_filtered_sigs) == 1:
             self.set_output(0, list_of_filtered_sigs[0])
         else:
             self.set_output(0, list_of_filtered_sigs)
-            
-            
+                    
 class NotchFilterNode(Node):
     title = 'Notch Filter'
     version = '0.1'
@@ -715,18 +692,22 @@ class NotchFilterNode(Node):
         fir_design: str = Enum('firwin','firwin2')
 
         
-    init_inputs = [PortConfig(label='data',allowed_data=StreamSignal)]
-    init_outputs = [PortConfig(label='filtered data',allowed_data=LabeledSignal)]
+    init_inputs = [PortConfig(label='data',allowed_data=StreamSignal | Sequence[StreamSignal])]
+    init_outputs = [PortConfig(label='filtered data',allowed_data=LabeledSignal | Sequence[StreamSignal])]
     
     @property
     def config(self) -> NotchFilterNode.Config:
         return self._config
     
     def init(self):
+
+        print("PRINT",self.config.filter_length_sec,self.config.filter_length_samples)
         self.line_freq = self.config.freqs
         self.filter_length_input = self.config.filter_length_sec if self.config.filter_length_sec else self.config.filter_length_samples
+        print("WHAT",self.filter_length_input)
         if not self.filter_length_input:
             self.filter_length_input = 'auto'
+        print("WHAT",self.filter_length_input)
         self.method = self.config.method
         self.bandwidth = self.config.mt_bandwidth if self.config.mt_bandwidth else None
         self.p_value = self.config.p_value
@@ -739,30 +720,38 @@ class NotchFilterNode(Node):
         if not signal:
             return 
         
-        sampling_freq = signal.info.nominal_srate
+        if not isinstance(signal,list):
+            signal = [signal]
+
+        list_of_filtered_sigs:Sequence = []
+        for sig in signal:
+
+            filtered_signal:StreamSignal = sig.copy()
+
+            sampling_freq = sig.info.nominal_srate   
+            freqs = np.arange(self.line_freq,sampling_freq/2,self.line_freq) 
         
-        freqs = np.arange(self.line_freq,sampling_freq/2,self.line_freq)
-        
-        filtered_data = mne.filter.notch_filter(
-            x = signal.data,
-            Fs = sampling_freq,
-            freqs = freqs,
-            filter_length = self.filter_length_input,
-            method = self.method,
-            mt_bandwidth= self.bandwidth,
-            p_value=self.p_value,
-            n_jobs=-1,
-            phase = self.phase,
-            fir_window = self.fir_window,
-            fir_design= self.fir_design
-        )
-        
-        filtered_signal = LabeledSignal(
-            signal.labels,
-            filtered_data, 
-            signal.info
-        )
-        self.set_output(0, filtered_signal)
+            filtered_data = mne.filter.notch_filter(
+                x = sig.data,
+                Fs = sampling_freq,
+                freqs = freqs,
+                filter_length = self.filter_length_input,
+                method = self.method,
+                mt_bandwidth= self.bandwidth,
+                p_value=self.p_value,
+                n_jobs=-1,
+                phase = self.phase,
+                fir_window = self.fir_window,
+                fir_design= self.fir_design
+            )
+
+            filtered_signal._data = filtered_data
+            list_of_filtered_sigs.append(filtered_signal)
+
+        if len(list_of_filtered_sigs) == 1:
+            self.set_output(0, list_of_filtered_sigs[0])
+        else:
+            self.set_output(0, list_of_filtered_sigs)
 
 # TODO CHECK CODE FROM HERE
 
@@ -775,8 +764,8 @@ class ResamplingNode(Node):
         downsample_factor:float = CX_Float(1.0,desc='factor to downsample by')
         method:str = Enum('fft','polyphase',desc='resampling method to use')
 
-    init_inputs = [PortConfig(label='data',allowed_data=Signal)]
-    init_outputs = [PortConfig(label='filtered data',allowed_data=Signal)]
+    init_inputs = [PortConfig(label='data',allowed_data=StreamSignal | Sequence[StreamSignal])]
+    init_outputs = [PortConfig(label='filtered data',allowed_data=StreamSignal | Sequence[StreamSignal])]
     
     @property
     def config(self) -> ResamplingNode.Config:
@@ -788,20 +777,40 @@ class ResamplingNode(Node):
         self.method = self.config.method
         
     def update_event(self,inp=-1):
-        signal: Signal = self.input(inp)
+        signal: StreamSignal = self.input(inp)
         if not signal: 
             return
             
-        resampled_data = mne.filter.resample(
-            x = signal.data,
-            up = self.upsample_factor,
-            down = self.downsample_factor,
-            n_jobs=-1,
-            method = self.method
-        )
+        if not isinstance(signal,list):
+            signal = [signal]
         
-        resampled_signal = Signal(resampled_data, None)
-        self.set_output(0,resampled_signal)
+        
+        list_of_resampled_sigs:Sequence = []
+        for sig in signal:
+            
+            resampled_signal:StreamSignal = sig.copy()
+
+            resampled_data = mne.filter.resample(
+                x = sig.data,
+                up = self.upsample_factor,
+                down = self.downsample_factor,
+                n_jobs=-1,
+                method = self.method
+            )
+
+            print(resampled_signal.timestamps)
+
+            resampled_signal._data = resampled_data
+            resampled_signal._timestamps = np.linspace(resampled_signal.timestamps[0],resampled_signal.timestamps[-1],resampled_data.shape[1])
+            
+            print(resampled_signal.timestamps)
+
+            list_of_resampled_sigs.append(resampled_signal)
+            
+        if len(list_of_resampled_sigs) == 1:
+            self.set_output(0, list_of_resampled_sigs[0])
+        else:
+            self.set_output(0, list_of_resampled_sigs)
           
 class RemoveTrendNode(Node):
     title = 'Remove Trend from EEG'
@@ -811,8 +820,8 @@ class RemoveTrendNode(Node):
         detrendType: str = Enum('high pass','high pass sinc','local detrend',desc='type of detrending to be performed')
         detrendCutoff:float = CX_Float(1.0,desc='the high-pass cutoff frequency to use for detrending (in Hz)')
         
-    init_inputs = [PortConfig(label='data',allowed_data=StreamSignal)]
-    init_outputs = [PortConfig(label='filtered data',allowed_data=Signal)]
+    init_inputs = [PortConfig(label='data',allowed_data=StreamSignal | Sequence[StreamSignal])]
+    init_outputs = [PortConfig(label='filtered data',allowed_data=StreamSignal | Sequence[StreamSignal])]
     
     @property
     def config(self) -> RemoveTrendNode.Config:
@@ -827,17 +836,30 @@ class RemoveTrendNode(Node):
         if not signal:
             return 
         
-        sampling_freq = signal.info.nominal_srate
-                
-        filtered_data = remove_trend_data(
-            data = signal.data,
-            sample_rate=sampling_freq,
-            detrendType=self.detrend_type,
-            detrendCutoff=self.detrend_cutoff
-        )
+        if not isinstance(signal,list):
+            signal = [signal]
         
-        filtered_signal = Signal(filtered_data, None)
-        self.set_output(0, filtered_signal)
+        list_of_filtered_sigs:Sequence = []
+        for sig in signal:
+
+            filtered_signal = sig.copy()
+
+            sampling_freq = sig.info.nominal_srate
+                    
+            filtered_data = remove_trend_data(
+                data = sig.data,
+                sample_rate=sampling_freq,
+                detrendType=self.detrend_type,
+                detrendCutoff=self.detrend_cutoff
+            )
+
+            filtered_signal._data = filtered_data
+            list_of_filtered_sigs.append(filtered_signal)
+            
+        if len(list_of_filtered_sigs) == 1:
+            self.set_output(0, list_of_filtered_sigs[0])
+        else:
+            self.set_output(0, list_of_filtered_sigs)
     
 class SignalToMNENode(Node):
     title = 'Data to MNE'
@@ -846,8 +868,8 @@ class SignalToMNENode(Node):
     class Config(NodeTraitsConfig):
         montage:str = Enum('biosemi32','biosemi16','biosemi64','standard_1005','standard_1020') 
         
-    init_inputs = [PortConfig(label='data',allowed_data=Signal)]
-    init_outputs = [PortConfig(label='MNE',allowed_data=Signal)]
+    init_inputs = [PortConfig(label='data',allowed_data=StreamSignal | Sequence[StreamSignal])]
+    init_outputs = [PortConfig(label='MNE',allowed_data=mne.io.array.array.RawArray | Sequence[mne.io.array.array.RawArray])]
     
     @property
     def config(self) -> SignalToMNENode.Config:
@@ -857,42 +879,107 @@ class SignalToMNENode(Node):
         self.montage = self.config.montage
         
     def update_event(self,inp=-1):
-        signal: Signal = self.input(inp)
-        if signal: 
+        signal: StreamSignal | Sequence[StreamSignal] = self.input(inp)
+
+        if not signal:
+            return
+        
+        if not isinstance(signal,list):
+            signal = [signal]
+
+        list_of_signals: Sequence = []
+        for sig in signal:
+
             info = mne.create_info(
-                ch_names = list(signal.info.channels.values()),
-                sfreq = signal.info.nominal_srate,
+                ch_names = sig.labels,
+                sfreq = sig.info.nominal_srate,
                 ch_types = 'eeg'
             )
             
             raw_mne = mne.io.RawArray(
-                data = signal.data,
+                data = sig.data,
                 info = info
             )
+
+            print(raw_mne,type(raw_mne))
             
             montage = mne.channels.make_standard_montage(self.config.montage)
-            raw_mne.set_montage(montage)
             
-            self.set_output(0,raw_mne)
+            if self.config.montage == "biosemi32":
+                missing_channels =  ['Af3', 'Fc1', 'Fc5', 'Cp1', 'Cp5', 'Po3', 'Po4', 'Cp6', 'Cp2', 'Fc6', 'Fc2', 'Af4']
+                for x in range(len(missing_channels)):
+                    for j in range(len(montage.ch_names)):
+                        if len(montage.ch_names[j]) == 3 and montage.ch_names[j].lower().capitalize() == missing_channels[x]:
+                            montage.ch_names[j] = missing_channels[x]
+
+            raw_mne.set_montage(montage)
+            list_of_signals.append(raw_mne)
+        
+        if len(list_of_signals) == 1:
+            self.set_output(0,list_of_signals[0])            
+        else:
+            self.set_output(0,list_of_signals)
 
 class MNEToSignalNode(Node):
     title = 'MNE to Signal'
     version = '0.1'
+
+    class Config(NodeTraitsConfig):
+        stream_name:str = CX_Str('Data Marker',desc='name of the stream')
+        stream_type:str = CX_Str('Data',desc='type of stream')
+
+    init_inputs = [PortConfig(label='MNE data',allowed_data=mne.io.array.array.RawArray | Sequence[mne.io.array.array.RawArray])]
+    init_outputs = [PortConfig(label='data',allowed_data=StreamSignal | Sequence[StreamSignal])]
     
-    init_inputs = [PortConfig(label='MNE data',allowed_data=mne.io.Raw)]
-    init_outputs = [PortConfig(label='data',allowed_data=Signal)]
-    
+    def init(self):
+        pass
+
+    @property
+    def config(self) -> MNEToSignalNode.Config:
+        return self._config
+
     def update_event(self,inp=-1):
-        raw: mne.io.Raw = self.input(inp).load_data()
-        if raw: 
-            
+        raws: mne.io.array.array.RawArray = self.input(inp).load_data()
+        if not raws:
+            return 
+
+        if not isinstance(raws,list):
+            raws = [raws]
+
+        streamsignal_list = []
+        for raw in raws:
             data = raw.get_data()
             sfreq = raw.info['sfreq']
             channels = raw.info['ch_names']
             channel_dict = {i:channels[i] for i in range(len(channels))}
-            
-        
-            self.set_output(0,data)
+
+            info = StreamInfo(
+                name = self.config.stream_name,
+                type = self.config.stream_type,
+                channel_count = len(channels),
+                nominal_srate = sfreq,
+                channel_format = 'float32',
+                source_id = str(1)
+            )
+
+            stream_info = LSLSignalInfo(info)
+
+            signal = StreamSignal(
+                timestamps = np.linspace(0.0,data.shape[1] * (1/sfreq),data.shape[1]),
+                data = data,
+                labels = channels,
+                signal_info = stream_info,
+                make_lowercase = False
+            )
+
+            streamsignal_list.append(signal)
+
+            print(data,signal.data,signal.timestamps)
+
+        if len(streamsignal_list) == 1:
+            self.set_output(0, streamsignal_list[0])
+        else:
+            self.set_output(0, streamsignal_list)
 
 class RemovalLineNoisePrepNode(Node):
     title = 'Line Noise Removal PREP'
@@ -901,27 +988,41 @@ class RemovalLineNoisePrepNode(Node):
     class Config(NodeTraitsConfig):
         line_freq:float = CX_Float(50.0,desc='line noise frequency')
                 
-    init_inputs = [PortConfig(label='data',allowed_data=mne.io.Raw)]
-    init_outputs = [PortConfig(label='filtered_data',allowed_data=mne.io.Raw)]
+    init_inputs = [PortConfig(label='data',allowed_data=mne.io.array.array.RawArray | Sequence[mne.io.array.array.RawArray])]
+    init_outputs = [PortConfig(label='filtered_data',allowed_data=mne.io.array.array.RawArray | Sequence[mne.io.array.array.RawArray])]
     
     @property
     def config(self) -> RemovalLineNoisePrepNode.Config:
         return self._config
     
-    def start(self):
+    def init(self):
         self.line_freq = self.config.line_freq
         
     def update_event(self,inp=-1):
-        signal: mne.io.Raw = self.input(inp).load_data()
-        if signal: 
-            
-            filtered_data = line_noise_removal_prep(
-                raw_eeg = signal,
-                sfreq = signal.info['sfreq'],
-                linenoise = np.arange(self.line_freq,signal.info['sfreq']/2,self.line_freq)
+        signal: mne.io.array.array.RawArray = self.input(inp)
+        if not signal:
+            return 
+        
+        if not isinstance(signal,list):
+            signal = [signal]
+
+        list_of_filtered_sigs:Sequence = []
+        for sig in signal:
+
+            raw_sig = sig.load_data()
+         
+            filtered_sig = line_noise_removal_prep(
+                raw_eeg = raw_sig,
+                sfreq = raw_sig.info['sfreq'],
+                linenoise = np.arange(self.line_freq,raw_sig.info['sfreq']/2,self.line_freq)
             )
             
-            self.set_output(0,filtered_data)
+            list_of_filtered_sigs.append(filtered_sig)
+        
+        if len(list_of_filtered_sigs) == 1:
+            self.set_output(0, list_of_filtered_sigs[0])
+        else:
+            self.set_output(0, list_of_filtered_sigs)
 
 class ReferencingPrepNode(Node):
     title = 'Referencing EEG Prep'
@@ -935,14 +1036,14 @@ class ReferencingPrepNode(Node):
         ransac:bool = Bool()
         channel_wise:bool = Bool()
     
-    init_inputs = [PortConfig(label = 'data', allowed_data= mne.io.Raw)]
-    init_outputs = [PortConfig(label = 'referenced data',allowed_data = mne.io.Raw)]
+    init_inputs = [PortConfig(label = 'data', allowed_data= mne.io.array.array.RawArray | Sequence[mne.io.array.array.RawArray])]
+    init_outputs = [PortConfig(label = 'referenced data',allowed_data = mne.io.array.array.RawArray | Sequence[mne.io.array.array.RawArray])]
     
     @property
     def config(self) -> ReferencingPrepNode.Config:
         return self._config
     
-    def start(self):
+    def init(self):
         self.ref_chs = self.config.ref_chs
         self.reref_chs = self.config.reref_chs
         self.line_freqs = self.config.line_freqs
@@ -951,39 +1052,72 @@ class ReferencingPrepNode(Node):
         self.channel_wise = self.config.channel_wise
 
     def update_event(self,inp=-1):
-        signal: mne.io.Raw = self.input(inp).load_data()
-        if signal: 
+        signal: mne.io.array.array.RawArray = self.input(inp)
+
+        if not signal:
+            return 
+        
+        if not isinstance(signal,list):
+            signal = [signal]
+
+        list_of_referenced_sigs:Sequence = []
+        for sig in signal:
+
+            raw_sig = sig.load_data() 
             
-            sfreq = signal.info['sfreq']
+            sfreq = raw_sig.info['sfreq']
             
-            self.line_freqs = np.arange(self.line_freqs, sfreq/2, self.line_freqs)
+            self.line_freqs_list = np.arange(self.line_freqs, sfreq/2, self.line_freqs)
+            print(self.line_freqs_list)
             
             referenced_eeg = referencing_prep(
-                raw_eeg = signal,
+                raw_eeg = raw_sig,
                 ref_chs = self.ref_chs,
                 reref_chs = self.reref_chs,
-                line_freqs = self.line_freqs,
+                line_freqs = self.line_freqs_list,
                 max_iterations = self.max_iterations,
                 ransac = self.ransac,
                 channel_wise = self.channel_wise
             )
+
+            list_of_referenced_sigs.append(referenced_eeg)
             
-            self.set_output(0,referenced_eeg)
+        if len(list_of_referenced_sigs) == 1:
+            self.set_output(0, list_of_referenced_sigs[0])
+        else:
+            self.set_output(0, list_of_referenced_sigs)
 
 class NoisyChannelPrepNode(Node):
     title = 'Noisy Channels Prep'
     version = '0.1'
     
-    init_inputs = [PortConfig(label = 'data', allowed_data= mne.io.Raw)]
-    init_outputs = [PortConfig(label = 'noisy channel detected data',allowed_data = mne.io.Raw)]
+    init_inputs = [PortConfig(label = 'data', allowed_data= mne.io.array.array.RawArray | Sequence[mne.io.array.array.RawArray])]
+    init_outputs = [PortConfig(label = 'noisy channel detected data',allowed_data = mne.io.array.array.RawArray | Sequence[mne.io.array.array.RawArray])]
 
     def update_event(self,inp=-1):
-        signal: mne.io.Raw = self.input(inp).load_data()
-        if signal: 
+        signal: mne.io.array.array.RawArray = self.input(inp).load_data()
+        
+        if not signal:
+            return 
+        
+        if not isinstance(signal,list):
+            signal = [signal]
+
+        list_of_sigs = []
+        for sig in signal:
+
+            raw = sig.load_data()
+                       
+            new_eeg = noisychannelsprep(raw)
+
+            print("NEW DATA",new_eeg)
             
-            new_eeg = noisychannelsprep(signal)
-            
-            self.set_output(0,new_eeg)
+            list_of_sigs.append(new_eeg)
+        
+        if len(list_of_sigs) == 1:
+            self.set_output(0, list_of_sigs[0])
+        else:
+            self.set_output(0, list_of_sigs)
 
 class InterpolateEEGNode(Node):
     title = 'Interpolate bad channels MNE'
@@ -993,24 +1127,40 @@ class InterpolateEEGNode(Node):
         reset_bads:bool = Bool()
         mode:str = Enum('accurate','fast')
     
-    init_inputs = [PortConfig(label = 'data', allowed_data= mne.io.Raw)]
-    init_outputs = [PortConfig(label = 'interpolated data',allowed_data = mne.io.Raw)]
+    init_inputs = [PortConfig(label = 'data', allowed_data= mne.io.array.array.RawArray | Sequence[mne.io.array.array.RawArray])]
+    init_outputs = [PortConfig(label = 'interpolated data',allowed_data = mne.io.array.array.RawArray | Sequence[mne.io.array.array.RawArray])]
 
     @property
     def config(self) -> InterpolateEEGNode.Config:
         return self._config
 
     def update_event(self,inp=-1):
-        signal: mne.io.Raw = self.input(inp).load_data()
-        if signal: 
+        signal: mne.io.array.array.RawArray = self.input(inp)
+
+        if not signal:
+            return 
+        
+        if not isinstance(signal,list):
+            signal = [signal]
+
+        list_of_sigs = []
+        for sig in signal:
             
-            new_eeg = signal.copy().interpolate_bads(
+            raw = sig.load_data()
+
+            new_eeg = raw.copy().interpolate_bads(
                 reset_bads = self.config.reset_bads,
                 mode = self.config.mode
             )
+
+            print("NEW DATA",new_eeg)
             
-            self.set_output(0,new_eeg) 
- 
+            list_of_sigs.append(new_eeg)
+        
+        if len(list_of_sigs) == 1:
+            self.set_output(0, list_of_sigs[0])
+        else:
+            self.set_output(0, list_of_sigs)
  
 class RepairArtifactsICANode(Node):
     title = 'Repair Artifacts with ICA'
@@ -1018,22 +1168,32 @@ class RepairArtifactsICANode(Node):
     
     class Config(NodeTraitsConfig):
         n_components:int = CX_Int()
-        mode:str = Enum('fastica','infomax','picard')
+        method:str = Enum('fastica','infomax','picard')
     
-    init_inputs = [PortConfig(label = 'data', allowed_data= mne.io.Raw)]
-    init_outputs = [PortConfig(label = 'cleaned data',allowed_data = mne.io.Raw)]
+    init_inputs = [PortConfig(label = 'data', allowed_data= mne.io.array.array.RawArray | Sequence[mne.io.array.array.RawArray])]
+    init_outputs = [PortConfig(label = 'cleaned data',allowed_data = mne.io.array.array.RawArray | Sequence[mne.io.array.array.RawArray])]
 
     @property
     def config(self) -> RepairArtifactsICANode.Config:
         return self._config
     
-    def start(self):
+    def init(self):
         self.n_components = self.config.n_components if self.config.n_components else None
         self.method = self.config.method
 
     def update_event(self,inp=-1):
-        signal: mne.io.Raw = self.input(inp).load_data()
-        if signal: 
+        signal: mne.io.array.array.RawArray = self.input(inp).load_data()
+
+        if not signal:
+            return 
+        
+        if not isinstance(signal,list):
+            signal = [signal]
+
+        list_of_sigs = []
+        for sig in signal:
+
+            raw = sig.load_data()
             
             ica = mne.preprocessing.ICA(
                 n_components=self.n_components,
@@ -1042,31 +1202,56 @@ class RepairArtifactsICANode(Node):
                 random_state=42
             )
             
-            ica.fit(signal)
-            ic_labels = label_components(signal,ica,method='iclabel')
+            ica.fit(raw)
+            ic_labels = label_components(raw,ica,method='iclabel')
             
             labels = ic_labels['labels']
             
             exclude_idx = [idx for idx,label in enumerate(labels) if label not in ['brain','other']]
             
             cleaned_signal = ica.apply(signal,exclude=exclude_idx)
-            self.set_output(0,cleaned_signal) 
+
+            print("NEW DATA",cleaned_signal)
+            
+            list_of_sigs.append(cleaned_signal)
+
+        if len(list_of_sigs) == 1:
+            self.set_output(0, list_of_sigs[0])
+        else:
+            self.set_output(0, list_of_sigs)
             
 class AverageReferenceNode(Node):
     title = 'Average Rereference on EEG'
     version = '0.1'
     
-    init_inputs = [PortConfig(label = 'data', allowed_data= mne.io.Raw)]
-    init_outputs = [PortConfig(label = 'rereferenced data',allowed_data = mne.io.Raw)]
+    init_inputs = [PortConfig(label = 'data', allowed_data=mne.io.array.array.RawArray | Sequence[mne.io.array.array.RawArray])]
+    init_outputs = [PortConfig(label = 'rereferenced data',allowed_data =mne.io.array.array.RawArray | Sequence[mne.io.array.array.RawArray])]
 
     def update_event(self,inp=-1):
-        signal: mne.io.Raw = self.input(inp).load_data()
-        if signal: 
+        signal: mne.io.array.array.RawArray = self.input(inp)
+
+        if not signal:
+            return 
+        
+        if not isinstance(signal,list):
+            signal = [signal]
+
+        list_of_sigs = []
+        for sig in signal:
+
+            raw = sig.load_data()
             
             rereferenced_data = mne.set_eeg_reference(
-                signal,
+                raw,
                 ref_channels = 'average',
                 copy=True
             )
             
-            self.set_output(0,rereferenced_data) 
+            print("NEW DATA",rereferenced_data)
+
+            list_of_sigs.append(rereferenced_data[0])
+
+        if len(list_of_sigs) == 1:
+            self.set_output(0, list_of_sigs[0])
+        else:
+            self.set_output(0, list_of_sigs)

@@ -330,10 +330,11 @@ class PSDMultitaperNode(Node):
         fmax: float = CX_Float(desc='the upper-bound on frequencies of interest')
         bandwidth: float = CX_Float(desc='the frequency bandwidth of the multi-taper window funciton in Hz')
         normalization: str = Enum('full','length',desc='normalization strategy')
-        output = str = Enum('power','complex')
+        output : str = Enum('power','complex')
+        class_: str = CX_Str('class name',desc='class name')
 
-    init_inputs = [PortConfig(label='data',allowed_data=Signal)]
-    init_outputs = [PortConfig(label='psds'),PortConfig(label='freqs')]
+    init_inputs = [PortConfig(label='data',allowed_data=Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal])]
+    init_outputs = [PortConfig(label='features',allowed_data = FeatureSignal | Sequence[FeatureSignal])]
 
     @property
     def config(self) -> PSDMultitaperNode.Config:
@@ -353,13 +354,20 @@ class PSDMultitaperNode(Node):
         self.output = self.config.output
 
     def update_event(self, inp=-1):
-        signal:Signal =self.input_payload(inp)
-        if signal:
-            features = signal.copy()
+        signal:Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal] = self.input(inp)
 
-            psds,freqs,_ = mne.time_frequency.psd_array_multitaper(
-                x = signal.data,
-                sfreq = signal.info.nominal_srate,
+        if not signal:
+            return
+        
+        if not isinstance(signal,Sequence):
+            signal = [signal]
+        
+        list_of_features = []
+        for sig in signal:
+
+            results = mne.time_frequency.psd_array_multitaper(
+                x = sig.data,
+                sfreq = sig.info.nominal_srate,
                 fmin = self.fmin,
                 fmax = self.fmax,
                 bandwidth= self.bandwidth,
@@ -368,13 +376,26 @@ class PSDMultitaperNode(Node):
                 n_jobs= -1
             )
 
-            self.set_output(0,psds)
-            self.set_output(1,freqs)
+            labels = [f'feature_{freq}_Hz' for freq in results[1]]
 
+            signal_features = FeatureSignal(
+                labels=labels,
+                class_dict = {f'{self.config.class_}':(0,results[0].shape[0])},
+                data = results[0],
+                signal_info = sig.info
+            )
 
+            list_of_features.append(signal_features)
 
+        print(list_of_features)
+        
+        if len(list_of_features) == 1:
+            self.set_output(0, list_of_features[0])
+        else:
+            self.set_output(0, list_of_features)
+        
 class PSDWelchNode(Node):
-    title = 'Power Spectral Density with Multitaper'
+    title = 'Power Spectral Density with Welch'
     version = '0.1'
 
 
@@ -385,10 +406,11 @@ class PSDWelchNode(Node):
         n_overlap: int = CX_Int(0, desc='the number of points of overlap between segments')
         n_per_seg: int = CX_Int(desc='length of each Welch segment')
         average: str = Enum('mean','median','none',desc='how to average the segments')
-        output = str = Enum('power','complex')
+        output: str = Enum('power','complex')
+        class_: str = CX_Str('class name',desc='class name')
 
-    init_inputs = [PortConfig(label='data',allowed_data=Signal)]
-    init_outputs = [PortConfig(label='psds'),PortConfig(label='freqs')]
+    init_inputs = [PortConfig(label='data',allowed_data=Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal])]
+    init_outputs = [PortConfig(label='features',allowed_data = FeatureSignal | Sequence[FeatureSignal])]
 
     @property
     def config(self) -> PSDWelchNode.Config:
@@ -412,13 +434,20 @@ class PSDWelchNode(Node):
         self.output = self.config.output
 
     def update_event(self, inp=-1):
-        signal:Signal =self.input_payload(inp)
-        if signal:
-            features = signal.copy()
+        signal:Signal =self.input(inp)
 
-            psds,freqs,_ = mne.time_frequency.psd_array_welch(
-                x = signal.data,
-                sfreq = signal.info.nominal_srate,
+        if not signal:
+            return
+        
+        if not isinstance(signal,Sequence):
+            signal = [signal]
+        
+        list_of_features = []
+        for sig in signal:
+
+            results = mne.time_frequency.psd_array_welch(
+                x = sig.data,
+                sfreq = sig.info.nominal_srate,
                 fmin = self.fmin,
                 fmax = self.fmax,
                 n_fft= self.n_fft,
@@ -429,10 +458,21 @@ class PSDWelchNode(Node):
                 window = 'hamming'
             )
 
-            self.set_output(0,psds)
-            self.set_output(1,freqs)
+            labels = [f'feature_{freq}_Hz' for freq in results[1]]
 
+            signal_features = FeatureSignal(
+                labels=labels,
+                class_dict = {f'{self.config.class_}':(0,results[0].shape[0])},
+                data = results[0],
+                signal_info = sig.info
+            )
 
+            list_of_features.append(signal_features)
+        
+        if len(list_of_features) == 1:
+            self.set_output(0, list_of_features[0])
+        else:
+            self.set_output(0, list_of_features)
 
 class MorletTFNode(Node):
     title = 'Time-Frequency Representetion Morlet'
@@ -442,10 +482,14 @@ class MorletTFNode(Node):
         n_cycles: int = CX_Int(7,desc='number of cycles in the wavelet')
         zero_mean: bool = Bool()
         use_fft: bool = Bool()
-        output = str = Enum('complex','power','phase','avg_power','itc','avg_power_itc')
+        output: str = Enum('complex','power','phase','avg_power','itc','avg_power_itc')
+        f_min: float = CX_Float(0.0,desc='minimum frequency')
+        f_max: float = CX_Float(0.0,desc='maximum frequency')
+        f_splits: int = CX_Int(desc='number of splits')
+        class_: str = CX_String('class name',desc='class name')
 
-    init_inputs = [PortConfig(label='data',allowed_data=Signal),PortConfig(label='freqs')]
-    init_outputs = [PortConfig(label='out')]
+    init_inputs = [PortConfig(label='data',allowed_data=Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal])]
+    init_outputs = [PortConfig(label='out',allowed_data = FeatureSignal | Sequence[FeatureSignal])]
 
     @property
     def config(self) -> MorletTFNode.Config:
@@ -456,16 +500,30 @@ class MorletTFNode(Node):
         self.zero_mean = self.config.zero_mean
         self.use_fft = self.config.use_fft
         self.output = self.config.output
+        self.fmin = self.config.f_min
+        self.fmax = self.config.f_max if self.config.f_max else 0.0
+        self.fplits = self.config.f_splits if self.config.f_splits else 0
 
     def update_event(self, inp=-1):
-        if inp == 0: signal:Signal =self.input_payload(inp)
-        if inp == 1: freqs = self.input_payload(inp)
-        if signal and freqs:
-            features = signal.copy()
+        signal:Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal] = self.input(inp)
+
+        if not signal:
+            return
+        
+        if not isinstance(signal,Sequence):
+            signal = [signal]
+        
+        list_of_features = []
+        for sig in signal:
+
+            if self.fmax == 0.0: self.fmax = sig.info.nominal_srate
+            if self.fplits == 0: self.fplits = int((self.fmax - self.fmin)/5)
+
+            freqs = np.linspace(self.fmix,self.fmax,self.fplits)
 
             out = mne.time_frequency.tfr_array_morlet(
-                data = signal.data,
-                sfreq = signal.info.nominal_srate,
+                data = sig.data,
+                sfreq = sig.info.nominal_srate,
                 freqs = freqs,
                 n_cycles = self.n_cycles,
                 zero_mean = self.zero_mean,
@@ -473,14 +531,30 @@ class MorletTFNode(Node):
                 output = self.output
             )
 
-            self.set_output(0,out)
+            if self.output in ['complex', 'phase', 'power']:
+                out_reshaped = out.reshape(out.shape[0],out.shape[1] * out.shape[2] * out.shape[3])
+                labels = [f'feature_channel_{chan}_{freq}_{n}' for chan in range(out.shape[1]) for freq in freqs for n in range(out.shape[3])]
+            else:
+                out_reshaped = out.reshape(out.shape[0],out.shape[1] * out.shape[2])
+                labels = [f'feature_{freq}_{n}' for freq in freqs for n in range(out.shape[2])]
 
+            signal_features = FeatureSignal(
+                labels=labels,
+                class_dict = {f'{self.config.class_}':(0,out_reshaped.shape[0])},
+                data = out_reshaped,
+                signal_info = sig.info
+            )
 
+            list_of_features.append(signal_features)
+
+        if len(list_of_features) == 1:
+            self.set_output(0, list_of_features[0])
+        else:
+            self.set_output(0, list_of_features)
 
 class MultitaperTFNode(Node):
     title = 'Time-Frequency Representetion Multitaper'
     version = '0.1'
-
 
     class Config(NodeTraitsConfig):
         n_cycles: int = CX_Int(7,desc='number of cycles in the wavelet')
@@ -488,9 +562,13 @@ class MultitaperTFNode(Node):
         use_fft: bool = Bool()
         time_bandwidth: float = CX_Float(4.0,desc='product between the temporal window length (in seconds) and the full frequency bandwidth (in Hz).')
         output = str = Enum('complex','power','phase','avg_power','itc','avg_power_itc')
+        f_min: float = CX_Float(0.0,desc='minimum frequency')
+        f_max: float = CX_Float(0.0,desc='maximum frequency')
+        f_splits: int = CX_Int(desc='number of splits')
+        class_: str = CX_String('class name',desc='class name')
 
-    init_inputs = [PortConfig(label='data',allowed_data=Signal),PortConfig(label='freqs')]
-    init_outputs = [PortConfig(label='out')]
+    init_inputs = [PortConfig(label='data',allowed_data=Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal])]
+    init_outputs = [PortConfig(label='out',allowed_data = FeatureSignal | Sequence[FeatureSignal])]
 
     @property
     def config(self) -> MultitaperTFNode.Config:
@@ -502,16 +580,30 @@ class MultitaperTFNode(Node):
         self.time_bandwidth = self.config.time_bandwidth if self.config.time_bandwidth >= 2.0 else 4.0
         self.use_fft = self.config.use_fft
         self.output = self.config.output
+        self.fmin = self.config.f_min
+        self.fmax = self.config.f_max if self.config.f_max else 0.0
+        self.fplits = self.config.f_splits if self.config.f_splits else 0
 
     def update_event(self, inp=-1):
-        if inp == 0: signal:Signal =self.input_payload(inp)
-        if inp == 1: freqs = self.input_payload(inp)
-        if signal and freqs:
-            features = signal.copy()
+        signal:Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal] = self.input(inp)
+
+        if not signal:
+            return
+        
+        if not isinstance(signal,Sequence):
+            signal = [signal]
+        
+        list_of_features = []
+        for sig in signal:
+
+            if self.fmax == 0.0: self.fmax = sig.info.nominal_srate
+            if self.fplits == 0: self.fplits = int((self.fmax - self.fmin)/5)
+
+            freqs = np.linspace(self.fmix,self.fmax,self.fplits)
 
             out = mne.time_frequency.tfr_array_multitaper(
-                data = signal.data,
-                sfreq = signal.info.nominal_srate,
+                data = sig.data,
+                sfreq = sig.info.nominal_srate,
                 freqs = freqs,
                 n_cycles= self.n_cycles,
                 zero_mean= self.zero_mean,
@@ -521,9 +613,29 @@ class MultitaperTFNode(Node):
                 n_jobs= -1
             )
 
-            self.set_output(0,out)
+            if self.output in ['complex', 'phase']:
+                out_reshaped = out.reshape(out.shape[0],out.shape[1] * out.shape[2] * out.shape[3] * out.shape[4])
+                labels = [f'feature_taper_{taper}_channel_{chan}_{freq}_{n}' for taper in range(out.shape[1]) for chan in range(out.shape[1]) for freq in freqs for n in range(out.shape[3])]
+            elif self.output == 'power':
+                out_reshaped = out.reshape(out.shape[0],out.shape[1] * out.shape[2] * out.shape[3])
+                labels = [f'feature_channel_{chan}_{freq}_{n}' for chan in range(out.shape[1]) for freq in freqs for n in range(out.shape[3])]
+            else:
+                out_reshaped = out.reshape(out.shape[0],out.shape[1] * out.shape[2])
+                labels = [f'feature_{freq}_{n}' for freq in freqs for n in range(out.shape[2])]
 
+            signal_features = FeatureSignal(
+                labels=labels,
+                class_dict = {f'{self.config.class_}':(0,out_reshaped.shape[0])},
+                data = out_reshaped,
+                signal_info = sig.info
+            )
 
+            list_of_features.append(signal_features)
+
+        if len(list_of_features) == 1:
+            self.set_output(0, list_of_features[0])
+        else:
+            self.set_output(0, list_of_features)
 
 class StockwellTFNode(Node):
     title = 'Time-Frequency Representetion Stockwell Transform'
@@ -534,10 +646,11 @@ class StockwellTFNode(Node):
         fmax: float = CX_Float(desc='the upper-bound on frequencies of interest')
         n_fft: int = CX_Int(desc='the length of the windows used for FFT')
         width: float = CX_Float(1.0,desc='the width of the Gaussian Window')
+        class_: str = CX_Str('class name',desc='class name')
         return_itc: bool = Bool()
 
-    init_inputs = [PortConfig(label='data',allowed_data=Signal),PortConfig(label='freqs')]
-    init_outputs = [PortConfig(label='st_power'),PortConfig(label='itc'),PortConfig(label='freqs')]
+    init_inputs = [PortConfig(label='data',allowed_data=Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal])]
+    init_outputs = [PortConfig(label='st_power',allowed_data = FeatureSignal | Sequence[FeatureSignal])]
 
     @property
     def config(self) -> StockwellTFNode.Config:
@@ -551,78 +664,61 @@ class StockwellTFNode(Node):
         self.return_itc = self.config.return_itc
 
     def update_event(self, inp=-1):
-        if inp == 0: signal:Signal =self.input_payload(inp)
-        if inp == 1: freqs = self.input_payload(inp)
-        if signal and freqs:
-            features = signal.copy()
+        signal:Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal] = self.input(inp)
 
-            st_power,itc,freqs = mne.time_frequency.tfr_array_stockwell(
-                data = signal.data,
-                sfreq = signal.info.nominal_srate,
+        if not signal:
+            return
+        
+        if not isinstance(signal,Sequence):
+            signal = [signal]
+        
+        list_of_features = []
+        for sig in signal:
+
+            out = mne.time_frequency.tfr_array_stockwell(
+                data = sig.data,
+                sfreq = sig.info.nominal_srate,
                 fmin = self.fmin,
                 fmax= self.fmax,
                 n_fft= self.n_fft,
                 width = self.width,
-                return_itc= self.return_itc,
+                return_itc= False,
                 n_jobs= -1
             )
 
-            if self.return_itc:
-                self.set_output(1,itc)
-            self.set_output(0,st_power)
-            self.set_output(2,freqs)
+            out_reshaped = out[0].reshape(out.shape[0],out.shape[1] * out.shape[2])
+            labels = [f'frequency_{freq}_feature_{i}' for freq in out[2] for i in range(out[0].shape[2])]
 
-
-
-class CWTNode(Node):
-    title = 'Continuous Wavelet Transform'
-    version = '0.1'
-
-    class Config(NodeTraitsConfig):
-        use_fft: bool = Bool(desc='use fft for convolutions')
-        mode: str = Enum('same','valid','full',desc='convention for convolution')
-
-    init_inputs = [PortConfig(label='data',allowed_data=Signal),PortConfig(label='wavelets')]
-    init_outputs = [PortConfig(label='output')]
-
-    @property
-    def config(self) -> CWTNode.Config:
-        return self._config
-
-    def init(self):
-        self.use_fft = self.config.use_fft
-        self.mode = self.config.mode
-
-    def update_event(self, inp=-1):
-        if inp == 0: signal:Signal =self.input_payload(inp)
-        if inp == 1: ws = self.input_payload(inp)
-        if signal and ws:
-            features = signal.copy()
-
-            output = mne.time_frequency.tfr.cwt(
-                X = signal.data,
-                Ws = ws,
-                use_fft = self.use_fft,
-                mode = self.mode
+            signal_features = FeatureSignal(
+                labels=labels,
+                class_dict = {f'{self.config.class_}':(0,sig.data.shape[0])},
+                data = out_reshaped,
+                signal_info = sig.info
             )
 
-            self.set_output(0,output)
+            list_of_features.append(signal_features)
 
-
+        if len(list_of_features) == 1:
+            self.set_output(0, list_of_features[0])
+        else:
+            self.set_output(0, list_of_features)
 
 class STFTNode(Node):
+    ## 2d array 
+
     title = 'Short Time Fourier Transform'
     version = '0.1'
 
     class Config(NodeTraitsConfig):
         wsize: int = CX_Int(4,desc='length of the STFT window in samples(must be a multiple of 4)')
         tstep: int = CX_Int(2,desc='step between successive windows in samples')
+        class_:stt = CX_Str('class name',desc='class name')
 
-    init_inputs = [PortConfig(label='data',allowed_data=Signal)]
-    init_outputs = [PortConfig(label='output')]
+    init_inputs = [PortConfig(label='data',allowed_data=Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal])]
+    init_outputs = [PortConfig(label='out',allowed_data = FeatureSignal | Sequence[FeatureSignal])]
 
     @property
-    def config(self) -> CWTNode.Config:
+    def config(self) -> STFTNode.Config:
         return self._config
 
     def init(self):
@@ -630,58 +726,43 @@ class STFTNode(Node):
         self.tstep = self.config.tstep
 
     def update_event(self, inp=-1):
-        signal:Signal = self.input_payload(inp)
-        if signal:
-            features = signal.copy()
+        signal:Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal] = self.input(inp)
+
+        if not signal:
+            return
+        
+        if not isinstance(signal,Sequence):
+            signal = [signal]
+        
+        list_of_features = []
+        for sig in signal:
 
             output = mne.time_frequency.stft(
-                x = signal.data,
+                x = sig.data,
                 wsize = self.wsize,
                 tstep = self.tstep
             )
 
-            self.set_output(0,output)
+            out_reshaped = output.reshape(output.shape[0],output.shape[1] * output.shape[2])
+            labels = [f'feature_{i}' for i in range(out_reshaped.shape[1])]
 
-
-
-class ISTFTode(Node):
-    title = 'Inverse Short Time Fourier Transform'
-    version = '0.1'
-
-    class Config(NodeTraitsConfig):
-        Tx: int = CX_Int(4,desc='length of the STFT window in samples(must be a multiple of 4)')
-        tstep: int = CX_Int(2,desc='step between successive windows in samples')
-
-    init_inputs = [PortConfig(label='data',allowed_data=Signal)]
-    init_outputs = [PortConfig(label='output')]
-
-    @property
-    def config(self) -> ISTFTode.Config:
-        return self._config
-
-    def init(self):
-        self.Tx = self.config.Tx if self.config.Tx else None
-        self.tstep = self.config.tstep
-
-    def update_event(self, inp=-1):
-        signal:Signal = self.input_payload(inp)
-        if signal:
-            features = signal.copy()
-
-            output = mne.time_frequency.istft(
-                X = signal.data,
-                tstep = self.tstep,
-                Tx = self.Tx
+            signal_features = FeatureSignal(
+                labels=labels,
+                class_dict = {f'{self.config.class_}':(0,1)},
+                data = out_reshaped,
+                signal_info = sig.info
             )
 
-            self.set_output(0,output)
+            list_of_features.append(signal_features)
 
-
+        if len(list_of_features) == 1:
+            self.set_output(0, list_of_features[0])
+        else:
+            self.set_output(0, list_of_features)
 
 class FourierCSDNode(Node):
     title = 'Cross-spectral density with Fourier Transform'
     version = '0.1'
-
 
     class Config(NodeTraitsConfig):
         fmin: float = CX_Float(0.0,desc='the lower-bound on frequencies of interest')
@@ -690,6 +771,7 @@ class FourierCSDNode(Node):
         tmin: float = CX_Float(desc='minimum time instant to consider, in seconds')
         tmax: float = CX_Float(desc='maximum time instant to consider, in seconds')
         n_fft: int = CX_Int(desc='length of the fft')
+
 
     init_inputs = [PortConfig(label='data',allowed_data=Signal)]
     init_outputs = [PortConfig(label='csd')]
@@ -833,232 +915,584 @@ class MeanNode(Node):
     title = 'Mean'
     version = '0.1'
     
-    init_inputs = [PortConfig(label='data',allowed_data=Signal)]
-    init_outputs = [PortConfig(label='features')]
+    init_inputs = [PortConfig(label='data',allowed_data=Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal])]
+    init_outputs = [PortConfig(label='features',allowed_data = FeatureSignal | Sequence[FeatureSignal])]
+    
+    class Config(NodeTraitsConfig):
+        class_: str = CX_String('class name',desc='class name')
+
+    def config(self) -> MeanNode.Config:
+        return self._config
     
     def init(self):
         classes = list(Statistics.subclasses.values())
         self.func = self.stats_selected[0]
-        self.features = np.zeros((32,1))
     
     def update_event(self, inp=-1):
-        signal:Signal =self.input_payload(inp)
-        if signal:
-            data = signal.data
+        signal:Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal] = self.input(inp)
+
+        if not signal:
+            return
+        
+        if not isinstance(signal,Sequence):
+            signal = [signal]
+        
+        list_of_features = []
+        for sig in signal:
+
+            data = sig.data
+
+            if data.ndim == 2:
+                data = data.reshape(1,data.shape[0],data.shape[1])
+
             func = self.func(data)
             feature = func.calculate_stat()
-            self.features[:,0] = feature
-            self.set_output(0,self.features)
+            
+            labels = [f'mean_value_channel_{chan}' for chan in range(feature.shape[1])]
+
+            signal_features = FeatureSignal(
+                labels=labels,
+                class_dict = {f'{self.config.class_}':(0,data.shape[0])},
+                data = feature,
+                signal_info = sig.info
+            )
+
+            list_of_features.append(signal_features)
+
+        if len(list_of_features) == 1:
+            self.set_output(0, list_of_features[0])
+        else:
+            self.set_output(0, list_of_features)
             
 class VarNode(Node):
     title = 'Variance'
     version = '0.1'
     
-    init_inputs = [PortConfig(label='data',allowed_data=Signal)]
-    init_outputs = [PortConfig(label='features')]
+    init_inputs = [PortConfig(label='data',allowed_data=Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal])]
+    init_outputs = [PortConfig(label='features',allowed_data = FeatureSignal | Sequence[FeatureSignal])]
+    
+    class Config(NodeTraitsConfig):
+        class_: str = CX_String('class name',desc='class name')
+
+    def config(self) -> VarNode.Config:
+        return self._config
     
     def init(self):
         classes = list(Statistics.subclasses.values())
-        self.func = self.stats_selected[1]
-        self.features = np.zeros((32,1))
+        self.func = self.stats_selected[0]
     
     def update_event(self, inp=-1):
-        signal:Signal =self.input_payload(inp)
-        if signal:
-            data = signal.data
+        signal:Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal] = self.input(inp)
+
+        if not signal:
+            return
+        
+        if not isinstance(signal,Sequence):
+            signal = [signal]
+        
+        list_of_features = []
+        for sig in signal:
+
+            data = sig.data
+
+            if data.ndim == 2:
+                data = data.reshape(1,data.shape[0],data.shape[1])
+
             func = self.func(data)
             feature = func.calculate_stat()
-            self.features[:,0] = feature
-            self.set_output(0,self.features)
+            
+            labels = [f'var_value_channel_{chan}' for chan in range(feature.shape[1])]
+
+            signal_features = FeatureSignal(
+                labels=labels,
+                class_dict = {f'{self.config.class_}':(0,data.shape[0])},
+                data = feature,
+                signal_info = sig.info
+            )
+
+            list_of_features.append(signal_features)
+
+        if len(list_of_features) == 1:
+            self.set_output(0, list_of_features[0])
+        else:
+            self.set_output(0, list_of_features)
             
 class StdNode(Node):
     title = 'Standard deviation'
     version = '0.1'
     
-    init_inputs = [PortConfig(label='data',allowed_data=Signal)]
-    init_outputs = [PortConfig(label='features')]
+    init_inputs = [PortConfig(label='data',allowed_data=Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal])]
+    init_outputs = [PortConfig(label='features',allowed_data = FeatureSignal | Sequence[FeatureSignal])]
+    
+    class Config(NodeTraitsConfig):
+        class_: str = CX_String('class name',desc='class name')
+
+    def config(self) -> StdNode.Config:
+        return self._config
     
     def init(self):
         classes = list(Statistics.subclasses.values())
-        self.func = self.stats_selected[2]
-        self.features = np.zeros((32,1))
+        self.func = self.stats_selected[0]
     
     def update_event(self, inp=-1):
-        signal:Signal =self.input_payload(inp)
-        if signal:
-            data = signal.data
+        signal:Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal] = self.input(inp)
+
+        if not signal:
+            return
+        
+        if not isinstance(signal,Sequence):
+            signal = [signal]
+        
+        list_of_features = []
+        for sig in signal:
+
+            data = sig.data
+
+            if data.ndim == 2:
+                data = data.reshape(1,data.shape[0],data.shape[1])
+
             func = self.func(data)
             feature = func.calculate_stat()
-            self.features[:,0] = feature
-            self.set_output(0,self.features)
+            
+            labels = [f'std_value_channel_{chan}' for chan in range(feature.shape[1])]
+
+            signal_features = FeatureSignal(
+                labels=labels,
+                class_dict = {f'{self.config.class_}':(0,data.shape[0])},
+                data = feature,
+                signal_info = sig.info
+            )
+
+            list_of_features.append(signal_features)
+
+        if len(list_of_features) == 1:
+            self.set_output(0, list_of_features[0])
+        else:
+            self.set_output(0, list_of_features)
             
 class PTPNode(Node):
     title= 'Peak-to-Peak Value'
     version = '0.1'
     
-    init_inputs = [PortConfig(label='data',allowed_data=Signal)]
-    init_outputs = [PortConfig(label='features')]
+    init_inputs = [PortConfig(label='data',allowed_data=Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal])]
+    init_outputs = [PortConfig(label='features',allowed_data = FeatureSignal | Sequence[FeatureSignal])]
+    
+    class Config(NodeTraitsConfig):
+        class_: str = CX_String('class name',desc='class name')
+
+    def config(self) -> PTPNode.Config:
+        return self._config
     
     def init(self):
         classes = list(Statistics.subclasses.values())
-        self.func = self.stats_selected[3]
-        self.features = np.zeros((32,1))
+        self.func = self.stats_selected[0]
     
     def update_event(self, inp=-1):
-        signal:Signal =self.input_payload(inp)
-        if signal:
-            data = signal.data
+        signal:Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal] = self.input(inp)
+
+        if not signal:
+            return
+        
+        if not isinstance(signal,Sequence):
+            signal = [signal]
+        
+        list_of_features = []
+        for sig in signal:
+
+            data = sig.data
+
+            if data.ndim == 2:
+                data = data.reshape(1,data.shape[0],data.shape[1])
+
             func = self.func(data)
             feature = func.calculate_stat()
-            self.features[:,0] = feature
-            self.set_output(0,self.features)
+            
+            labels = [f'ptp_value_channel_{chan}' for chan in range(feature.shape[1])]
+
+            signal_features = FeatureSignal(
+                labels=labels,
+                class_dict = {f'{self.config.class_}':(0,data.shape[0])},
+                data = feature,
+                signal_info = sig.info
+            )
+
+            list_of_features.append(signal_features)
+
+        if len(list_of_features) == 1:
+            self.set_output(0, list_of_features[0])
+        else:
+            self.set_output(0, list_of_features)
             
 class SkewNode(Node):
     title = 'Skewness'
     version = '0.1'
     
-    init_inputs = [PortConfig(label='data',allowed_data=Signal)]
-    init_outputs = [PortConfig(label='features')]
+    init_inputs = [PortConfig(label='data',allowed_data=Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal])]
+    init_outputs = [PortConfig(label='features',allowed_data = FeatureSignal | Sequence[FeatureSignal])]
+    
+    class Config(NodeTraitsConfig):
+        class_: str = CX_String('class name',desc='class name')
+
+    def config(self) -> SkewNode.Config:
+        return self._config
     
     def init(self):
         classes = list(Statistics.subclasses.values())
-        self.func = self.stats_selected[4]
-        self.features = np.zeros((32,1))
+        self.func = self.stats_selected[0]
     
     def update_event(self, inp=-1):
-        signal:Signal =self.input_payload(inp)
-        if signal:
-            data = signal.data
+        signal:Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal] = self.input(inp)
+
+        if not signal:
+            return
+        
+        if not isinstance(signal,Sequence):
+            signal = [signal]
+        
+        list_of_features = []
+        for sig in signal:
+
+            data = sig.data
+
+            if data.ndim == 2:
+                data = data.reshape(1,data.shape[0],data.shape[1])
+
             func = self.func(data)
             feature = func.calculate_stat()
-            self.features[:,0] = feature
-            self.set_output(0,self.features)
+            
+            labels = [f'skewness_value_channel_{chan}' for chan in range(feature.shape[1])]
+
+            signal_features = FeatureSignal(
+                labels=labels,
+                class_dict = {f'{self.config.class_}':(0,data.shape[0])},
+                data = feature,
+                signal_info = sig.info
+            )
+
+            list_of_features.append(signal_features)
+
+        if len(list_of_features) == 1:
+            self.set_output(0, list_of_features[0])
+        else:
+            self.set_output(0, list_of_features)
             
 class KurtNode(Node):
     title = 'Kurtosis'
     version = '0.1'
     
-    init_inputs = [PortConfig(label='data',allowed_data=Signal)]
-    init_outputs = [PortConfig(label='features')]
+    init_inputs = [PortConfig(label='data',allowed_data=Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal])]
+    init_outputs = [PortConfig(label='features',allowed_data = FeatureSignal | Sequence[FeatureSignal])]
+    
+    class Config(NodeTraitsConfig):
+        class_: str = CX_String('class name',desc='class name')
+
+    def config(self) -> KurtNode.Config:
+        return self._config
     
     def init(self):
         classes = list(Statistics.subclasses.values())
-        self.func = self.stats_selected[5]
-        self.features = np.zeros((32,1))
+        self.func = self.stats_selected[0]
     
     def update_event(self, inp=-1):
-        signal:Signal =self.input_payload(inp)
-        if signal:
-            data = signal.data
+        signal:Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal] = self.input(inp)
+
+        if not signal:
+            return
+        
+        if not isinstance(signal,Sequence):
+            signal = [signal]
+        
+        list_of_features = []
+        for sig in signal:
+
+            data = sig.data
+
+            if data.ndim == 2:
+                data = data.reshape(1,data.shape[0],data.shape[1])
+
             func = self.func(data)
             feature = func.calculate_stat()
-            self.features[:,0] = feature
-            self.set_output(0,self.features)
+            
+            labels = [f'kurtosis_value_channel_{chan}' for chan in range(feature.shape[1])]
+
+            signal_features = FeatureSignal(
+                labels=labels,
+                class_dict = {f'{self.config.class_}':(0,data.shape[0])},
+                data = feature,
+                signal_info = sig.info
+            )
+
+            list_of_features.append(signal_features)
+
+        if len(list_of_features) == 1:
+            self.set_output(0, list_of_features[0])
+        else:
+            self.set_output(0, list_of_features)
             
 class RMSNode(Node):
     title = 'RMS value'
     version = '0.1'
     
-    init_inputs = [PortConfig(label='data',allowed_data=Signal)]
-    init_outputs = [PortConfig(label='features')]
+    init_inputs = [PortConfig(label='data',allowed_data=Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal])]
+    init_outputs = [PortConfig(label='features',allowed_data = FeatureSignal | Sequence[FeatureSignal])]
+    
+    class Config(NodeTraitsConfig):
+        class_: str = CX_String('class name',desc='class name')
+
+    def config(self) -> RMSNode.Config:
+        return self._config
     
     def init(self):
         classes = list(Statistics.subclasses.values())
-        self.func = self.stats_selected[6]
-        self.features = np.zeros((32,1))
+        self.func = self.stats_selected[0]
     
     def update_event(self, inp=-1):
-        signal:Signal =self.input_payload(inp)
-        if signal:
-            data = signal.data
+        signal:Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal] = self.input(inp)
+
+        if not signal:
+            return
+        
+        if not isinstance(signal,Sequence):
+            signal = [signal]
+        
+        list_of_features = []
+        for sig in signal:
+
+            data = sig.data
+
+            if data.ndim == 2:
+                data = data.reshape(1,data.shape[0],data.shape[1])
+
             func = self.func(data)
             feature = func.calculate_stat()
-            self.features[:,0] = feature
-            self.set_output(0,self.features)
+            
+            labels = [f'rms_value_channel_{chan}' for chan in range(feature.shape[1])]
+
+            signal_features = FeatureSignal(
+                labels=labels,
+                class_dict = {f'{self.config.class_}':(0,data.shape[0])},
+                data = feature,
+                signal_info = sig.info
+            )
+
+            list_of_features.append(signal_features)
+
+        if len(list_of_features) == 1:
+            self.set_output(0, list_of_features[0])
+        else:
+            self.set_output(0, list_of_features)
                        
 class MobilityNode(Node):
     title = 'Hjorth Mobility'
     version = '0.1'
     
-    init_inputs = [PortConfig(label='data',allowed_data=Signal)]
-    init_outputs = [PortConfig(label='features')]
+    init_inputs = [PortConfig(label='data',allowed_data=Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal])]
+    init_outputs = [PortConfig(label='features',allowed_data = FeatureSignal | Sequence[FeatureSignal])]
+    
+    class Config(NodeTraitsConfig):
+        class_: str = CX_String('class name',desc='class name')
+
+    def config(self) -> MobilityNode.Config:
+        return self._config
     
     def init(self):
         classes = list(Statistics.subclasses.values())
-        self.func = self.stats_selected[7]
-        self.features = np.zeros((32,1))
+        self.func = self.stats_selected[0]
     
     def update_event(self, inp=-1):
-        signal:Signal =self.input_payload(inp)
-        if signal:
-            data = signal.data
+        signal:Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal] = self.input(inp)
+
+        if not signal:
+            return
+        
+        if not isinstance(signal,Sequence):
+            signal = [signal]
+        
+        list_of_features = []
+        for sig in signal:
+
+            data = sig.data
+
+            if data.ndim == 2:
+                data = data.reshape(1,data.shape[0],data.shape[1])
+
             func = self.func(data)
             feature = func.calculate_stat()
-            self.features[:,0] = feature
-            self.set_output(0,self.features)
+            
+            labels = [f'mobility_value_channel_{chan}' for chan in range(feature.shape[1])]
+
+            signal_features = FeatureSignal(
+                labels=labels,
+                class_dict = {f'{self.config.class_}':(0,data.shape[0])},
+                data = feature,
+                signal_info = sig.info
+            )
+
+            list_of_features.append(signal_features)
+
+        if len(list_of_features) == 1:
+            self.set_output(0, list_of_features[0])
+        else:
+            self.set_output(0, list_of_features)
                
 class ComplexityNode(Node):
     title = 'Hjorth Complexity'
     version = '0.1'
     
-    init_inputs = [PortConfig(label='data',allowed_data=Signal)]
-    init_outputs = [PortConfig(label='features')]
+    init_inputs = [PortConfig(label='data',allowed_data=Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal])]
+    init_outputs = [PortConfig(label='features',allowed_data = FeatureSignal | Sequence[FeatureSignal])]
+    
+    class Config(NodeTraitsConfig):
+        class_: str = CX_String('class name',desc='class name')
+
+    def config(self) -> ComplexityNode.Config:
+        return self._config
     
     def init(self):
         classes = list(Statistics.subclasses.values())
-        self.func = self.stats_selected[8]
-        self.features = np.zeros((32,1))
+        self.func = self.stats_selected[0]
     
     def update_event(self, inp=-1):
-        signal:Signal =self.input_payload(inp)
-        if signal:
-            data = signal.data
+        signal:Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal] = self.input(inp)
+
+        if not signal:
+            return
+        
+        if not isinstance(signal,Sequence):
+            signal = [signal]
+        
+        list_of_features = []
+        for sig in signal:
+
+            data = sig.data
+
+            if data.ndim == 2:
+                data = data.reshape(1,data.shape[0],data.shape[1])
+
             func = self.func(data)
             feature = func.calculate_stat()
-            self.features[:,0] = feature
-            self.set_output(0,self.features)
+            
+            labels = [f'complexity_value_channel_{chan}' for chan in range(feature.shape[1])]
+
+            signal_features = FeatureSignal(
+                labels=labels,
+                class_dict = {f'{self.config.class_}':(0,data.shape[0])},
+                data = feature,
+                signal_info = sig.info
+            )
+
+            list_of_features.append(signal_features)
+
+        if len(list_of_features) == 1:
+            self.set_output(0, list_of_features[0])
+        else:
+            self.set_output(0, list_of_features)
                   
 class Quantile75thNode(Node):
     title = '75th quantile'
     version = '0.1'
     
-    init_inputs = [PortConfig(label='data',allowed_data=Signal)]
-    init_outputs = [PortConfig(label='features')]
+    init_inputs = [PortConfig(label='data',allowed_data=Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal])]
+    init_outputs = [PortConfig(label='features',allowed_data = FeatureSignal | Sequence[FeatureSignal])]
+    
+    class Config(NodeTraitsConfig):
+        class_: str = CX_String('class name',desc='class name')
+
+    def config(self) -> Quantile75thNode.Config:
+        return self._config
     
     def init(self):
         classes = list(Statistics.subclasses.values())
-        self.func = self.stats_selected[9]
-        self.features = np.zeros((32,1))
+        self.func = self.stats_selected[0]
     
     def update_event(self, inp=-1):
-        signal:Signal =self.input_payload(inp)
-        if signal:
-            data = signal.data
+        signal:Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal] = self.input(inp)
+
+        if not signal:
+            return
+        
+        if not isinstance(signal,Sequence):
+            signal = [signal]
+        
+        list_of_features = []
+        for sig in signal:
+
+            data = sig.data
+
+            if data.ndim == 2:
+                data = data.reshape(1,data.shape[0],data.shape[1])
+
             func = self.func(data)
             feature = func.calculate_stat()
-            self.features[:,0] = feature
-            self.set_output(0,self.features)
+            
+            labels = [f'q75th_value_channel_{chan}' for chan in range(feature.shape[1])]
+
+            signal_features = FeatureSignal(
+                labels=labels,
+                class_dict = {f'{self.config.class_}':(0,data.shape[0])},
+                data = feature,
+                signal_info = sig.info
+            )
+
+            list_of_features.append(signal_features)
+
+        if len(list_of_features) == 1:
+            self.set_output(0, list_of_features[0])
+        else:
+            self.set_output(0, list_of_features)
              
 class Quantile25thNode(Node):
     title = '25th quantile'
     version = '0.1'
     
-    init_inputs = [PortConfig(label='data',allowed_data=Signal)]
-    init_outputs = [PortConfig(label='features')]
+    init_inputs = [PortConfig(label='data',allowed_data=Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal])]
+    init_outputs = [PortConfig(label='features',allowed_data = FeatureSignal | Sequence[FeatureSignal])]
+    
+    class Config(NodeTraitsConfig):
+        class_: str = CX_String('class name',desc='class name')
+
+    def config(self) -> Quantile25thNode.Config:
+        return self._config
     
     def init(self):
         classes = list(Statistics.subclasses.values())
-        self.func = self.stats_selected[10]
-        self.features = np.zeros((32,1))
+        self.func = self.stats_selected[0]
     
     def update_event(self, inp=-1):
-        signal:Signal =self.input_payload(inp)
-        if signal:
-            data = signal.data
+        signal:Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal] = self.input(inp)
+
+        if not signal:
+            return
+        
+        if not isinstance(signal,Sequence):
+            signal = [signal]
+        
+        list_of_features = []
+        for sig in signal:
+
+            data = sig.data
+
+            if data.ndim == 2:
+                data = data.reshape(1,data.shape[0],data.shape[1])
+
             func = self.func(data)
             feature = func.calculate_stat()
-            self.features[:,0] = feature
-            self.set_output(0,self.features)
+            
+            labels = [f'q25th_value_channel_{chan}' for chan in range(feature.shape[1])]
+
+            signal_features = FeatureSignal(
+                labels=labels,
+                class_dict = {f'{self.config.class_}':(0,data.shape[0])},
+                data = feature,
+                signal_info = sig.info
+            )
+
+            list_of_features.append(signal_features)
+
+        if len(list_of_features) == 1:
+            self.set_output(0, list_of_features[0])
+        else:
+            self.set_output(0, list_of_features)
                         
 class StatisticsNode(Node):
     title = 'Basic Statistics'
@@ -1084,79 +1518,205 @@ class StatisticsNode(Node):
             ),
             style='custom'
         )
+        class_:str = CX_Str('class name',desc='class name')
 
-    init_inputs = [PortConfig(label='data',allowed_data=Signal)]
-    init_outputs = [PortConfig(label='features')]
-
+    init_inputs = [PortConfig(label='data',allowed_data=Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal])]
+    init_outputs = [PortConfig(label='features',allowed_data = FeatureSignal | Sequence[FeatureSignal])]
+    
     @property
     def config(self) -> StatisticsNode.Config:
         return self._config
     
     def init(self):
+        self.stats = ['mean','var','std','ptp','skewness','kurtosis','rms','mobility','complexity','75th quantile','25th quantile']
         self.stats_selected = self.config.stats_selected
         classes = list(Statistics.subclasses.values())
         self.funcs = [classes[_] for _ in self.stats_selected]
-        self.features = np.zeros((32,len(self.stats_selected)))
     
     def update_event(self, inp=-1):
-        signal:Signal =self.input_payload(inp)
-        if signal:
-            data = signal.data
+        signal:Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal] = self.input(inp)
+
+        if not signal:
+            return
+        
+        if not isinstance(signal,Sequence):
+            signal = [signal]
+        
+        list_of_features = []
+        for sig in signal:
+
+            data = sig.data
+
+            if data.ndim == 2:
+                data = data.reshape(1,data.shape[0],data.shape[1])
+
+            features = np.zeros((data.shape[0],data.shape[1],len(self.funcs)))
+            labels = [f'feature_{self.stats[stat]}' for stat in self.stats_selected]
+
             for index,func in enumerate(self.funcs):
                 func = func(data)
                 feature = func.calculate_stat()
-                self.features[:,index] = feature
+                features[:,:,index] = feature
 
-            self.set_output(0,self.features)
+            signal_features = FeatureSignal(
+                labels=labels,
+                class_dict = {f'{self.config.class_}':(0,data.shape[0])},
+                data = features,
+                signal_info = sig.info
+            )
+
+            list_of_features.append(signal_features)
+
+        print
+
+        if len(list_of_features) == 1:
+            self.set_output(0, list_of_features[0])
+        else:
+            self.set_output(0, list_of_features)
             
 class ApproximateEntopyNode(Node):
+    #2d arrays only (n_channels,times)
+
     title = 'Approximate Entropy'
     version = '0.1'
     
-    init_inputs = [PortConfig(label='data',allowed_data=Signal)]
-    init_outputs = [PortConfig(label='features')]
+    init_inputs = [PortConfig(label='data',allowed_data=Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal])]
+    init_outputs = [PortConfig(label='features',allowed_data = FeatureSignal | Sequence[FeatureSignal])]
+    
+    class Config(NodeTraitsConfig):
+        class_: str = CX_String('class name',desc='class name')
+
+    def config(self) -> ApproximateEntopyNode.Config:
+        return self._config
+    
+    def init(self):
+        pass
     
     def update_event(self, inp=-1):
-        signal:Signal = self.input_payload(inp)
-        if signal:
-            data = signal.data
+        signal:Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal] = self.input(inp)
+
+        if not signal:
+            return
+        
+        if not isinstance(signal,Sequence):
+            signal = [signal]
+        
+        list_of_features = []
+        for sig in signal:
+
+            data = sig.data
             feature = univariate.compute_app_entropy(data)
-            self.set_output(0,feature)
+            
+            labels = [f'approximate_entropy_channel_{i}' for i in range(data.shape[0])]
+
+            signal_features = FeatureSignal(
+                labels=labels,
+                class_dict = {f'{self.config.class_}':(0,1)},
+                data = feature,
+                signal_info = sig.info
+            )
+
+            list_of_features.append(signal_features)
+
+        if len(list_of_features) == 1:
+            self.set_output(0, list_of_features[0])
+        else:
+            self.set_output(0, list_of_features)
 
 class SampleEntropyNode(Node):
     title = 'Sample Entropy'
     version = '0.1'
     
-    init_inputs = [PortConfig(label='data',allowed_data=Signal)]
-    init_outputs = [PortConfig(label='features')]
+    init_inputs = [PortConfig(label='data',allowed_data=Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal])]
+    init_outputs = [PortConfig(label='features',allowed_data = FeatureSignal | Sequence[FeatureSignal])]
+    
+    class Config(NodeTraitsConfig):
+        class_: str = CX_String('class name',desc='class name')
+
+    def config(self) -> SampleEntropyNode.Config:
+        return self._config
+    
+    def init(self):
+        pass
     
     def update_event(self, inp=-1):
-        signal:Signal = self.input_payload(inp)
-        if signal:
-            data = signal.data
+        signal:Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal] = self.input(inp)
+
+        if not signal:
+            return
+        
+        if not isinstance(signal,Sequence):
+            signal = [signal]
+        
+        list_of_features = []
+        for sig in signal:
+
+            data = sig.data
             feature = univariate.compute_samp_entropy(data)
-            self.set_output(0,feature)
+            
+            labels = [f'sample_entropy_channel_{i}' for i in range(data.shape[0])]
+
+            signal_features = FeatureSignal(
+                labels=labels,
+                class_dict = {f'{self.config.class_}':(0,1)},
+                data = feature,
+                signal_info = sig.info
+            )
+
+            list_of_features.append(signal_features)
+
+        if len(list_of_features) == 1:
+            self.set_output(0, list_of_features[0])
+        else:
+            self.set_output(0, list_of_features)
             
 class SVDEntropyNode(Node):
     title = 'SVD Entropy'
     version = '0.1'
     
+    init_inputs = [PortConfig(label='data',allowed_data=Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal])]
+    init_outputs = [PortConfig(label='features',allowed_data = FeatureSignal | Sequence[FeatureSignal])]
+    
     class Config(NodeTraitsConfig):
+        class_: str = CX_String('class name',desc='class name')
         tau: int = CX_Int(2,desc='the delay (number of samples)')
-    
-    init_inputs = [PortConfig(label='data',allowed_data=Signal)]
-    init_outputs = [PortConfig(label='features')]
-    
-    @property
+
     def config(self) -> SVDEntropyNode.Config:
         return self._config
     
+    def init(self):
+        pass
+    
     def update_event(self, inp=-1):
-        signal:Signal = self.input_payload(inp)
-        if signal:
-            data = signal.data
+        signal:Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal] = self.input(inp)
+
+        if not signal:
+            return
+        
+        if not isinstance(signal,Sequence):
+            signal = [signal]
+        
+        list_of_features = []
+        for sig in signal:
+
+            data = sig.data
             feature = univariate.compute_svd_entropy(data=data,tau=self.config.tau)
-            self.set_output(0,feature)
+            
+            labels = [f'svd_entropy_channel_{i}' for i in range(data.shape[0])]
+
+            signal_features = FeatureSignal(
+                labels=labels,
+                class_dict = {f'{self.config.class_}':(0,1)},
+                data = feature,
+                signal_info = sig.info
+            )
+
+            list_of_features.append(signal_features)
+
+        if len(list_of_features) == 1:
+            self.set_output(0, list_of_features[0])
+        else:
+            self.set_output(0, list_of_features)
             
 class WaveletEnergyNode(Node):
     title = 'Wavelet Transform Energy'
@@ -1164,20 +1724,45 @@ class WaveletEnergyNode(Node):
     
     class Config(NodeTraitsConfig):
         wavelet_name:str = Enum('haar', 'db1', 'db2', 'db3', 'db4', 'db5', 'db6', 'db7', 'db8', 'db9', 'db10','morl','cmorl','gaus1', 'gaus2', 'gaus3', 'gaus4', 'gaus5', 'gaus6', 'gaus7', 'gaus8',desc='the wavelet name from which we calculate the wavelet coefficients and their energy')
+        class_: str = CX_String('class name',desc='class name')
+
+    init_inputs = [PortConfig(label='data',allowed_data=Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal])]
+    init_outputs = [PortConfig(label='features',allowed_data = FeatureSignal | Sequence[FeatureSignal])]
     
-    init_inputs = [PortConfig(label='data',allowed_data=Signal)]
-    init_outputs = [PortConfig(label='features')]
-        
     @property
     def config(self) -> WaveletEnergyNode.Config:
         return self._config 
     
     def update_event(self, inp=-1):
-        signal:Signal = self.input_payload(inp)
-        if signal:
-            data = signal.data
-            feature = univariate.compute_wavelet_coef_energy(data,wavelet_name=self.config.wavelet_name)
-            self.set_output(0,feature)
+        signal:Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal] = self.input(inp)
+
+        if not signal:
+            return
+        
+        if not isinstance(signal,Sequence):
+            signal = [signal]
+        
+        list_of_features = []
+        for sig in signal:
+
+            data = sig.data
+            feature = univariate.compute_wavelet_coef_energy(data)
+            
+            labels = [f'wavelet_energy_channel_{i}' for i in range(feature.shape[0])]
+
+            signal_features = FeatureSignal(
+                labels=labels,
+                class_dict = {f'{self.config.class_}':(0,1)},
+                data = feature,
+                signal_info = sig.info
+            )
+
+            list_of_features.append(signal_features)
+
+        if len(list_of_features) == 1:
+            self.set_output(0, list_of_features[0])
+        else:
+            self.set_output(0, list_of_features)
             
 class PLVNode(Node):
     title = 'Phase Locking Value (PLV)'
@@ -1185,20 +1770,48 @@ class PLVNode(Node):
     
     class Config(NodeTraitsConfig):
         include_diagonal: bool = Bool()
+        class_: str = CX_String('class name',desc='class name')
         
-    init_inputs = [PortConfig(label='data',allowed_data=Signal)]
-    init_outputs = [PortConfig(label='features')]
+    init_inputs = [PortConfig(label='data',allowed_data=Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal])]
+    init_outputs = [PortConfig(label='features',allowed_data = FeatureSignal | Sequence[FeatureSignal])]
         
     @property
     def config(self) -> PLVNode.Config:
         return self._config 
     
+    def init(self):
+        pass
+
     def update_event(self, inp=-1):
-        signal:Signal = self.input_payload(inp)
-        if signal:
-            data = signal.data
+        signal:Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal] = self.input(inp)
+
+        if not signal:
+            return
+        
+        if not isinstance(signal,Sequence):
+            signal = [signal]
+        
+        list_of_features = []
+        for sig in signal:
+
+            data = sig.data
             feature = bivariate.compute_phase_lock_val(data,include_diag=self.config.include_diagonal)
-            self.set_output(0,feature)
+            
+            labels = [f'plv_feature_{i}' for i in range(feature.shape[0])]
+
+            signal_features = FeatureSignal(
+                labels=labels,
+                class_dict = {f'{self.config.class_}':(0,1)},
+                data = feature,
+                signal_info = sig.info
+            )
+
+            list_of_features.append(signal_features)
+
+        if len(list_of_features) == 1:
+            self.set_output(0, list_of_features[0])
+        else:
+            self.set_output(0, list_of_features)
 
 class CorrelationNode(Node):
     title = 'Pearson Correlation (time-domain)'
@@ -1207,20 +1820,48 @@ class CorrelationNode(Node):
     class Config(NodeTraitsConfig):
         include_diagonal: bool = Bool()
         return_eigenvalues: bool = Bool()
+        class_: str = CX_String('class name',desc='class name')
         
-    init_inputs = [PortConfig(label='data',allowed_data=Signal)]
-    init_outputs = [PortConfig(label='features')]
-        
+    init_inputs = [PortConfig(label='data',allowed_data=Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal])]
+    init_outputs = [PortConfig(label='features',allowed_data = FeatureSignal | Sequence[FeatureSignal])]
+    
     @property
     def config(self) -> CorrelationNode.Config:
         return self._config 
     
+    def init(self):
+        pass
+    
     def update_event(self, inp=-1):
-        signal:Signal = self.input_payload(inp)
-        if signal:
-            data = signal.data
+        signal:Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal] = self.input(inp)
+
+        if not signal:
+            return
+        
+        if not isinstance(signal,Sequence):
+            signal = [signal]
+        
+        list_of_features = []
+        for sig in signal:
+
+            data = sig.data
             feature = bivariate.compute_time_corr(data,with_eigenvalues=self.config.return_eigenvalues,include_diag=self.config.include_diagonal)
-            self.set_output(0,feature)
+            
+            labels = [f'correlation_{i}' for i in range(feature.shape[0])]
+
+            signal_features = FeatureSignal(
+                labels=labels,
+                class_dict = {f'{self.config.class_}':(0,1)},
+                data = feature,
+                signal_info = sig.info
+            )
+
+            list_of_features.append(signal_features)
+
+        if len(list_of_features) == 1:
+            self.set_output(0, list_of_features[0])
+        else:
+            self.set_output(0, list_of_features)
 
 class CorrelationSpectralNode(Node):
     title = 'Pearson Correlation (time-domain)'
@@ -1230,18 +1871,29 @@ class CorrelationSpectralNode(Node):
         include_diagonal: bool = Bool()
         return_eigenvalues: bool = Bool()
         psd_method:str = Enum('welch','multitaper','fft')
+        class_: str = CX_String('class name',desc='class name')
         
-    init_inputs = [PortConfig(label='data',allowed_data=Signal)]
-    init_outputs = [PortConfig(label='features')]
-        
+    init_inputs = [PortConfig(label='data',allowed_data=Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal])]
+    init_outputs = [PortConfig(label='features',allowed_data = FeatureSignal | Sequence[FeatureSignal])]
+     
     @property
     def config(self) -> CorrelationSpectralNode.Config:
         return self._config 
     
     def update_event(self, inp=-1):
-        signal:Signal = self.input_payload(inp)
-        if signal:
-            data = signal.data
+        signal:Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal] = self.input(inp)
+
+        if not signal:
+            return
+        
+        if not isinstance(signal,Sequence):
+            signal = [signal]
+        
+        list_of_features = []
+        for sig in signal:
+
+            data = sig.data
+            
             feature = bivariate.compute_spect_corr(
                 sfreq= signal.info.nominal_srate,
                 data = data,
@@ -1249,7 +1901,22 @@ class CorrelationSpectralNode(Node):
                 include_diag= self.config.include_diagonal,
                 psd_method= self.config.psd_method
             )
-            self.set_output(0,feature)
+
+            labels = [f'spectral_correlation_feature_{i}' for i in range(feature.shape[0])]
+
+            signal_features = FeatureSignal(
+                labels=labels,
+                class_dict = {f'{self.config.class_}':(0,1)},
+                data = feature,
+                signal_info = sig.info
+            )
+
+            list_of_features.append(signal_features)
+
+        if len(list_of_features) == 1:
+            self.set_output(0, list_of_features[0])
+        else:
+            self.set_output(0, list_of_features)
 
 class PowerSpectrumNode(Node):
     title = 'Power Spectrum'
@@ -1262,10 +1929,11 @@ class PowerSpectrumNode(Node):
         normalization: bool = Bool()
         psd_method: str = Enum('welch','multitaper','fft',desc='method to calculate the power spectrum')
         log_calculation: bool = Bool()
+        class_: str = CX_String('class name',desc='class name')
         
         
-    init_inputs = [PortConfig(label='data',allowed_data=Signal)]
-    init_outputs = [PortConfig(label='features')]
+    init_inputs = [PortConfig(label='data',allowed_data=Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal])]
+    init_outputs = [PortConfig(label='features',allowed_data = FeatureSignal | Sequence[FeatureSignal])]
     
     @property
     def config(self) -> PowerSpectrumNode.Config:
@@ -1286,8 +1954,19 @@ class PowerSpectrumNode(Node):
         self.log_calculation = self.config.log_calculation
     
     def update_event(self, inp=-1):
-        signal:Signal = self.input_payload(inp)
-        if signal:
+        signal:Sequence[LabeledSignal] | LabeledSignal | StreamSignal | Sequence[StreamSignal] = self.input(inp)
+
+        if not signal:
+            return
+        
+        if not isinstance(signal,Sequence):
+            signal = [signal]
+        
+        list_of_features = []
+        for sig in signal:
+
+            data = sig.data
+            
             feature = univariate.compute_pow_freq_bands(
                 data = signal.data,
                 sfreq = signal.info.nominal_srate,
@@ -1297,6 +1976,20 @@ class PowerSpectrumNode(Node):
                 log = self.log_calculation
             )
             
-            self.set_output(0,feature)
+            labels = [f'power_spectrum_feature_{i}' for i in range(feature.shape[0])]
+
+            signal_features = FeatureSignal(
+                labels=labels,
+                class_dict = {f'{self.config.class_}':(0,1)},
+                data = feature,
+                signal_info = sig.info
+            )
+
+            list_of_features.append(signal_features)
+
+        if len(list_of_features) == 1:
+            self.set_output(0, list_of_features[0])
+        else:
+            self.set_output(0, list_of_features)
 
 

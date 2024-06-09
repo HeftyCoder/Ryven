@@ -1,5 +1,9 @@
 import mne 
 import pyprep
+from pyprep.removeTrend import removeTrend
+from pyprep.find_noisy_channels import NoisyChannels
+from pyprep.reference import Reference
+
 import numpy as np
 
 def runline(y, n, dn):
@@ -118,7 +122,7 @@ def remove_trend_data(
 
 def line_noise_removal_prep(raw_eeg: mne.io.Raw, sfreq: float, linenoise: float):
     EEG_raw = raw_eeg.get_data()
-    EEG_new = pyprep.removeTrend(EEG_raw, sfreq, matlab_strict=False)
+    EEG_new = removeTrend(EEG_raw, sfreq, matlab_strict=False)
 
     # Step 2: Removing line noise
     EEG_clean = mne.filter.notch_filter(
@@ -175,7 +179,7 @@ def referencing_prep(
         "max_chunk_size": max_chunk_size,
     }
     
-    reference = pyprep.Reference(
+    reference = Reference(
         raw = raw_eeg,
         params = prep_params,
         random_state = 1,
@@ -202,7 +206,7 @@ def referencing_prep(
     return raw_eeg
 
 def noisychannelsprep(raw_eeg:mne.io.Raw):
-    noisy_detector = pyprep.NoisyChannels(raw_eeg,random_state=1)
+    noisy_detector = NoisyChannels(raw_eeg,random_state=1)
     noisy_detector.find_bad_by_nan_flat()
     return raw_eeg
     
