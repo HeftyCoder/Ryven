@@ -238,7 +238,6 @@ class RemoveComponentsCommand(FlowUndoCommand):
             if isinstance(i, NodeItem):
                 self.node_items.append(i)
                 self.nodes.append(i.node)
-                i.node_gui._on_deleted()
                 
             elif isinstance(i, DrawingObject):
                 self.drawings.append(i)
@@ -299,6 +298,9 @@ class RemoveComponentsCommand(FlowUndoCommand):
         # remove drawings
         for d in self.drawings:
             self.flow_view.remove_drawing(d)
+        
+        for n_i in self.node_items:
+            n_i.node_gui._on_deleted()
 
     def restore_internal_connections(self):
         for c in self.internal_connections:

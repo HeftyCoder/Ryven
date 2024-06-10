@@ -25,8 +25,19 @@ from traits.observation.events import (
     DictChangeEvent, 
     SetChangeEvent
 )
-from traits.api import Button
+
+from traits.api import (
+    Button, 
+    TraitListObject, 
+    TraitSetObject, 
+    TraitDictObject,
+    List,
+    Set,
+    Dict,
+) 
+from collections.abc import Sequence, Mapping, Set as AbcSet, MutableSet
 from qtpy.QtWidgets import QVBoxLayout, QWidget
+from copy import copy
 
 
 class NodeTraitsConfigInspector(NodeConfigInspector[NodeTraitsConfig], QWidget):
@@ -44,48 +55,118 @@ class NodeTraitsConfigInspector(NodeConfigInspector[NodeTraitsConfig], QWidget):
         def on_trait_changed(event):
             
             gui.flow_view.setFocus()
-            def undo_redo(event, func, value):
+            def undo_redo(obj, name, func, *args):
                 def _undo__redo():
-                    node.config.block_change_events()
-                    func(event, value)
-                    node.config.allow_change_events()
+                    conf: NodeTraitsConfig = node.config
+                    conf.block_change_events()
+                    func(obj, name, *args)
+                    conf.allow_change_events()
                         
                 return _undo__redo
             
-            def undo_redo_pair(event, func, undo_val, redo_val):
+            def undo_redo_pair(obj, name, func, undo_args, redo_args):
                 return (
-                    undo_redo(event, func, undo_val),
-                    undo_redo(event, func, redo_val)
+                    undo_redo(obj, name, func, undo_args),
+                    undo_redo(obj, name, func, redo_args)
                 )
                 
             node_id = node.global_id
-            message = f'Config Change Node: {node_id}: {event}'
             
             if isinstance(event, TraitChangeEvent):
-                u_pair = undo_redo_pair(event, _trait_change, event.old, event.new)
-            elif isinstance(event, ListChangeEvent):
-                u_pair = undo_redo_pair(
-                    event, 
-                    _list_change, 
-                    (event.index, event.added, event.removed),
-                    (event.index, event.removed, event.added)
-                )
-            elif isinstance(event, SetChangeEvent):
-                u_pair = undo_redo_pair(
-                    event,
-                    _set_change,
-                    (event.added, event.removed),
-                    (event.removed, event.added)
-                )
-            else:
-                u_pair = undo_redo_pair(
-                    event,
-                    _dict_change,
-                    (event.added, event.removed),
-                    (event.removed, event.added)
-                )
                 
-            undo, redo = u_pair
+                # this needs to get copied if it's a list otherwise
+                # in redo the values from the last events (not trait change)
+                # will be retained
+                
+                # i.e If a list had actions ["", ""] and ["xx", ""], if we
+                # completely undo and then redo, we'd end up with ["xx", ""]
+                # instead of ["", ""]
+                
+                name, obj = event.name, event.object
+                if isinstance(event.new, (Sequence, Set, Mapping)):
+                    new_val = copy(event.new)
+                    old_val = copy(event.old)
+                else:
+                    new_val = event.new
+                    old_val = event.old
+                
+                undo = undo_redo(obj, name, _trait_change, old_val)
+                redo = undo_redo(obj, name, _trait_change, new_val)
+                
+            else:
+                if isinstance(event, ListChangeEvent):
+                    tlist: TraitListObject = event.object
+                    obj, name = tlist.object(), tlist.name
+                    new_val = getattr(obj, name)
+                    old_val = copy(new_val)
+                    _list_undo(old_val, event.index, event.added, event.removed)
+                    
+                    undo = undo_redo(
+                        obj, 
+                        name, 
+                        _list_change,
+                        event.index,
+                        event.added,
+                        event.removed 
+                    )
+                    redo = undo_redo(
+                        obj,
+                        name,
+                        _list_change,
+                        event.index,
+                        event.removed,
+                        event.added
+                    )
+                    
+                elif isinstance(event, SetChangeEvent):
+                    tset: TraitSetObject = event.object
+                    obj, name = tset.object(), tset.name
+                    new_val = getattr(obj, name)
+                    old_val = copy(new_val)
+                    _set_undo(old_val, event.added, event.removed)
+                    undo = undo_redo(
+                        obj,
+                        name,
+                        _set_change,
+                        event.added,
+                        event.removed
+                    )
+                    redo = undo_redo(
+                        obj,
+                        name,
+                        _set_change,
+                        event.removed,
+                        event.added
+                    )
+                    
+                elif isinstance(event, DictChangeEvent):
+                    tdict: TraitDictObject = event.object
+                    obj, name = tdict.object(), tdict.name
+                    new_val = getattr(obj, name)
+                    old_val = copy(new_val)
+                    _dict_undo(old_val, event.added, event.removed)
+                    undo = undo_redo(
+                        obj,
+                        name,
+                        _dict_change,
+                        event.added,
+                        event.removed
+                    )
+                    redo = undo_redo(
+                        obj,
+                        name,
+                        _dict_change,
+                        event.removed,
+                        event.added
+                    )
+            
+            message = f'Config Change Node: {node.title}[{node_id}] {name}: {new_val}'
+            # this shouldn't happen
+            # I don't know if this is a bug in traits or I'm
+            # doing something wrong
+            # but since it's happening, lets guard against it
+            if old_val == new_val:
+                return
             gui.flow_view.push_undo(
                 DelegateCommand(
                     gui.flow_view,
@@ -94,7 +175,7 @@ class NodeTraitsConfigInspector(NodeConfigInspector[NodeTraitsConfig], QWidget):
                     redo,
                 ), True
             )
-        
+            
         return on_trait_changed
     
     
@@ -223,27 +304,44 @@ class NodeTraitsGroupConfigInspector(NodeTraitsConfigInspector):
 
 #   ------UTIL-------
 
-def _trait_change(event: TraitChangeEvent, value):
-    setattr(event.object, event.name, value)
-            
-def _list_change(event: ListChangeEvent, value: tuple): # (added, removed, index)
-    l: list = event.object
-    index, added, removed = value
-    
-    del l[index:index+len(added)]
-    l[index:index] = removed
-            
-def _set_change(event: SetChangeEvent, value: tuple): # (added, removed)
-    s: set = event.object
-    added, removed = value
-    for r in removed:
-        s.remove(r)
-    s.update(added)
+def _trait_change(obj, name, value):
+    setattr(obj, name, value)
+
+def _list_change(obj, name, index, added, removed): # (added, removed, index)
+    li: Sequence = getattr(obj, name)
+    _list_undo(li, index, added, removed)
+
+def _list_undo(li, index, added, removed):
+    del li[index:index+len(added)]
+    li[index:index] = removed
+         
+def _set_change(obj, name, added, removed): # (added, removed)
+    s: set = getattr(obj, name)
+    _set_undo(s, added, removed)
+
+def _set_undo(s: set, added, removed):
+    s.difference_update(added)
+    s.update(removed)
         
-def _dict_change(event: DictChangeEvent, value: tuple): #(added, removed)
-    d: dict = event.object
-    added, removed = value
+def _dict_change(obj, name, added, removed): #(added, removed)
+    d: dict = getattr(obj, name)
+    _dict_undo(d, added, removed)
+
+def _dict_undo(d: dict, added, removed):
     for key in removed:
         del d[key]
     d.update(added)
+    
+# Some nice info
 
+# What is a TraitListObject? (It was used before for the above functions)
+
+# A validator that holds all the information Internally, this object changes for 
+# a trait when the whole list changes, rather than only its items. That's why
+# we have to reset the whole list for undo-redo to work correctly and not rely
+# on the TraitListObject it self
+
+# the same applies to Set and Dict Traits (TraitSetObject, TraitDictObject)
+
+# This means that we never pass that object and change it. We should always
+# use the trait itself for any undos, redos

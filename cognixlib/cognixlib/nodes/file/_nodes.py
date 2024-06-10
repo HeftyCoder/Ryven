@@ -158,7 +158,13 @@ class XDFImportingNode(Node):
             desc="the file name will be extracted from this if there is a string variable"
         )
         lowercase_labels: bool = Bool(False, desc="if checked, makes all the incoming labels into lowercase")
+        streams: list[str] =  List(CX_Str(), desc="the requested for extraction stream names")
 
+        #@observe("streams.items", post_init=True)
+        def notify_streams_change(self, event):
+            print(event, type(event))
+            
+            
     init_outputs = [PortConfig(label='streams',allowed_data=Mapping[str,StreamSignal])]
         
     @property
@@ -187,7 +193,6 @@ class XDFImportingNode(Node):
             streams , header = pyxdf.load_xdf(path_file)
             
             for stream in streams:
-                self.logger.debug(f"Found Stream: {stream}")
                 stream_name = stream['info']['name'][0]
                 stream_type = stream['info']['type'][0]
                 stream_channel_count = stream['info']['channel_count'][0]
