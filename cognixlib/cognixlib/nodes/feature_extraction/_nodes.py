@@ -152,8 +152,8 @@ class FBCSPTrainRealTimeNode(Node):
                 
                 self.fbcsp_feature_extractor = FBCSP(self.n_filters)
             
-            data1 = [_ for sig1 in self.signal1 for _ in (sig1.data if sig1.data.ndim == 3 else [sig1.data])] 
-            data2 = [_ for sig2 in self.signal2 for _ in (sig2.data if sig2.data.ndim == 3 else [sig2.data])] 
+            data1 = [_ for sig1 in self.signal1 for _ in (sig1.data.Τ if sig1.data.ndim == 3 else [sig1.data.Τ])] 
+            data2 = [_ for sig2 in self.signal2 for _ in (sig2.data.Τ if sig2.data.ndim == 3 else [sig2.data.Τ])] 
             data = np.array(data1 + data2)          
             
             sum_of_data_class1 = (
@@ -259,8 +259,8 @@ class FBCSPTransformRealTimeNode(Node):
             
             self.fbcsp_feature_extractor = self.dict['fbcsp_filters']
 
-            data1 = [_ for sig1 in self.signal1 for _ in (sig1.data if sig1.data.ndim == 3 else [sig1.data])] 
-            data2 = [_ for sig2 in self.signal2 for _ in (sig2.data if sig2.data.ndim == 3 else [sig2.data])] 
+            data1 = [_ for sig1 in self.signal1 for _ in (sig1.data.Τ if sig1.data.ndim == 3 else [sig1.data.Τ])] 
+            data2 = [_ for sig2 in self.signal2 for _ in (sig2.data.Τ if sig2.data.ndim == 3 else [sig2.data.Τ])] 
             data = np.array(data1 + data2)          
             
             sum_of_data_class1 = (

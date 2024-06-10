@@ -615,7 +615,7 @@ class FIRFilterNode(Node):
                 fir_design = self.config.fir_design
                 )
             
-            filtered_signal._data = filtered_data
+            filtered_signal._data = filtered_data.Τ
         
             list_of_filtered_sigs.append(filtered_signal)
         
@@ -659,7 +659,7 @@ class IIRFilterNode(Node):
             filtered_signal:StreamSignal = sig.copy()
             
             filtered_data = mne.filter.filter_data(
-                data = sig.data,
+                data = sig.data.Τ,
                 sfreq = sig.info.nominal_srate,
                 l_freq = self.config.l_freq,
                 h_freq = self.config.h_freq,
@@ -667,7 +667,7 @@ class IIRFilterNode(Node):
                 method = 'iir'
                 )
             
-            filtered_signal._data = filtered_data
+            filtered_signal._data = filtered_data.Τ
             
             list_of_filtered_sigs.append(filtered_signal)
             
@@ -732,7 +732,7 @@ class NotchFilterNode(Node):
             freqs = np.arange(self.line_freq,sampling_freq/2,self.line_freq) 
         
             filtered_data = mne.filter.notch_filter(
-                x = sig.data,
+                x = sig.data.Τ,
                 Fs = sampling_freq,
                 freqs = freqs,
                 filter_length = self.filter_length_input,
@@ -745,7 +745,7 @@ class NotchFilterNode(Node):
                 fir_design= self.fir_design
             )
 
-            filtered_signal._data = filtered_data
+            filtered_signal._data = filtered_data.Τ
             list_of_filtered_sigs.append(filtered_signal)
 
         if len(list_of_filtered_sigs) == 1:
