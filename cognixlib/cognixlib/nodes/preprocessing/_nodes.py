@@ -599,9 +599,9 @@ class FIRFilterNode(Node):
         for sig in signal:
             
             filtered_signal:StreamSignal = sig.copy()
-        
+
             filtered_data = mne.filter.filter_data(
-                data = sig.data,
+                data = sig.data.T,
                 sfreq = sig.info.nominal_srate,
                 l_freq = self.config.low_freq,
                 h_freq = self.config.high_freq,
