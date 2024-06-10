@@ -10,6 +10,7 @@ from ...api.data import (
     TimeSignal,
     LabeledSignal,
     FeatureSignal,
+    StreamSignal
 )
 
 from cognixcore.api import (
