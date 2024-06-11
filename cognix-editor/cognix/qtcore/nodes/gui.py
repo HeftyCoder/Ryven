@@ -64,6 +64,8 @@ class NodeGUI(QObject):
     output_added = Signal(int, object)
     input_removed = Signal(int, object)
     output_removed = Signal(int, object)
+    input_renamed = Signal(int, object, str)
+    output_renamed = Signal(int, object, str)
     update_shape_triggered = Signal()
     hide_unconnected_ports_triggered = Signal()
     show_unconnected_ports_triggered = Signal()
@@ -96,6 +98,8 @@ class NodeGUI(QObject):
         self.node.output_added.sub(self._on_new_output_added)
         self.node.input_removed.sub(self._on_input_removed)
         self.node.output_removed.sub(self._on_output_removed)
+        self.node.input_renamed.sub(self._on_input_renamed)
+        self.node.output_renamed.sub(self._on_output_renamed)
         self.node.progress_updated.sub(self._on_progress_updated)
         self.config_changed_signal.connect(self._on_config_changed)
 
@@ -198,6 +202,12 @@ class NodeGUI(QObject):
 
     def _on_output_removed(self, _, index, out):
         self.output_removed.emit(index, out)
+    
+    def _on_input_renamed(self, _, index, inp, old_name):
+        self.input_renamed.emit(index, inp, old_name)
+    
+    def _on_output_renamed(self, _, index, out, old_name):
+        self.output_renamed.emit(index, out, old_name)
 
     def _on_progress_updated(self, progress: ProgressState):
         self.progress_updated.emit(progress)

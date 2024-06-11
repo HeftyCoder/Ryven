@@ -99,7 +99,6 @@ class XDFWriterNode(Node):
                 samples_count=self.samples_count[i]
             )
         self.xdfile.close_file()
-            # creation_of_xdf(self.xdfile,i,self.inlets[i],None,None,False,False,True,first_time=self.timestamps[i][0][0],last_time=self.timestamps[i][-1][-1],samples_count=self.samples_count[i])  
     
     def update_event(self,inp=-1):
           
@@ -123,7 +122,6 @@ class XDFWriterNode(Node):
             self.timestamps[inp] = []
             self.samples_count[inp] = 0
             self.xdfile.write_header(inp, self.inlets[inp])
-            # creation_of_xdf(self.xdfile,inp,self.inlets[inp],None,None,True,False,False,0,0,0)
 
             self.write_header.add(inp)
         
@@ -143,7 +141,6 @@ class XDFWriterNode(Node):
             timestamps,
             self.inlets[inp]['channel_count']
         )
-        # creation_of_xdf(self.xdfile,inp,self.inlets[inp],samples,timestamps,False,True,False,0,0,0)
         
             
 class XDFImportingNode(Node):
@@ -160,12 +157,37 @@ class XDFImportingNode(Node):
         lowercase_labels: bool = Bool(False, desc="if checked, makes all the incoming labels into lowercase")
         streams: list[str] =  List(CX_Str(), desc="the requested for extraction stream names")
 
-        #@observe("streams.items", post_init=True)
+        @observe("streams.items", post_init=True)
         def notify_streams_change(self, event):
-            print(event, type(event))
+            if self.is_duplicate_notif(event):
+                return
             
+            valid_names: list[str] = []
+            for stream in self.streams:
+                valid_s = stream.strip()
+                if valid_s:
+                    valid_names.append(valid_s)
             
-    init_outputs = [PortConfig(label='streams',allowed_data=Mapping[str,StreamSignal])]
+            outputs = self.node._outputs
+            output_diff = len(valid_names) - len(outputs) + 1
+            if output_diff < 0:
+                for i in range(abs(output_diff)): 
+                    if len(outputs) == 1: # protect the first output
+                        break
+                    self.node.delete_output(len(outputs) - 1)
+            else:
+                for i in range(output_diff):
+                    self.node.create_output(
+                        PortConfig(
+                            'stream', 
+                            allowed_data=StreamSignal
+                        )
+                    )
+            
+            for i in range(1, len(outputs)):
+                self.node.rename_output(i, valid_names[i-1])
+            
+    init_outputs = [PortConfig(label='streams',allowed_data=Mapping[str, StreamSignal])]
         
     @property
     def config(self) -> XDFImportingNode.Config:

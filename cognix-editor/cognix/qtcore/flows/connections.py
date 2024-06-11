@@ -11,6 +11,7 @@ from ..gui_base import GUIBase, AnimationTimer, QGraphicsItemAnimated
 from ..utils import sqrt, pythagoras
 from ..ports.item import PortItem
 from ..design import Design
+from ...qtcore.nodes.item import NodeItem
 
 from qtpy.QtCore import (
     QTimeLine, 
@@ -27,7 +28,7 @@ from qtpy.QtWidgets import (
     QGraphicsObject,
 )
 
-from cognixcore import NodeOutput, NodeInput, Node
+from cognixcore import NodeOutput, NodeInput, Node, ConnectionInfo
 from enum import Enum
 
 from typing import Any
@@ -40,20 +41,22 @@ class ConnectionItem(GUIBase, QGraphicsPathItem, QObject):
     
     data_signal = Signal(Any) # tuple[NodeOutput, NodeInput]
 
-    def __init__(self, connection: tuple[NodeOutput, NodeInput], session_design: Design):
+    def __init__(
+        self, 
+        inp_node_item: NodeItem, 
+        out_node_item: NodeItem, 
+        connection: ConnectionInfo, 
+        session_design: Design
+    ):
         QGraphicsPathItem.__init__(self)
         QObject.__init__(self)
 
         self.setAcceptHoverEvents(True)
 
         self.connection = connection
-        out, inp = self.connection
-
-        out_port_index = out.node._outputs.index(out)
-        inp_port_index = inp.node._inputs.index(inp)
-        self.out_item: PortItem = out.node.gui.item.outputs[out_port_index]
-        self.inp_item: PortItem = inp.node.gui.item.inputs[inp_port_index]
-
+        self.inp_node_item = inp_node_item
+        self.out_node_item = out_node_item
+        
         self.session_design = session_design
         self.session_design.flow_theme_changed.connect(self.recompute)
         self.session_design.performance_mode_changed.connect(self.recompute)
@@ -89,8 +92,16 @@ class ConnectionItem(GUIBase, QGraphicsPathItem, QObject):
         
         self.recompute()
 
+    @property
+    def out_item(self):
+        return self.out_node_item.outputs[self.connection.out_i]
+    
+    @property
+    def inp_item(self):
+        return self.inp_node_item.inputs[self.connection.inp__i]
+        
     def node(self) -> Node:
-        return self.connection[0].node
+        return self.connection.node_out
         
     def __on_data_signal(self, data):
         """Called when the data signal is emitted"""
@@ -101,16 +112,15 @@ class ConnectionItem(GUIBase, QGraphicsPathItem, QObject):
     
     def __on_data(self, node: Node, index: int, out: NodeOutput, data):
         """Emits the data changed signal for this connection item"""
-        output, _ = self.connection
+        output = self.connection.out_port
         if out == output and (self.session_design.connection_animation_enabled or self._anim_timer.is_running):
             self.data_signal.emit(data)
     
     def __str__(self):
-        out, inp = self.connection
-        node_in_name = f'{inp.node.gui.item}'
-        node_in_index = inp.node._inputs.index(inp)
-        node_out_name = f'{out.node.gui.item}'
-        node_out_index = out.node._outputs.index(out)
+        node_in_name = f'{self.connection.node_inp.gui.item}'
+        node_in_index = self.connection.inp__i
+        node_out_name = f'{self.connection.node_out.gui.item}'
+        node_out_index =self.connection.out_i
         return f'{node_out_index}->{node_in_index} ({node_out_name}, {node_in_name})'
 
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget):

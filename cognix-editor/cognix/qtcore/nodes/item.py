@@ -411,7 +411,7 @@ class NodeItemWidget(QGraphicsWidget):
     def insert_output_into_layout(self, index: int, out: OutputPortItem):
         self.outputs_layout.insertItem(index * 2 + 1, out)  # *2 because of the stretches
         self.outputs_layout.setAlignment(out, Qt.AlignRight)
-        if len(self.node_gui.node.outputs) > 1:
+        if len(self.node_gui.node._outputs) > 1:
             self.outputs_layout.insertStretch(index * 2 + 1)  # *2+1 because of the stretches, too
 
     def remove_output_from_layout(self, out: OutputPortItem):
@@ -584,6 +584,8 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
         self.node_gui.output_added.connect(self.on_node_output_added)
         self.node_gui.input_removed.connect(self.on_node_input_removed)
         self.node_gui.output_removed.connect(self.on_node_output_removed)
+        self.node_gui.input_renamed.connect(self.on_node_input_renamed)
+        self.node_gui.output_renamed.connect(self.on_node_output_renamed)
 
         # FLAGS
         self.setFlags(
@@ -782,6 +784,10 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
     def on_node_input_removed(self, index, inp: NodeInput):
         self.remove_input(inp)
 
+    def on_node_input_renamed(self, index: int, inp: NodeInput, old_name: str):
+        self.inputs[index].update()
+        self.update()
+        
     def remove_input(self, inp: NodeInput):
         item = None
         for inp_item in self.inputs:
@@ -828,18 +834,15 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
             self.update()
 
     def on_node_output_removed(self, index, out: NodeOutput):
-        self.remove_output(out)
+        self.remove_output(index, out)
+    
+    def on_node_output_renamed(self, index: int, out: NodeOutput, old_name: str):
+        self.outputs[index].update()
+        self.update_shape()
 
-    def remove_output(self, out: NodeOutput):
-        item = None
-        for out_item in self.outputs:
-            if out_item.port == out:
-                item = out_item
-                break
-
-        # index = self.node.outputs.index(out)
-        # item = self.outputs[index]
-
+    def remove_output(self, index: int, out: NodeOutput):
+        item = self.outputs[index]
+        
         # see remove_input() for info!
         self.scene().removeItem(item.pin)
         self.scene().removeItem(item.label)
@@ -1049,30 +1052,32 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
     
     def update_conn_pos(self):
         """Updates the scene positions of connections"""
-
+        
         for o in self.node._outputs:
             for i in self.node.flow.connected_inputs(o):
                 # c.item.recompute()
-
-                if (o, i) not in self.flow_view.connection_items:
+                c_info = self.flow_view.flow.connection_info((o, i))
+                if c_info not in self.flow_view.connection_items:
                     # it can happen that the connection item hasn't been
                     # created yet
                     continue
 
-                item = self.flow_view.connection_items[(o,i)]
+                item = self.flow_view.connection_items[c_info]
                 item.recompute()
+                
         for i in self.node._inputs:
             o = self.node.flow.connected_output(i)
             # c.item.recompute()
-
-            if (o, i) not in self.flow_view.connection_items:
+            c_info = self.flow_view.flow.connection_info((o, i))
+            if c_info not in self.flow_view.connection_items:
                 # it can happen that the connection item hasn't been
                 # created yet
                 continue
 
-            item = self.flow_view.connection_items[(o,i)]
+            item = self.flow_view.connection_items[c_info]
             item.recompute()
-
+            
+        
     def hoverEnterEvent(self, event):
         self.hovered = True
         self.widget.update_shape()

@@ -48,12 +48,20 @@ def val(port: NodePort):
 
 
 def connections(port: NodePort):
+    f = port.node.flow
     if isinstance(port, NodeOutput):
-        return [(port, i) for i in port.node.flow.connected_inputs(port)]
+        return [
+            f.connection_info((port, i)) 
+            for i in port.node.flow.connected_inputs(port)
+        ]
     else:
         conn_out = port.node.flow.connected_output(port)
         if conn_out:
-            return [(port.node.flow.connected_output(port), port)]
+            return [
+                f.connection_info(
+                    (port.node.flow.connected_output(port), port)
+                )
+            ]
         else:
             return []
 
@@ -64,18 +72,33 @@ def connections(port: NodePort):
 class PortItem(GUIBase, QGraphicsWidget):
     """The GUI representative for ports of nodes, also handling mouse events for connections."""
 
-    def __init__(self, node_gui: NodeGUI, node_item: NodeItem, port: NodePort, flow_view: FlowView):
+    def __init__(
+        self, 
+        node_gui: NodeGUI, 
+        node_item: NodeItem, 
+        port: NodePort, 
+        flow_view: FlowView
+    ):
         GUIBase.__init__(self, representing_component=port)
         QGraphicsWidget.__init__(self)
 
         self.setGraphicsItem(self)
 
         self.node_gui = node_gui
+        self.node = self.node_gui.node
         self.node_item = node_item
-        self.port = port
+        self._is_input = isinstance(port, NodeInput)
+        self._port_list = self.node._inputs if self._is_input else self.node._outputs
+        self._port_index = self._port_list.index(port)
         self.flow_view = flow_view
 
-        self.pin = PortItemPin(self.port, self, self.node_gui, self.node_item)
+        self.pin = PortItemPin(
+            self._port_list,
+            self._port_index,
+            self,
+            self.node_gui, 
+            self.node_item
+        )
 
         self.label = GraphicsTextWidget(self)
         self.label.set_font(QFont("Source Code Pro", 10, QFont.Bold))
@@ -85,6 +108,12 @@ class PortItem(GUIBase, QGraphicsWidget):
         self._layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(self._layout)
 
+    @property
+    def port(self):
+        if len(self._port_list) <= self._port_index:
+            return None
+        return self._port_list[self._port_index]
+    
     # >>> interaction boilerplate >>>
     def boundingRect(self):
         return QRectF(QPointF(0, 0), self.geometry().size())
@@ -243,10 +272,11 @@ class PinState(IntEnum):
         
 class PortItemPin(QGraphicsWidget):
     
-    def __init__(self, port: NodePort, port_item, node_gui: NodeGUI, node_item: NodeItem):
+    def __init__(self, port_list: list[NodePort], port_index: int, port_item, node_gui: NodeGUI, node_item: NodeItem):
         super(PortItemPin, self).__init__(node_item)
-
-        self.port = port
+        
+        self._port_list = port_list
+        self.port_index = port_index
         self.port_item = port_item
         self.node_gui = node_gui
         self.node_item = node_item
@@ -265,6 +295,12 @@ class PortItemPin(QGraphicsWidget):
         self.height = 17
         self.port_local_pos = None
 
+    @property
+    def port(self):
+        if len(self._port_list) <= self.port_index:
+            return None
+        return self._port_list[self.port_index]
+    
     @property
     def state(self):
         """Returns the pin state, regardless of whether it's connected"""
@@ -300,12 +336,16 @@ class PortItemPin(QGraphicsWidget):
         return QSizeF(self.width, self.height)
 
     def paint(self, painter, option, widget=None):
+        port = self.port
+        if not port:
+            return
+        
         self.node_item.session_design.flow_theme.paint_PI(
             node_gui=self.node_gui,
             painter=painter,
             option=option,
             node_color=self.node_gui.color,
-            type_=self.port.type_,
+            type_=port.type_,
             pin_state=self._state,
             rect=QRectF(
                 self.padding, self.padding, self.width_no_padding(), self.height_no_padding()

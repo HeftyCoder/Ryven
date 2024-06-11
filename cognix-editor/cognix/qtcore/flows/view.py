@@ -55,7 +55,8 @@ from cognixcore import (
     NodePort, 
     InfoMsgs, 
     PortObjPos, 
-    ConnValidType
+    ConnValidType,
+    ConnectionInfo
 )
 from cognixcore.node import node_from_identifier
 
@@ -284,8 +285,8 @@ class FlowView(GUIBase, QGraphicsView):
         self.design = session_gui.design
         self.node_items: dict[Node, NodeItem] = {}
         self.node_items__cache: dict[Node, NodeItem] = {}
-        self.connection_items: dict[tuple[NodeOutput, NodeInput], ConnectionItem] = {}  # {Connection: ConnectionItem}
-        self.connection_items__cache: dict[tuple[NodeOutput, NodeInput], ConnectionItem] = {}
+        self.connection_items: dict[ConnectionInfo, ConnectionItem] = {}  # {Connection: ConnectionItem}
+        self.connection_items__cache: dict[ConnectionInfo, ConnectionItem] = {}
         self.selection_mode: _SelectionMode = _SelectionMode.UNDOABLE_CLICK
 
         # DRAGGING - CONNECTION
@@ -728,7 +729,7 @@ class FlowView(GUIBase, QGraphicsView):
                 else:
                     self._drag_conn_port_items = (port_item_over, selected_port_item)
 
-                self._valid_check = self.flow.can_nodes_connect(self._get_drag_conn_pair())
+                self._valid_check = self.flow.can_ports_connect(self._get_drag_conn_pair())
                 
             elif not port_item_over and node_item_over and self._conn_item_over != node_item_over:
                 updated = True
@@ -738,7 +739,7 @@ class FlowView(GUIBase, QGraphicsView):
                 if isinstance(selected_port, NodeOutput):
                     for inp_port_item in node_item_over.inputs:
                         self._drag_conn_port_items = (selected_port_item, inp_port_item)
-                        self._valid_check = self.flow.can_nodes_connect(
+                        self._valid_check = self.flow.can_ports_connect(
                             self._get_drag_conn_pair()
                         )
                         if  self._valid_check == ConnValidType.VALID:
@@ -747,7 +748,7 @@ class FlowView(GUIBase, QGraphicsView):
                 else:
                     for out_port_item in node_item_over.outputs:
                         self._drag_conn_port_items = (out_port_item, selected_port_item)
-                        self._valid_check = self.flow.can_nodes_connect(
+                        self._valid_check = self.flow.can_ports_connect(
                             self._get_drag_conn_pair()
                         )
                         if self._valid_check == ConnValidType.VALID:
@@ -1410,7 +1411,7 @@ class FlowView(GUIBase, QGraphicsView):
                 ConnectPortsCommand(self, out=self.flow.graph_adj_rev[inp], inp=inp, silent=self.silent_on_connecting())
             )
         
-        # using Flow.can_nodes_connect to avoid removing the connection since we can now select and delete it
+        # using Flow.can_ports_connect to avoid removing the connection since we can now select and delete it
         # otherwise this would delete the connection if it existed
         self.push_undo(ConnectPortsCommand(self, out=out, inp=inp, silent=self.silent_on_connecting()))
 
@@ -1418,29 +1419,30 @@ class FlowView(GUIBase, QGraphicsView):
         for c in conns:
             self.add_connection(c)
             
-    def add_connection(self, c: tuple[NodeOutput, NodeInput]):
-        out, inp = c
+    def add_connection(self, conn: tuple[NodeOutput, NodeInput]):
+        c = self.flow.connection_info(conn)
+        out_node, inp_node = c.node_out, c.node_inp
 
-        # TODO: need to verify that connection_items_cache still works fine with new connection object
         item: ConnectionItem = None
         if c in self.connection_items__cache.keys():
             item = self.connection_items__cache[c]
 
         else:
-            if inp.type_ == 'data':
-                # item = self.CLASSES['data conn item'](c, self.session.design)
-                item = DataConnectionItem(c, self.session_gui.design)
+            inp_node_item = self.node_items[c.node_inp]
+            out_node_item = self.node_items[c.node_out]
+            
+            if c.inp_port.type_ == 'data':
+                item = DataConnectionItem(inp_node_item, out_node_item, c, self.session_gui.design)
             else:
-                # item = self.CLASSES['exec conn item'](c, self.session.design)
-                item = ExecConnectionItem(c, self.session_gui.design)
+                item = ExecConnectionItem(inp_node_item, out_node_item, c, self.session_gui.design)
 
         self._add_connection_item(item)
 
         item.out_item.port_connected()
         item.inp_item.port_connected()
         # for updating the visual state
-        for i in c:
-            self.node_items[i.node].update()
+        self.node_items[out_node].update()
+        self.node_items[inp_node].update()
 
     def _add_connection_item(self, item: ConnectionItem):
         self._set_selection_mode(_SelectionMode.INSTANT)
@@ -1450,15 +1452,16 @@ class FlowView(GUIBase, QGraphicsView):
         item.setZValue(-1)
         # self.viewport().repaint()
 
-    def remove_connection(self, c: tuple[NodeOutput, NodeInput]):
+    def remove_connection(self, conn: tuple[NodeOutput, NodeInput]):
+        c = self.flow.connection_info(conn)
         item = self.connection_items[c]
         self._remove_connection_item(item)
 
         item.out_item.port_disconnected()
         item.inp_item.port_disconnected()
         # for updating the visual state
-        for i in c:
-            self.node_items[i.node].update()
+        self.node_items[c.node_inp].update()
+        self.node_items[c.node_out].update()
         del self.connection_items[c]
 
     def _remove_connection_item(self, item: ConnectionItem):
@@ -1468,7 +1471,7 @@ class FlowView(GUIBase, QGraphicsView):
 
     def auto_connect(self, p: NodePort, n: Node):
         if p.io_pos == PortObjPos.OUTPUT:
-            for inp in n.inputs:
+            for inp in n._inputs:
                 if p.type_ == inp.type_:
                     # connect exactly once
                     self.connect_node_ports__cmd(p, inp)
@@ -1480,6 +1483,7 @@ class FlowView(GUIBase, QGraphicsView):
                     self.connect_node_ports__cmd(p, out)
                     return
 
+    # don't know what this is
     def update_conn_item(self, c: tuple[NodeOutput, NodeInput]):
         if c in self.connection_items:
             self.connection_items[c].changed = True

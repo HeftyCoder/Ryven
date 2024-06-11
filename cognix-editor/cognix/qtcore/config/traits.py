@@ -307,19 +307,26 @@ class NodeTraitsGroupConfigInspector(NodeTraitsConfigInspector):
 def _trait_change(obj, name, value):
     setattr(obj, name, value)
 
-def _list_change(obj, name, index, added, removed): # (added, removed, index)
+def _list_change(obj: NodeTraitsConfig, name, index, added, removed): # (added, removed, index)
     li: Sequence = getattr(obj, name)
     _list_undo(li, index, added, removed)
 
 def _list_undo(li, index, added, removed):
-    del li[index:index+len(added)]
-    li[index:index] = removed
+    # ... still don't know if it's my problem or traits
+    if removed == added:
+        print("nn")
+        return
+    li[index: (index + len(added))] = removed
+
+# TODO Find a way for both set and undo to happen in one operation
          
 def _set_change(obj, name, added, removed): # (added, removed)
     s: set = getattr(obj, name)
     _set_undo(s, added, removed)
 
 def _set_undo(s: set, added, removed):
+    if added == removed:
+        return
     s.difference_update(added)
     s.update(removed)
         
@@ -328,6 +335,8 @@ def _dict_change(obj, name, added, removed): #(added, removed)
     _dict_undo(d, added, removed)
 
 def _dict_undo(d: dict, added, removed):
+    if added == removed:
+        return
     for key in removed:
         del d[key]
     d.update(added)
