@@ -17,6 +17,14 @@ from ...api.data import (
     LabeledSignal,
     CircularBuffer
 )
+from ...api.processing.filters import (
+    FilterParams,
+    Phase,
+    FIRFilter,
+    IIRFilter,
+    Phase,
+    FilterWindow,
+)
 
 from ...api.mne.prep import (
     remove_trend_data,
@@ -36,6 +44,7 @@ class SegmentationNode(Node):
 
     class Config(NodeTraitsConfig):
         offset: tuple[float, float] = CX_Tuple(-0.5, 0.5)
+        markers: list[str] = List(CX_Str(), desc="the markers to segment the signal by")
         marker_name: str = CX_String('marker')
         mode: str = Enum(
             'input', 
@@ -46,6 +55,10 @@ class SegmentationNode(Node):
         timestamp_buffer: int = CX_Int(1000, desc = 'Maximum amount of timestamps that can be processed')
         debug: bool = Bool(False, desc='debug message when data is segmented')
 
+        @observe("markers.items")
+        def notify_markers_change(self, event):
+            pass
+        
     init_inputs = [
         PortConfig(label='data', allowed_data=StreamSignal),
         PortConfig(
@@ -402,13 +415,7 @@ class WindowNode(Node):
             data_inp = [data_inp]
         
         result: list[StreamSignal] = []
-        buffer = CircularBuffer.create_empty()
-        
-        # we're assuming data comes ordered in time
-        # that means that the list of signals are segments
-        # of one bigger signal
-        # Reversing helps with adding the signals in order
-        # since the extraction algorithm works last to first
+        buffer = CircularBuffer.empty()
         
         step = self.step
         msg = ''
@@ -563,13 +570,17 @@ class FIRFilterNode(Node):
     class Config(NodeTraitsConfig):
         low_freq: float = CX_Float(desc='the low frequency of the filter')
         high_freq: float = CX_Float(desc='the high frequency of the fitler')
-        filter_length_str: str = CX_String('None',desc='the length of the filterin ms')
-        filter_length_int: int = CX_Int(desc='the length of the filter in samples')
-        l_trans_bandwidth:float = CX_Float(0.0,desc='the width of the transition band at the low cut-off frequency in Hz')
-        h_trans_bandwidth:float = CX_Float(0.0,desc='the width of the transition band at the high cut-off frequency in Hz')
-        phase:str = Enum('zero','minimum','zero-double','minimum-half',desc='the phase of the filter')
-        fir_window:str = Enum('hamming','hann','blackman',desc='the window to use in the FIR filter')
-        fir_design:str = Enum('firwin','firwin2',desc='the design of the FIR filter')
+        l_trans_bandwidth:float = CX_Float(0.0, desc='the width of the transition band at the low cut-off frequency in Hz')
+        h_trans_bandwidth:float = CX_Float(0.0, desc='the width of the transition band at the high cut-off frequency in Hz')
+        filter_length = Union(
+            CX_Int(10, desc="the number of taps for the filter"),
+            CX_Str("auto", desc="a string representing the length of the filter (i.e 5s, 5ms etc)")
+        ),
+    
+        # filter_length_str: str = CX_String('None',desc='the length of the filterin ms')
+        # filter_length_int: int = CX_Int(desc='the length of the filter in samples')
+        phase: str = Enum(Phase, desc='the phase of the filter')
+        window: str = Enum(FilterWindow, desc='a choice of windows for an fir filter')
             
     init_inputs = [PortConfig(label='data',allowed_data=StreamSignal | Sequence[StreamSignal])]
     init_outputs = [PortConfig(label='filtered data',allowed_data=StreamSignal | Sequence[StreamSignal])]
@@ -579,50 +590,48 @@ class FIRFilterNode(Node):
         return self._config
     
     def init(self):
-        self.filter_length = 'auto'
-        print(self.config.filter_length_str,self.config.filter_length_int)
-        if self.config.filter_length_str != 'None':
-            self.filter_length = self.config.filter_length_str
-        if self.config.filter_length_int != 0:
-            self.filter_length = self.config.filter_length_int
+        # TODO might include length later
+        c = self.config
+        self.fir_params = FilterParams(
+            c.low_freq,
+            c.high_freq,
+            c.l_trans_bandwidth if c.l_trans_bandwidth != 0 else "auto",
+            c.h_trans_bandwidth if c.h_trans_bandwidth != 0 else "auto",
+            c.filter_length,
+            c.phase 
+        )
+        
+        self.fir_filter: FIRFilter = None
                 
     def update_event(self, inp=-1):
         
-        signal: StreamSignal = self.input(inp)
-        if not signal:
+        signals: StreamSignal = self.input(inp)
+        if not signals:
             return
         
-        if not isinstance(signal,list):
-            signal = [signal]
+        if not isinstance(signals, Sequence):
+            signals = [signals]
         
-        list_of_filtered_sigs:Sequence = []
-        for sig in signal:
+        if not self.fir_filter:
+            first_signal = signals[0]
+            info = first_signal.info
+            self.fir_filter = FIRFilter(
+                info.nominal_srate,
+                self.fir_params,
+                self.config.window,
+                first_signal,
+            )
             
-            filtered_signal:StreamSignal = sig.copy()
-
-            filtered_data = mne.filter.filter_data(
-                data = sig.data.T,
-                sfreq = sig.info.nominal_srate,
-                l_freq = self.config.low_freq,
-                h_freq = self.config.high_freq,
-                filter_length = self.filter_length,
-                l_trans_bandwidth = self.config.l_trans_bandwidth if self.config.l_trans_bandwidth!=0.0 else 'auto',
-                h_trans_bandwidth = self.config.h_trans_bandwidth if self.config.h_trans_bandwidth!=0.0 else 'auto',
-                n_jobs = -1,
-                method = 'fir',
-                phase = self.config.phase,
-                fir_window = self.config.fir_window,
-                fir_design = self.config.fir_design
-                )
+        filtered_sigs: Sequence = []
+        for sig in signals:
             
-            filtered_signal._data = filtered_data.Τ
+            f_sig = self.fir_filter.filter(sig)
+            filtered_sigs.append(f_sig)
         
-            list_of_filtered_sigs.append(filtered_signal)
-        
-        if len(list_of_filtered_sigs) == 1:
-            self.set_output(0, list_of_filtered_sigs[0])
+        if len(filtered_sigs) == 1:
+            self.set_output(0, filtered_sigs[0])
         else:
-            self.set_output(0, list_of_filtered_sigs)
+            self.set_output(0, filtered_sigs)
     
 class IIRFilterNode(Node):
     title = 'IIR Filter'

@@ -19,7 +19,7 @@ class CircularBuffer:
         return result
     
     @classmethod
-    def create_empty(cls):
+    def empty(cls):
         return CircularBuffer(1, 1, 1, 1, False)
         
     def __init__(

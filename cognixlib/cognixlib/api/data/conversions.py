@@ -9,6 +9,18 @@ from numpy import dtypes
 import pylsl
 from types import MappingProxyType
 
+__str_to_np = {
+    'float32': np.dtype(np.float32),
+    'float64': np.dtype(np.float64),
+    'int8': np.dtype(np.int8),
+    'int16': np.dtype(np.int16),
+    'int32': np.dtype(np.int32),
+    'int64': np.dtype(np.int64),
+    'string': np.dtype(np.string_),    
+}
+
+str_to_np = MappingProxyType(__str_to_np)
+
 __np_to_lsl = {
     np.dtype(np.float32): pylsl.cf_float32,
     np.dtype(np.float64): pylsl.cf_double64,

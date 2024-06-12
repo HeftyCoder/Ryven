@@ -162,11 +162,7 @@ class XDFImportingNode(Node):
             if self.is_duplicate_notif(event):
                 return
             
-            valid_names: list[str] = []
-            for stream in self.streams:
-                valid_s = stream.strip()
-                if valid_s:
-                    valid_names.append(valid_s)
+            valid_names = self.valid_names
             
             outputs = self.node._outputs
             output_diff = len(valid_names) - len(outputs) + 1
@@ -186,6 +182,15 @@ class XDFImportingNode(Node):
             
             for i in range(1, len(outputs)):
                 self.node.rename_output(i, valid_names[i-1])
+        
+        @property
+        def valid_names(self):
+            valid_names: list[str] = []
+            for stream in self.streams:
+                valid_s = stream.strip()
+                if valid_s:
+                    valid_names.append(valid_s)
+            return valid_names
             
     init_outputs = [PortConfig(label='streams',allowed_data=Mapping[str, StreamSignal])]
         
@@ -207,7 +212,7 @@ class XDFImportingNode(Node):
         
         formats = ['double64','float32','int32','string','int16','int8','int64']
         
-        stream_collection = dict()
+        stream_collection: dict[str, StreamSignal] = {}
         
         print(path_file)
         
@@ -249,6 +254,12 @@ class XDFImportingNode(Node):
                 )
 
             self.set_output(0, stream_collection)
+            
+            valid_names = self.config.valid_names
+            for index, valid_name in enumerate(valid_names):
+                stream = stream_collection.get(valid_name)
+                if stream:
+                    self.set_output(index, stream)
         
         else:
             self.logger.error(msg=f'The path {path_file} doesnt exist')

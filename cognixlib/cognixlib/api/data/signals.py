@@ -7,6 +7,7 @@ from itertools import chain
 from copy import copy, deepcopy
 import numpy as np
 
+from .conversions import *
 class SignalInfo:
     """
     A signal info carries metadata about the signal
@@ -99,9 +100,10 @@ class Signal:
     def _extract_data(other):
         return other.data if isinstance(other, Signal) else other
     
-    def copy(self):
+    def copy(self, copydata=True):
         new_sig = copy(self)
-        new_sig._data = new_sig.data.copy()
+        if copydata:
+            new_sig._data = new_sig.data.copy()
         return new_sig
     
     def deepcopy(self):
@@ -402,6 +404,14 @@ class StreamSignalInfo(SignalInfo, StreamConfig):
             data_format,
             name 
         )
+    
+    @property
+    def data_format_np(self):
+        return str_to_np[self.data_format]
+    
+    @property
+    def data_format_lsl(self):
+        return lsl_to_np[self.data_format]
         
 class StreamSignal(TimeSignal, LabeledSignal):
     """
