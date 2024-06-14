@@ -143,14 +143,13 @@ class XDFWriterNode(Node):
         )
         
 
-from ..core import NameConfig
+from ..utils import PortList
           
 class XDFImportingNode(Node):
     title = 'XDF Import'
     version = '0.1'
     
     class Config(NodeTraitsConfig):
-        names: NameConfig = NameConfig()
         directory: str = Directory(desc='the saving directory')
         default_file_name: str = CX_Str("filename")
         varname: str = CX_Str(
@@ -158,42 +157,7 @@ class XDFImportingNode(Node):
             desc="the file name will be extracted from this if there is a string variable"
         )
         lowercase_labels: bool = Bool(False, desc="if checked, makes all the incoming labels into lowercase")
-        streams: list[str] =  List(CX_Str(), desc="the requested for extraction stream names")
-        
-        @observe("streams.items", post_init=True)
-        def notify_streams_change(self, event):
-            if self.is_duplicate_notif(event):
-                return
-            
-            valid_names = self.valid_names
-            
-            outputs = self.node._outputs
-            output_diff = len(valid_names) - len(outputs) + 1
-            if output_diff < 0:
-                for i in range(abs(output_diff)): 
-                    if len(outputs) == 1: # protect the first output
-                        break
-                    self.node.delete_output(len(outputs) - 1)
-            else:
-                for i in range(output_diff):
-                    self.node.create_output(
-                        PortConfig(
-                            'stream', 
-                            allowed_data=StreamSignal
-                        )
-                    )
-            
-            for i in range(1, len(outputs)):
-                self.node.rename_output(i, valid_names[i-1])
-        
-        @property
-        def valid_names(self):
-            valid_names: list[str] = []
-            for stream in self.streams:
-                valid_s = stream.strip()
-                if valid_s:
-                    valid_names.append(valid_s)
-            return valid_names
+        ports: PortList = CX_Instance(PortList, style='custom')
             
     init_outputs = [PortConfig(label='streams',allowed_data=Mapping[str, StreamSignal])]
         
