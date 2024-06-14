@@ -62,6 +62,15 @@ class Signal:
         self._data = data
         self._info = signal_info
     
+    @property
+    def info(self):
+        """Metadata information regarding the signal"""
+        return self._info
+    
+    @property
+    def data(self):
+        return self._data
+    
     def __str__(self):
         return str(self.data)
     
@@ -128,15 +137,6 @@ class Signal:
         cols_to_keep = np.where(np.all(condition, axis=0))[0]
         new_data = self.data[:, cols_to_keep]
         return Signal(new_data, self.info)           
-        
-    @property
-    def info(self):
-        """Metadata information regarding the signal"""
-        return self._info
-    
-    @property
-    def data(self):
-        return self._data
 
 class TimeSignal(Signal, Timestamped):
     """
@@ -211,6 +211,24 @@ class TimeSignal(Signal, Timestamped):
         self._time_datamap = TimeSignal.DataMap(data, timestamps, signal_info)
     
     @property
+    def data(self):
+        return self._data
+    
+    @data.setter
+    def data(self, value: np.ndarray):
+        self._data = value
+        self._time_datamap.data = value
+        
+    @property
+    def timestamps(self):
+        return self._timestamps
+    
+    @timestamps.setter
+    def timestamps(self, value: np.ndarray):
+        self._timestamps = value
+        self._time_datamap.timestamps = value
+        
+    @property
     def time_datamap(self):
         """Retrieves an object with mapped indices from timestamps to data"""
         return self._time_datamap
@@ -220,8 +238,8 @@ class TimeSignal(Signal, Timestamped):
         """Shorthand for time_datamap"""
         return self.time_datamap
     
-    def copy(self):
-        new_sig = super().copy()
+    def copy(self, copydata=True):
+        new_sig = super().copy(copydata)
         new_sig._time_datamap = TimeSignal.DataMap(
             new_sig.data, 
             new_sig.timestamps, 
@@ -288,12 +306,20 @@ class LabeledSignal(Signal, Labeled):
         """
         def __init__(self, data: np.ndarray, labels: np.ndarray, info: SignalInfo):
             self.data = data
-            self.labels = labels
             self.info = info
-            self._label_to_index: dict[str, int] = {
-                label:index for index, label in enumerate(labels.flat)
-            }
+            self.labels = labels
         
+        @property
+        def labels(self):
+            return self._labels
+        
+        @labels.setter
+        def labels(self, value: np.ndarray):
+            self._labels = value
+            self._label_to_index: dict[str, int] = {
+                label:index for index, label in enumerate(value.flat)
+            }
+            
         def __str__(self):
             return f"{self.labels}\n{self.data}"
         
@@ -351,6 +377,24 @@ class LabeledSignal(Signal, Labeled):
         self._label_datamap = LabeledSignal.DataMap(data, self.labels, signal_info)
 
     @property
+    def data(self):
+        return self._data
+    
+    @data.setter
+    def data(self, value: np.ndarray):
+        self._data = value
+        self._label_datamap.data = value
+        
+    @property
+    def labels(self):
+        return self._labels
+    
+    @labels.setter
+    def labels(self, value: np.ndarray):
+        self._labels = value
+        self._label_datamap.labels = value
+    
+    @property
     def label_datamap(self):
         """Retrieves an object with mapped indices from labels to data"""
         return self._label_datamap
@@ -360,8 +404,8 @@ class LabeledSignal(Signal, Labeled):
         """Shorthand for label_datamap"""
         return self.label_datamap
     
-    def copy(self):
-        new_sig = super().copy()
+    def copy(self, copydata=True):
+        new_sig = super().copy(copydata)
         new_sig._label_datamap = LabeledSignal.DataMap(
             new_sig.data,
             new_sig.labels,
@@ -445,8 +489,8 @@ class StreamSignal(TimeSignal, LabeledSignal):
     def info(self):
         return self._info
     
-    def copy(self):
-        new_sig: StreamSignal = Signal.copy(self)
+    def copy(self, copydata=True):
+        new_sig: StreamSignal = Signal.copy(self, copydata)
         new_sig._label_datamap = LabeledSignal.DataMap(
             new_sig.data,
             new_sig.labels,

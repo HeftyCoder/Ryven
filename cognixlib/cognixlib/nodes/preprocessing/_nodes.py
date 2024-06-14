@@ -17,6 +17,12 @@ from ...api.data import (
     LabeledSignal,
     CircularBuffer
 )
+from ...api.processing.manipulation import (
+    SegmentFinder,
+    SegmentFinderOffline,
+    SegmentFinderOnline,
+)
+
 from ...api.processing.filters import (
     FilterParams,
     Phase,
@@ -75,15 +81,21 @@ class SegmentationNode(Node):
     ]
 
     def init(self):
-        self.buffer: CircularBuffer = None
-        self.data_signal: StreamSignal = None
         
-        self.update_dict = {
-            0: self.update_data,
-            1: self.update_marker
-        }
-        self.marker_tm_cache = np.full(shape=self.config.timestamp_buffer, fill_value=np.nan,dtype='float64')
-        self.current_length = 0
+        self._valid_markers: list[str] = None
+        # find valid markers
+        self._m_name_to_port = dict[str, int] = {}
+        
+        self._seg_finder: SegmentFinder = None
+        
+        if self.config.mode == "input":
+            self._seg_finder = SegmentFinderOffline(
+                marker_names=self._valid_markers,
+            )
+        else:
+            self._seg_finder = SegmentFinderOnline(
+                marker_names=self._valid_markers,
+            )
              
     @property
     def config(self) -> SegmentationNode.Config:
@@ -91,115 +103,44 @@ class SegmentationNode(Node):
     
     def update_event(self, inp=-1):
         
-        update_result = self.update_input(inp)
-        
-        if not (update_result and self.buffer):
+        sig = self.input(inp)
+        if sig is None:
             return
         
-        output_data = []
-        output_timestamps =[]
-        timestamps_out = 0
+        if inp==0:
+            sig: StreamSignal = sig
+            if isinstance(self._seg_finder, SegmentFinderOnline) and not self._seg_finder.is_buffer_init():
+                self._seg_finder.set_buffer_info(
+                    self.config.buffer_duration, 
+                    sig.info.nominal_srate,
+                )
+
+            self._seg_finder.update_data(sig)
         
-        for i in range(self.current_length):
-            segment, timestamps = self.buffer.segment(
-                self.marker_tm_cache[i], 
-                self.config.offset
-            )
+        else:
             
-            if segment is not None:
-                output_timestamps.append(timestamps)
-                output_data.append(segment)
-                timestamps_out += 1
-                self.marker_tm_cache[i] = np.nan
+            self._seg_finder.update_markers(sig)
         
-        if timestamps_out != 0:
-            signal = [
-                StreamSignal(
-                    output_timestamps[i],
-                    self.data_signal.labels,
-                    output_data[i], 
-                    self.data_signal.info
-                ) 
-                for i in range(timestamps_out)
-            ]
+        signal_segments = self._seg_finder.segments(self.config.offset)
+        if signal_segments:
             
             if self.config.debug:
-                msg = f"ERATE: {self.buffer.effective_dts} Found {len(signal)} Segments</br></br>"
-                for s in signal:
-                    s_dur = s.timestamps[-1] - s.timestamps[0]
-                    msg += f"\t[{s.timestamps[0]} : {s.timestamps[-1]}] dur:[{s_dur}]</br>"
-                self.logger.info(msg)
-                
-            if len(signal) == 1:
-                signal = signal[0]
+                msg = f"ERATE: {self._seg_finder._buffer.effective_srate}\n"
+                msg += f"Found Marker Types: {signal_segments.keys()}\n"
             
-            self.current_length -= timestamps_out    
-            self.set_output(0, signal)
+            for m_name, signals in signal_segments:
+                out_index = self._m_name_to_port[m_name]
+                self.set_output(out_index, signals)
                 
-    def update_input(self, inp):
-        func = self.update_dict.get(inp)
-        if not func:
-            return False
-        return func(inp)
-    
-    def update_data(self, inp: int):
-        self.data_signal: StreamSignal = self.input(inp)
-        if not self.data_signal:
-            return False
-        
-        # create buffer if it doesn't exist
-        if self.config.mode == 'input':
-            self.buffer = CircularBuffer.create(
-                    self.data_signal.data,
-                    self.data_signal.timestamps,
-                )
-        else:    
-            if not self.buffer:
-                
-                buffer_duration = self.config.buffer_duration    
-                self.buffer = CircularBuffer(
-                    sampling_frequency=self.data_signal.info.nominal_srate,
-                    buffer_duration=buffer_duration,
-                    start_time=self.data_signal.timestamps[0],
-                    channels_count=len(self.data_signal.labels)
-                )
-        
-            self.buffer.append(self.data_signal.data, self.data_signal.timestamps)
-        
-        print(self.buffer.effective_srate)
-        return True
-
-    def update_marker(self, inp: int):
-        marker_signal = self.input(inp)        
-        
-        # no signal or no buffer
-        if not marker_signal:
-            return False
-        
-        timestamps = []
-                        
-        if isinstance(marker_signal, StreamSignal):
-            timestamps = [
-                ts for name, ts in zip(marker_signal.data, marker_signal.timestamps) 
-                if name[0] == self.config.marker_name
-            ]
-
-        ### list of type [[marker1,timestamp1],[marker2,timestamp2]]
-        elif isinstance(marker_signal, list): 
-            timestamps = [
-                time for marker, time in marker_signal 
-                if marker == self.config.marker_name
-            ]
+                # debug only
+                if self.config.debug:
+                    msg += f"\n For Marker: {m_name}"
+                    for sig in signals:
+                        s_dur = sig.timestamps[-1] - sig.timestamps[0]
+                        msg += f"\t[{sig.timestamps[0]} : {sig.timestamps[-1]}] dur:[{s_dur}]</br>"
             
-        ## no markers match
-        if len(timestamps) == 0:
-            return False
-        
-        self.marker_tm_cache[self.current_length:self.current_length + len(timestamps)] = timestamps
-        self.current_length += len(timestamps)
-        self.marker_tm_cache[0:self.current_length].sort()
-        return True
-
+            if self.config.debug:
+                self.logger.info(msg)          
 
 class WindowNode(Node):
     """

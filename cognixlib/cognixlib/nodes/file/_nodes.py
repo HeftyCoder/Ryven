@@ -142,12 +142,15 @@ class XDFWriterNode(Node):
             self.inlets[inp]['channel_count']
         )
         
-            
+
+from ..core import NameConfig
+          
 class XDFImportingNode(Node):
     title = 'XDF Import'
     version = '0.1'
     
     class Config(NodeTraitsConfig):
+        names: NameConfig = NameConfig()
         directory: str = Directory(desc='the saving directory')
         default_file_name: str = CX_Str("filename")
         varname: str = CX_Str(
@@ -156,7 +159,7 @@ class XDFImportingNode(Node):
         )
         lowercase_labels: bool = Bool(False, desc="if checked, makes all the incoming labels into lowercase")
         streams: list[str] =  List(CX_Str(), desc="the requested for extraction stream names")
-
+        
         @observe("streams.items", post_init=True)
         def notify_streams_change(self, event):
             if self.is_duplicate_notif(event):
@@ -263,12 +266,10 @@ class XDFImportingNode(Node):
         
         else:
             self.logger.error(msg=f'The path {path_file} doesnt exist')
-        
-            
+              
     def update_event(self, inp=-1):
         pass
-            
-                            
+                                 
 class SelectStreamNode(Node):
     title = 'Select Stream'
     version = '0.1' 

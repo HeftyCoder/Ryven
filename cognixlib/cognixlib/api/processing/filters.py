@@ -39,7 +39,7 @@ class FilterParams:
     l_trans_bandwidth: float = "auto"
     h_trans_bandwidth: float = "auto"
     filter_length: str | int = "auto"
-    phase: Phase
+    phase: Phase = Phase.ZERO
     
 class Filter(ABC):
     """The basic definition of a filter"""
