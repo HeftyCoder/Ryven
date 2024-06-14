@@ -31,6 +31,7 @@ from ...api.processing.filters import (
     Phase,
     FilterWindow,
 )
+from ..utils import PortList
 
 from ...api.mne.prep import (
     remove_trend_data,
@@ -50,8 +51,6 @@ class SegmentationNode(Node):
 
     class Config(NodeTraitsConfig):
         offset: tuple[float, float] = CX_Tuple(-0.5, 0.5)
-        markers: list[str] = List(CX_Str(), desc="the markers to segment the signal by")
-        marker_name: str = CX_String('marker')
         mode: str = Enum(
             'input', 
             'buffer', 
@@ -60,10 +59,17 @@ class SegmentationNode(Node):
         buffer_duration: float = CX_Float(10.0, desc = 'Duration of the buffer in seconds', visible_when='mode=="buffer"')
         timestamp_buffer: int = CX_Int(1000, desc = 'Maximum amount of timestamps that can be processed')
         debug: bool = Bool(False, desc='debug message when data is segmented')
-
-        @observe("markers.items")
-        def notify_markers_change(self, event):
-            pass
+        markers: PortList = Instance(
+            PortList,
+            lambda: PortList(
+                list_type=PortList.ListType.OUTPUTS,
+                out_params=PortList.Params(
+                    allowed_data=StreamSignal | Sequence[StreamSignal]
+                )
+            ),
+            style='custom',
+            desc='the markers to segment the signal by'
+        )
         
     init_inputs = [
         PortConfig(label='data', allowed_data=StreamSignal),
@@ -73,18 +79,17 @@ class SegmentationNode(Node):
         )
     ]
 
-    init_outputs = [
-        PortConfig(
-            label='segment', 
-            allowed_data = Sequence[StreamSignal] | StreamSignal
-        )
-    ]
-
+    @property
+    def config(self) -> SegmentationNode.Config:
+        return self._config
+    
     def init(self):
         
-        self._valid_markers: list[str] = None
+        self._valid_markers: list[str] = self.config.markers.valid_names
         # find valid markers
-        self._m_name_to_port = dict[str, int] = {}
+        self._m_name_to_port = dict[str, int] = {
+            m_name: index for index, m_name in enumerate(self._valid_markers)
+        }
         
         self._seg_finder: SegmentFinder = None
         
@@ -96,10 +101,6 @@ class SegmentationNode(Node):
             self._seg_finder = SegmentFinderOnline(
                 marker_names=self._valid_markers,
             )
-             
-    @property
-    def config(self) -> SegmentationNode.Config:
-        return self._config
     
     def update_event(self, inp=-1):
         

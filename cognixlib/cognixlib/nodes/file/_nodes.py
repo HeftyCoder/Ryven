@@ -157,7 +157,17 @@ class XDFImportingNode(Node):
             desc="the file name will be extracted from this if there is a string variable"
         )
         lowercase_labels: bool = Bool(False, desc="if checked, makes all the incoming labels into lowercase")
-        ports: PortList = CX_Instance(PortList, style='custom')
+        ports: PortList = Instance(
+            PortList,
+            lambda:PortList(
+                list_type=PortList.ListType.OUTPUTS,
+                min_port_count=1,
+                out_params=PortList.Params(
+                        allowed_data=StreamSignal
+                    ),
+                ), 
+            style='custom'
+        )
             
     init_outputs = [PortConfig(label='streams',allowed_data=Mapping[str, StreamSignal])]
         

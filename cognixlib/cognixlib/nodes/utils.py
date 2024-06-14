@@ -1,8 +1,7 @@
 from cognixcore.config.traits import *
-from cognixcore.api import PortConfig
-from cognixcore.node import Node
-from traitsui.api import VGroup, VFold, ListEditor
+from cognixcore.api import PortConfig, NodePort
 from enum import IntEnum
+from dataclasses import dataclass
 
 class PortList(NodeTraitsConfig):
     
@@ -13,14 +12,18 @@ class PortList(NodeTraitsConfig):
         """
         OUTPUTS = 1
         INPUTS = 2
+    
+    @dataclass
+    class Params:
+        prefix: str = ''
+        suffix: str = ''
+        allowed_data: type = None
         
     ports: list[str] =  List(CX_Str(), desc="dynamic ports")
-    list_type: ListType = CX_Int(ListType.INPUTS, visible=False)
-    min_port_count = CX_Int(0, visible=False) # this essentially protects from deleting static ports
-    out_prefix = CX_Str('', visible=False)
-    out_suffix = CX_Str('', visible=False)
-    inp_prefix = CX_Str('', visible=False)
-    inp_suffix = CX_Str('', visible=False)
+    list_type: ListType = Int(ListType.INPUTS, visible=False)
+    min_port_count = Int(0, visible=False) # this essentially protects from deleting static ports
+    inp_params = Instance(Params, visible=False)
+    out_params = Instance(Params, visible=False)
     
     @observe("ports.items", post_init=True)
     def notify_ports_change(self, event):
@@ -29,23 +32,51 @@ class PortList(NodeTraitsConfig):
         
         valid_names = self.valid_names
         
-        outputs = self.node._outputs
-        output_diff = len(valid_names) - len(outputs) + 1
-        if output_diff < 0:
-            for i in range(abs(output_diff)): 
-                if len(outputs) == 1: # protect the first output
-                    break
-                self.node.delete_output(len(outputs) - 1)
-        else:
-            for i in range(output_diff):
-                self.node.create_output(
-                    PortConfig(
-                        'port',
+        def fix_ports(
+            port_list: Sequence[NodePort], 
+            delete_func, 
+            create_func, 
+            rename_func,
+            params: PortList.Params
+        ):
+            port_diff = len(valid_names) - len(port_list) + self.min_port_count
+            if port_diff < 0:
+                for i in range(abs(port_diff)):
+                    if len(port_list) == self.min_port_count:
+                        break
+                    delete_func(len(port_list) - 1)
+            else:
+                for i in range(port_diff):
+                    create_func(
+                        PortConfig(
+                            'port',
+                            allowed_data=params.allowed_data
+                        )
                     )
+            
+            for i in range(self.min_port_count, len(port_list)):
+                rename_func(
+                    i,
+                    f"{params.prefix}{valid_names[i-self.min_port_count]}{params.suffix}"
                 )
-        
-        for i in range(1, len(outputs)):
-            self.node.rename_output(i, valid_names[i-1])
+         
+        if self.mods_inputs():
+            fix_ports(
+                self._node._inputs,
+                self._node.delete_input,
+                self._node.create_input,
+                self._node.rename_input,
+                self.out_params
+            )
+               
+        if self.mods_outputs():
+            fix_ports(
+                self._node._outputs,
+                self._node.delete_output,
+                self._node.create_output,
+                self._node.rename_output,
+                self.out_params
+            )
     
     @property
     def valid_names(self):

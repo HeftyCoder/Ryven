@@ -1055,7 +1055,6 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
         
         for o in self.node._outputs:
             for i in self.node.flow.connected_inputs(o):
-                # c.item.recompute()
                 c_info = self.flow_view.flow.connection_info((o, i))
                 if c_info not in self.flow_view.connection_items:
                     # it can happen that the connection item hasn't been
@@ -1067,7 +1066,8 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
                 
         for i in self.node._inputs:
             o = self.node.flow.connected_output(i)
-            # c.item.recompute()
+            if not o:
+                continue
             c_info = self.flow_view.flow.connection_info((o, i))
             if c_info not in self.flow_view.connection_items:
                 # it can happen that the connection item hasn't been
