@@ -143,10 +143,14 @@ def run(*args_,
     #   not a list of `str` anymore).
 
     # Get packages required by the project
+    built_in = MainWindow.built_in_packages()
     if conf.project:
         pkgs, pkgs_not_found, project_dict = nodes_package.process_nodes_packages(
             conf.project, requested_packages=list(conf.nodes))
 
+        for b in built_in:
+            pkgs_not_found.remove(b)
+            
         if pkgs_not_found:
             str_missing_pkgs = ', '.join([str(p.name) for p in pkgs_not_found])
             plural = len(pkgs_not_found) > 1
