@@ -783,7 +783,8 @@ class StartupDialog(QDialog):
             node_item = self.missing_list_widget.item(i)
             font = node_item.font()
             for pkg_path in self.conf.nodes:
-                if node_item.text() == pkg_path.stem:
+                n_text = node_item.text()
+                if n_text == pkg_path.stem or n_text in built_in:
                     # Missing package is provided by manually imported package
                     font.setStrikeOut(True)
                     break
