@@ -36,6 +36,7 @@ from ..main.utils import (
     is_package_available,
 )
 from ..main.packages.nodes_package import process_nodes_packages
+from ..gui.main_window import MainWindow
 from ..gui.styling.window_theme import apply_stylesheet
 
 
@@ -762,11 +763,13 @@ class StartupDialog(QDialog):
         4. En/Disable 'Ok', 'Find' and 'Clear' buttons.
         """
         # Mark all imported packages, if they were manually imported
+        built_in = MainWindow.built_in_packages()
         for i in range(self.imported_list_widget.count()):
             node_item = self.imported_list_widget.item(i)
             font = node_item.font()
             for pkg_path in self.conf.nodes:
-                if node_item.text() == pkg_path.stem:
+                n_text = node_item.text()
+                if n_text == pkg_path.stem or n_text in built_in:
                     # Required package is overwritten by manually imported package
                     font.setStrikeOut(True)
                     break

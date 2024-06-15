@@ -52,6 +52,11 @@ class MainWindow(QMainWindow):
     _node_types_updated = Signal(list)
     _flow_deleted_signal = Signal(Flow)
     _flow_renamed_signal = Signal(Flow, str)
+    
+    @classmethod
+    def built_in_packages(cls):
+        return list(cls.__built_in_packages)
+    
     @classmethod
     def get_session_gui_instance(cls) -> SessionGUI:
         return cls.__session_gui_instance
