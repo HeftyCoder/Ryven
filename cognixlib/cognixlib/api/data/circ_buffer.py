@@ -1,7 +1,7 @@
 import numpy as np
 from collections.abc import Sequence
 
-_default_dts_err_scale=1.5
+_default_dts_err_scale=2
 
 # TODO Fifx this class to not need to transpose the data before it enters
 class CircularBuffer:
@@ -233,7 +233,7 @@ class CircularBuffer:
             search_boundary = abs(search_boundary)
             if index <= self.current_index or index + search_boundary < self.size:
                 if index <= self.current_index:
-                    search_boundary = min(search_boundary, self.current_index)
+                    search_boundary = min(search_boundary, self.current_index + 1)
                 else:
                     search_boundary = min(search_boundary, self.size-1)
                     

@@ -770,7 +770,8 @@ CONTROLS
             }
 
         data = json.dumps(whole_project_dict, indent=4)
-        InfoMsgs.write(data)
+        InfoMsgs.write("project saved!")
+        # InfoMsgs.write(data)
 
         file.write(data)
         file.close()

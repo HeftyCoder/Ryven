@@ -274,6 +274,11 @@ class WindowNode(Node):
         wnd_finder = self.port_ind_to_finder[inp]
         if not wnd_finder:
             return
+        
+        # we're assuming that in real time it's always a time signal and not a list
+        if isinstance(wnd_finder, WindowFinderOnline) and not wnd_finder.is_buffer_init():
+            wnd_finder.init_buffer(signals.info.nominal_srate, signals)
+        
         wnds_list, wnds_map = wnd_finder.extract_windows(signals)
         if not wnds_map:
             return
@@ -413,18 +418,23 @@ class FIRFilterNode(Node):
         high_freq: float = CX_Float(desc='the high frequency of the fitler')
         l_trans_bandwidth:float = CX_Float(0.0, desc='the width of the transition band at the low cut-off frequency in Hz')
         h_trans_bandwidth:float = CX_Float(0.0, desc='the width of the transition band at the high cut-off frequency in Hz')
-        filter_length = Union(
-            CX_Int(10, desc="the number of taps for the filter"),
-            CX_Str("auto", desc="a string representing the length of the filter (i.e 5s, 5ms etc)")
-        ),
-    
-        # filter_length_str: str = CX_String('None',desc='the length of the filterin ms')
-        # filter_length_int: int = CX_Int(desc='the length of the filter in samples')
+        filter_length: str = CX_String('auto',desc='a string representing the length of the filter (i.e 5s, 5ms etc)')
         phase: str = Enum(Phase, desc='the phase of the filter')
         window: str = Enum(FilterWindow, desc='a choice of windows for an fir filter')
-            
-    init_inputs = [PortConfig(label='data',allowed_data=StreamSignal | Sequence[StreamSignal])]
-    init_outputs = [PortConfig(label='filtered data',allowed_data=StreamSignal | Sequence[StreamSignal])]
+        ports: PortList = Instance(
+            PortList,
+            lambda: PortList(
+                list_type=PortList.ListType.OUTPUTS | PortList.ListType.INPUTS,
+                inp_params=PortList.Params(
+                    allowed_data=StreamSignal | Sequence[StreamSignal]
+                ),
+                out_params=PortList.Params(
+                    allowed_data=StreamSignal | Sequence[StreamSignal],
+                    suffix="_filt"
+                )
+            ),
+            style='custom'
+        )
     
     @property
     def config(self) -> FIRFilterNode.Config:
@@ -433,12 +443,18 @@ class FIRFilterNode(Node):
     def init(self):
         # TODO might include length later
         c = self.config
+        
+        try:
+            filter_length = int(c.filter_length)
+        except:
+            filter_length = c.filter_length
+        
         self.fir_params = FilterParams(
             c.low_freq,
             c.high_freq,
             c.l_trans_bandwidth if c.l_trans_bandwidth != 0 else "auto",
             c.h_trans_bandwidth if c.h_trans_bandwidth != 0 else "auto",
-            c.filter_length,
+            filter_length,
             c.phase 
         )
         
@@ -470,9 +486,9 @@ class FIRFilterNode(Node):
             filtered_sigs.append(f_sig)
         
         if len(filtered_sigs) == 1:
-            self.set_output(0, filtered_sigs[0])
+            self.set_output(inp, filtered_sigs[0])
         else:
-            self.set_output(0, filtered_sigs)
+            self.set_output(inp, filtered_sigs)
     
 class IIRFilterNode(Node):
     title = 'IIR Filter'

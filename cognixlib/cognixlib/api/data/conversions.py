@@ -57,6 +57,18 @@ ___str_to_lsl = {
 
 str_to_lsl = MappingProxyType(___str_to_lsl)
 
+__lsl_to_str = {
+    pylsl.cf_float32: 'float32',
+    pylsl.cf_double64: 'float64',
+    pylsl.cf_int8: 'int8',
+    pylsl.cf_int16: 'int16',
+    pylsl.cf_int32: 'int32',
+    pylsl.cf_int64: 'int64',
+    pylsl.cf_string: 'string',
+}
+
+lsl_to_str = MappingProxyType(__lsl_to_str)
+
 def get_lsl_format(key: np.dtype | str | int):
     if isinstance(key, int):
         return key

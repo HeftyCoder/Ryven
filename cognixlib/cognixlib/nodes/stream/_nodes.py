@@ -30,7 +30,7 @@ from ...api.data import (
     TimeSignal,
     Signal
 )
-from ...api.data.conversions import np_to_lsl, lsl_to_np
+from ...api.data.conversions import np_to_lsl, lsl_to_np, lsl_to_str
 
 class LSLSignalInfo(StreamSignalInfo):
     
@@ -53,7 +53,7 @@ class LSLSignalInfo(StreamSignalInfo):
         super().__init__(
             nominal_srate=lsl_info.nominal_srate(),
             signal_type=lsl_info.type(),
-            data_format=lsl_info.channel_format(),
+            data_format=lsl_to_str[lsl_info.channel_format()],
             name=lsl_info.name(),
         )
 

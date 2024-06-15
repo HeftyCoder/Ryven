@@ -77,7 +77,7 @@ class FIRFilter(Filter):
             method="fir",
             phase=params.phase,
             fir_window=wnd,
-            fir_desing="firwin"
+            fir_design="firwin"
         )
     
     def filter(self, signal: Signal, copy=True):

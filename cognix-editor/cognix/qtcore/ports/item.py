@@ -125,6 +125,8 @@ class PortItem(GUIBase, QGraphicsWidget):
     # <<< interaction boilerplate <<<
 
     def update(self):
+        if self.port is None:
+            return
         self.node_item.session_design.flow_theme.setup_PI_label(
             self.label,
             self.port.type_,

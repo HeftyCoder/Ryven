@@ -162,7 +162,7 @@ class SegmentFinderOnline(SegmentFinder):
                 sampling_frequency=self._nominal_srate,
                 buffer_duration=self._buffer_dur,
                 start_time=data_signal.timestamps[0],
-                channels_count=len(data_signal.data.shape[1])
+                channels_count=data_signal.data.shape[1]
             )
         
         self._buffer.append(data_signal.data, data_signal.timestamps)
@@ -263,7 +263,9 @@ class WindowFinderOffline(WindowFinder):
                     map_result[signal.unique_key].append(w_sig)
                     l_result.append(w_sig)
                     
-                time += step
+                    # due to finite sampling, we have to add
+                    # the actual duration instead of the requested one
+                    time += step
         
         return l_result, map_result
 
@@ -284,11 +286,14 @@ class WindowFinderOnline(WindowFinder):
         self.extra_buffer = extra_buffer
         self.current_time = 0
         self.first_window = True
-        
         if self.srate > 0 and start_data:
             self.init_buffer(srate, start_data)
         else:
             self.buffer: CircularBuffer = None
+    
+    @property
+    def step(self):
+        return self.overlap.step(self.window_length)
     
     def init_buffer(self, srate: float, start_data: TimeSignal):
         self.buffer = CircularBuffer(
@@ -297,6 +302,9 @@ class WindowFinderOnline(WindowFinder):
                 start_data.tms[0],
                 start_data.data.shape[1]
             )
+    
+    def is_buffer_init(self):
+        return self.buffer is not None
         
     def extract_windows(
         self, signal: TimeSignal
@@ -314,6 +322,7 @@ class WindowFinderOnline(WindowFinder):
         
         l_result: list[TimeSignal] = []
         map_result: dict[SignalKey, list[TimeSignal]] = {}
+        
         # check for first window
         if self.first_window and self.current_time >= self.window_length:
             extra = self.current_time - self.window_length
@@ -333,21 +342,21 @@ class WindowFinderOnline(WindowFinder):
                 
                 map_result[signal.unique_key].append(w_sig)
                 l_result.append(w_sig)
-            
-            self.current_time -= self.window_length + extra
+
+                # due to finite sampling, we have to subtract
+                # the actual duration, which may be slightly
+                # different than the window duration
+                self.current_time -= w_sig.duration
+                
             self.first_window = False
         
         # check for any residual windows by applying overlap
-        step = self.overlap.step(self.window_length)
-        
-        if not self.first_window and self.current_time >= step:
-            
-            offset = self.current_time - step
-            self.current_time -= offset
-            
-            while True:
+        if not self.first_window:
+            step = self.step
+            while self.current_time >= step:
+                extra = self.current_time - step
                 seg, tms = self.buffer.segment_current(
-                    (-offset-self.window_length, -offset),
+                    (-extra-self.window_length, -extra),
                     self.error_margin,
                     self.dts_error_scale
                 )
@@ -362,11 +371,7 @@ class WindowFinderOnline(WindowFinder):
                     
                     map_result[signal.unique_key].append(w_sig)
                     l_result.append(w_sig)
-                
-                offset += step
-                self.current_time -= offset
-                
-                if self.current_time <= 0:
-                    break
+
+                    self.current_time -= self.step + (w_sig.duration - self.window_length)
         
         return l_result, map_result

@@ -25,7 +25,7 @@ from collections.abc import Mapping
 
 from ...api.file.xdf import XDFWriter
 from ...api.data import StreamSignal
-from ...api.data.conversions import get_lsl_format
+from ...api.data.conversions import get_lsl_format, lsl_to_str
 from ..stream import LSLSignalInfo
 
 class XDFWriterNode(Node):
@@ -47,8 +47,6 @@ class XDFWriterNode(Node):
     
     def __init__(self, flow: Flow):
         super().__init__(flow)
-        
-        self.formats = ['double64','float32','int32','string','int16','int8','int64']
 
         def add_stream():
             self.create_input(
@@ -115,7 +113,7 @@ class XDFWriterNode(Node):
                 'stream_type':signal.info.signal_type,
                 'channel_count':len(signal.labels),
                 'nominal_srate':signal.info.nominal_srate,
-                'channel_format':self.formats[signal.info.data_format],
+                'channel_format':signal.info.data_format,
                 'time_created':self.start_time,
                 'channels':signal.labels.tolist() # TODO should this be a list according to XDF and LSL standards?
             }
@@ -145,7 +143,7 @@ class XDFWriterNode(Node):
 
 from ..utils import PortList
           
-class XDFImportingNode(Node):
+class XDFImporerNode(Node):
     title = 'XDF Import'
     version = '0.1'
     
@@ -172,7 +170,7 @@ class XDFImportingNode(Node):
     init_outputs = [PortConfig(label='streams',allowed_data=Mapping[str, StreamSignal])]
         
     @property
-    def config(self) -> XDFImportingNode.Config:
+    def config(self) -> XDFImporerNode.Config:
         return self._config
     
     def init(self):
@@ -224,7 +222,8 @@ class XDFImportingNode(Node):
                 
                 if isinstance(stream_data, Sequence):
                     stream_data = np.array(stream_data)
-                    
+                else:
+                    print(stream_data.dtype)    
                 stream_collection[stream_name] = StreamSignal(
                     timestamps=stream_timestamps,
                     data=stream_data,
