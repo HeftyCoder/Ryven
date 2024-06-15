@@ -43,7 +43,7 @@ from threading import Thread
         
 class MainWindow(QMainWindow):
 
-    __built_in_packages = ['built_in', 'cognix_nodes']
+    __built_in_packages = ['built_in', 'cognix_library']
     __session_gui_instance = None
     
     _dialog_label_signal = Signal(str)
