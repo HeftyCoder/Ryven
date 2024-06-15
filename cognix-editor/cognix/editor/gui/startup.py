@@ -701,7 +701,9 @@ class StartupDialog(QDialog):
 
         self.imported_list_widget.clear()
         self.missing_list_widget.clear()
-
+        # TODO avoid including the basic cognix library in the missing list
+        built_in = MainWindow.built_in_packages()
+        
         if project_path is None:
             self.conf.project = None
             self.project_name.setText(LBL_CREATE_PROJECT)
@@ -720,6 +722,8 @@ class StartupDialog(QDialog):
                 node_item.setFlags(item_flags)
                 self.imported_list_widget.addItem(node_item)
             for node_path in sorted(missing_nodes, key=lambda p: p.name):
+                if node_path.name in built_in:
+                    continue
                 node_item = QListWidgetItem(node_path.name)
                 node_item.setToolTip(str(node_path))
                 node_item.setFlags(item_flags)
