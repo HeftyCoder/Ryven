@@ -717,6 +717,8 @@ class StartupDialog(QDialog):
             required_nodes, missing_nodes, _ = process_nodes_packages(project_path)
             item_flags = ~Qt.ItemIsSelectable & ~Qt.ItemIsEditable
             for node in sorted(required_nodes, key=lambda n: n.name):
+                if node.name in built_in:
+                    continue
                 node_item = QListWidgetItem(node.name)
                 node_item.setToolTip(node.directory)
                 node_item.setFlags(item_flags)
