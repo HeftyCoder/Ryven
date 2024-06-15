@@ -219,11 +219,9 @@ class FlowsListWidget(QWidget):
                               'You are about to delete a flow. This cannot be undone, all content will be lost. '
                               'Do you want to continue?', QMessageBox.Cancel | QMessageBox.Yes, self)
         msg_box.setDefaultButton(QMessageBox.Cancel)
-        ret = msg_box.exec_()
+        ret = msg_box.exec()
         if ret != QMessageBox.Yes:
             return
-
-        self.list_widgets.remove(flow_widget)
-        flow_widget.setParent(None)
+        
         self.session_gui.core_session.delete_flow(flow)
         # self.recreate_list()
