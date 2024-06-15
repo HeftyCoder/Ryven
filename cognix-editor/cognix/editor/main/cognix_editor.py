@@ -149,8 +149,10 @@ def run(*args_,
             conf.project, requested_packages=list(conf.nodes))
 
         for b in built_in:
-            pkgs_not_found.remove(b)
-            
+            try:
+                pkgs_not_found.remove(b)
+            except:
+                pass
         if pkgs_not_found:
             str_missing_pkgs = ', '.join([str(p.name) for p in pkgs_not_found])
             plural = len(pkgs_not_found) > 1
