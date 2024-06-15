@@ -222,6 +222,9 @@ class XDFImportingNode(Node):
                 
                 stream_info = LSLSignalInfo(info)
                 
+                if isinstance(stream_data, Sequence):
+                    stream_data = np.array(stream_data)
+                    
                 stream_collection[stream_name] = StreamSignal(
                     timestamps=stream_timestamps,
                     data=stream_data,
@@ -232,11 +235,11 @@ class XDFImportingNode(Node):
 
             self.set_output(0, stream_collection)
             
-            valid_names = self.config.valid_names
+            valid_names = self.config.ports.valid_names
             for index, valid_name in enumerate(valid_names):
                 stream = stream_collection.get(valid_name)
                 if stream:
-                    self.set_output(index, stream)
+                    self.set_output(index + 1, stream)
         
         else:
             self.logger.error(msg=f'The path {path_file} doesnt exist')

@@ -2,12 +2,15 @@
 This module defines ways to extract segments out of a signal based on timestamps
 or simple windowing. 
 """
-from ..data.signals import TimeSignal, StreamSignal
+from __future__ import annotations
+from ..data.signals import TimeSignal, SignalKey
 from ..data.circ_buffer import CircularBuffer
 from numpy import full, nan, float64, ndarray
-from collections.abc import Sequence, Iterable
+from collections.abc import Sequence, Iterable, Mapping
 from abc import ABC, abstractmethod
+from enum import IntEnum
 
+# SEGMENTS
 class SegmentFinder(ABC):
     """
     Extracts segments from a signal based on marker timestamps relative to
@@ -16,9 +19,10 @@ class SegmentFinder(ABC):
     
     class TimestampCache:
         
-        def __init__(self, cache_length=1000):
+        def __init__(self, finder: SegmentFinder, cache_length=1000):
             self.current_length = 0
             self._cache = full(shape=cache_length, fill_value=nan,dtype=float64)
+            self._finder = finder
             self._buffer: CircularBuffer = None
         
         def append(self, tmps: float | Sequence[float] | ndarray):
@@ -27,7 +31,7 @@ class SegmentFinder(ABC):
                 self._cache[self.current_length:self.current_length + l_t] = tmps
                 self.current_length += l_t
             else:
-                self._cache[self.current_length + 1] = tmps
+                self._cache[self.current_length] = tmps
                 self.current_length += 1
         
         def sort(self):
@@ -38,7 +42,7 @@ class SegmentFinder(ABC):
             cl = self.current_length
             
             for i in range(cl):
-                segment, timestamps = self._buffer.segment(
+                segment, timestamps = self._finder._buffer.segment(
                     self._cache[i],
                     offset,
                 )
@@ -59,9 +63,10 @@ class SegmentFinder(ABC):
     ):
         self._data_ref: TimeSignal = None
         self._marker_tm_cache = {
-            m_name: SegmentFinder.TimestampCache(marker_cache_length)
+            m_name: SegmentFinder.TimestampCache(self, marker_cache_length)
             for m_name in marker_names
         }
+        self._buffer: CircularBuffer = None
     
     @abstractmethod
     def update_data(self, data_signal: TimeSignal):
@@ -70,10 +75,15 @@ class SegmentFinder(ABC):
     def update_markers(self, marker_signal: TimeSignal | Sequence[tuple[str, float]]):        
         
         changed_caches: set[SegmentFinder.TimestampCache] = set()
-                 
-        for i in range(len(marker_signal)):
+        m_len = (
+            marker_signal.data.shape[0] 
+            if isinstance(marker_signal, TimeSignal)
+            else len(marker_signal)
+        )
+        
+        for i in range(m_len):
             if isinstance(marker_signal, TimeSignal):
-                m_name = marker_signal.data[i]
+                m_name = marker_signal.data[i][0]
                 tms = marker_signal.timestamps[i]
             else:
                 m_name, tms = marker_signal
@@ -133,7 +143,6 @@ class SegmentFinderOnline(SegmentFinder):
     ):
         super().__init__(marker_names, marker_cache_length)
         self.set_buffer_info(buffer_dur, nominal_srate)
-        self._buffer: CircularBuffer = None
         
         if data_signal:
             self.update_data(data_signal)
@@ -155,9 +164,209 @@ class SegmentFinderOnline(SegmentFinder):
                 start_time=data_signal.timestamps[0],
                 channels_count=len(data_signal.data.shape[1])
             )
-        else:
-            self._buffer.append(data_signal.data, data_signal.timestamps)
+        
+        self._buffer.append(data_signal.data, data_signal.timestamps)
     
     def is_buffer_init(self):
         return self._buffer is not None
+
+
+# WINDOWING
+class BaseOverlap(ABC):
+    """Calculates the step of overlaps for the window finder"""
     
+    @abstractmethod
+    def step(self, wnd_length: float):
+        pass
+
+class ZeroOverlap(BaseOverlap):
+    
+    def step(self, wnd_length: float):
+        return wnd_length
+
+class StepOverlap(BaseOverlap):
+    
+    def __init__(self, overlap_step: float):
+        self.overlap_step = overlap_step
+        
+    def step(self, wnd_length: float):
+        return min(wnd_length, self.overlap_step)
+
+class PercentOverlap(BaseOverlap):
+    
+    def __init__(self, percent_overlap: float):
+        self.percent_overlap = percent_overlap
+    
+    def step(self, wnd_length: float):
+        return max(
+            0,
+            (1-self.percent_overlap) * wnd_length
+        )
+        
+class WindowFinder(ABC):
+    """A searcher for smaller windows, overlapping or not, in a bigger signal."""
+        
+    def __init__(
+        self,
+        window_length: float,
+        error_margin: float,
+        dts_error_scale: float=1.5,
+        overlap: BaseOverlap=ZeroOverlap()
+    ):
+        self.window_length = window_length
+        self.error_margin = error_margin
+        self.dts_error_scale = dts_error_scale
+        self.overlap = overlap
+    
+    @abstractmethod
+    def extract_windows(
+        self, signal: TimeSignal | Sequence[TimeSignal]
+    ) -> tuple[Sequence[TimeSignal], Mapping[SignalKey, Sequence[TimeSignal]]]:
+        pass
+
+class WindowFinderOffline(WindowFinder):
+    
+    def extract_windows(
+        self, signal: TimeSignal | Sequence[TimeSignal]
+    ) -> tuple[Sequence[TimeSignal], Mapping[SignalKey, Sequence[TimeSignal]]]:
+        if isinstance(signal, TimeSignal):
+            signal = [signal]
+        
+        l_result: list[TimeSignal] = []
+        map_result: dict[SignalKey, list[TimeSignal]] = {}
+        buffer = CircularBuffer.empty()
+        
+        step = self.overlap.step(self.window_length)
+        for signal in signal:
+            
+            buffer.reset(signal.data, signal.timestamps)
+            time = 0
+            sig_start = signal.tms[0]
+            
+            while time <= signal.duration - self.window_length + self.error_margin:
+                
+                seg, tms = buffer.segment(
+                    time + sig_start,
+                    (0, self.window_length),
+                    self.error_margin,
+                    self.dts_error_scale
+                )
+                
+                if seg is not None:
+                    if signal.unique_key not in map_result:
+                        map_result[signal.unique_key] = []
+                    
+                    w_sig = signal.copy(False)
+                    w_sig.timestamps = tms
+                    w_sig.data = seg
+                    
+                    map_result[signal.unique_key].append(w_sig)
+                    l_result.append(w_sig)
+                    
+                time += step
+        
+        return l_result, map_result
+
+class WindowFinderOnline(WindowFinder):
+    
+    def __init__(
+        self, 
+        window_length: float, 
+        error_margin: float,
+        dts_error_scale: float = 1.5, 
+        overlap: BaseOverlap = ZeroOverlap(),
+        extra_buffer: float = 0.5,
+        srate: int = 0,
+        start_data: TimeSignal = None
+    ):
+        super().__init__(window_length, error_margin, dts_error_scale, overlap)
+        self.srate=srate
+        self.extra_buffer = extra_buffer
+        self.current_time = 0
+        self.first_window = True
+        
+        if self.srate > 0 and start_data:
+            self.init_buffer(srate, start_data)
+        else:
+            self.buffer: CircularBuffer = None
+    
+    def init_buffer(self, srate: float, start_data: TimeSignal):
+        self.buffer = CircularBuffer(
+                srate,
+                self.window_length + self.extra_buffer,
+                start_data.tms[0],
+                start_data.data.shape[1]
+            )
+        
+    def extract_windows(
+        self, signal: TimeSignal
+    ) -> tuple[Sequence[TimeSignal], Mapping[SignalKey, Sequence[TimeSignal]]]:
+        
+        data_dur = signal.duration
+        self.current_time += data_dur
+        
+        # if the buffer is not large enough to hold
+        # all the incoming data, we attempt to expand it
+        self.buffer.append_expand(
+            signal.data,
+            signal.timestamps
+        )
+        
+        l_result: list[TimeSignal] = []
+        map_result: dict[SignalKey, list[TimeSignal]] = {}
+        # check for first window
+        if self.first_window and self.current_time >= self.window_length:
+            extra = self.current_time - self.window_length
+            seg, tms = self.buffer.segment_current(
+                (-self.window_length-extra, -extra),
+                self.error_margin,
+                self.dts_error_scale
+            )
+            
+            if seg is not None:
+                w_sig = signal.copy(False)
+                w_sig.timestamps = tms
+                w_sig.data = seg
+                
+                if signal.unique_key not in map_result:
+                    map_result[signal.unique_key] = []
+                
+                map_result[signal.unique_key].append(w_sig)
+                l_result.append(w_sig)
+            
+            self.current_time -= self.window_length + extra
+            self.first_window = False
+        
+        # check for any residual windows by applying overlap
+        step = self.overlap.step(self.window_length)
+        
+        if not self.first_window and self.current_time >= step:
+            
+            offset = self.current_time - step
+            self.current_time -= offset
+            
+            while True:
+                seg, tms = self.buffer.segment_current(
+                    (-offset-self.window_length, -offset),
+                    self.error_margin,
+                    self.dts_error_scale
+                )
+                
+                if seg is not None:
+                    w_sig = signal.copy(False)
+                    w_sig.timestamps = tms
+                    w_sig.data = seg
+                    
+                    if signal.unique_key not in map_result:
+                        map_result[signal.unique_key] = []
+                    
+                    map_result[signal.unique_key].append(w_sig)
+                    l_result.append(w_sig)
+                
+                offset += step
+                self.current_time -= offset
+                
+                if self.current_time <= 0:
+                    break
+        
+        return l_result, map_result

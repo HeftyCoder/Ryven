@@ -8,6 +8,21 @@ from copy import copy, deepcopy
 import numpy as np
 
 from .conversions import *
+
+class SignalKey:
+    """
+    The numpy nature of the signal classes make them inherently
+    unhasable. This is a python object that every signal
+    instance creates that acts as its unique identifier.
+    """
+    
+    def __init__(self, sig: Signal):
+        self._signal = sig
+    
+    @property
+    def signal(self):
+        return self._signal
+    
 class SignalInfo:
     """
     A signal info carries metadata about the signal
@@ -61,6 +76,12 @@ class Signal:
     ):
         self._data = data
         self._info = signal_info
+        self._unique_key = SignalKey(self)
+    
+    @property
+    def unique_key(self):
+        """A unique identifier for this signal instance"""
+        return self._unique_key
     
     @property
     def info(self):
@@ -111,6 +132,7 @@ class Signal:
     
     def copy(self, copydata=True):
         new_sig = copy(self)
+        new_sig._unique_key = SignalKey(self)
         if copydata:
             new_sig._data = new_sig.data.copy()
         return new_sig
@@ -480,8 +502,11 @@ class StreamSignal(TimeSignal, LabeledSignal):
         signal_info: StreamSignalInfo,
         make_lowercase=False
     ):
-        TimeSignal.__init__(self, timestamps, None, None)
-        LabeledSignal.__init__(self, labels, None, None, make_lowercase)
+        if not isinstance(data, np.ndarray):
+            data = np.array(data)
+            
+        TimeSignal.__init__(self, timestamps, data, None)
+        LabeledSignal.__init__(self, labels, data, None, make_lowercase)
         self._data = data
         self._info = signal_info
     

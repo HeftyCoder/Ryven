@@ -17,11 +17,7 @@ from ...api.data import (
     LabeledSignal,
     CircularBuffer
 )
-from ...api.processing.manipulation import (
-    SegmentFinder,
-    SegmentFinderOffline,
-    SegmentFinderOnline,
-)
+from ...api.processing.manipulation import *
 
 from ...api.processing.filters import (
     FilterParams,
@@ -43,7 +39,7 @@ from ...api.mne.prep import (
 class SegmentationNode(Node):
     """
     Outputs segments of a StreamSignal based on timestamps
-    of a specific marker.
+    of a list of markers.
     """
     
     title = 'Segment'
@@ -87,7 +83,7 @@ class SegmentationNode(Node):
         
         self._valid_markers: list[str] = self.config.markers.valid_names
         # find valid markers
-        self._m_name_to_port = dict[str, int] = {
+        self._m_name_to_port: dict[str, int] = {
             m_name: index for index, m_name in enumerate(self._valid_markers)
         }
         
@@ -129,7 +125,7 @@ class SegmentationNode(Node):
                 msg = f"ERATE: {self._seg_finder._buffer.effective_srate}\n"
                 msg += f"Found Marker Types: {signal_segments.keys()}\n"
             
-            for m_name, signals in signal_segments:
+            for m_name, signals in signal_segments.items():
                 out_index = self._m_name_to_port[m_name]
                 self.set_output(out_index, signals)
                 
@@ -177,7 +173,7 @@ class WindowNode(Node):
     class Config(NodeTraitsConfig):
         mode: str = Enum('input', 'buffer', desc='the operation mode of the Window Node')
         window_length: float = CX_Float(0.5, desc='length of the window in seconds')
-        error_margin: float = CX_Float(0.01, desc='error margin for when the segment is slightly smaller than requested')
+        error_margin: float = CX_Float(0.0, desc='error margin for when the segment is slightly smaller than requested')
         dts_error_scale: float = Range(
             1.0, 
             3.0, 
@@ -188,9 +184,22 @@ class WindowNode(Node):
         overlap_mode: str = Enum('none', 'step', 'percent', desc='how the segmented windows should be overlapped')
         overlap_step: float = Range(0.01, None, 0.5, exclude_high=True, desc='overlap step between the windows, in seconds')
         overlap_percent: float = Range(0.0, 0.99, desc='overlap percent between the windows')
-        # the 0.99 means that at max, 100 windos can be created with a step of x * window_time
+        # the 0.99 means that at max, 100 windows can be created with a step of x * window_time
         debug: bool = Bool(False, desc='debug message when data is segmented')
-
+        ports: PortList = Instance(
+            PortList,
+            lambda: PortList(
+                list_type= PortList.ListType.INPUTS | PortList.ListType.OUTPUTS,
+                inp_params=PortList.Params(
+                    allowed_data=StreamSignal | Sequence[StreamSignal]
+                ),
+                out_params=PortList.Params(
+                    allowed_data=StreamSignal | Sequence[StreamSignal],
+                    suffix="_wnds"
+                )
+            ),
+            style='custom'
+        )
         # to show the borders correctly, the scrollable must be in an outside group
         traits_view = View(
             Group(
@@ -214,193 +223,83 @@ class WindowNode(Node):
                         ),
                     ),
                     Item('debug'),
+                    Item('ports', style='custom'),
                 ),
                 label='configuration',
                 scrollable=True,
             )
         )
-        
-    init_inputs = [
-        PortConfig(
-            label='in',
-            allowed_data=StreamSignal | Sequence[StreamSignal]
-        )
-    ]
-    init_outputs = [
-        PortConfig(
-            label='out',
-            allowed_data=Sequence[StreamSignal]
-        )
-    ]
  
     def init(self):
-        self.buffer: CircularBuffer = None
-        self.current_time = 0
-        self.first_window = True
+        
+        if self.config.overlap_mode == "none":
+            self.overlap = ZeroOverlap()
+        elif self.config.overlap_mode == "step":
+            self.overlap = StepOverlap(self.config.overlap_step)
+        else:
+            self.overlap = PercentOverlap(self.config.overlap_percent)
+        
+        def create_finder():
+            if self.config.mode == "input":
+                return WindowFinderOffline(
+                    self.config.window_length,
+                    self.config.error_margin,
+                    self.config.dts_error_scale,
+                    self.overlap
+                )
+            else:
+                return WindowFinderOnline(
+                    self.config.window_length,
+                    self.config.error_margin,
+                    self.config.dts_error_scale,
+                    self.overlap,
+                    self.config.extra_buffer,
+                )
+            
+        self.port_ind_to_finder: dict[int, WindowFinder] ={
+            index: create_finder()
+            for index in range(len(self._outputs))
+        }
     
     @property
     def config(self) -> WindowNode.Config:
         return self._config
     
-    @property
-    def wnd_time(self):
-        return self.config.window_length
-    
-    @property
-    def step(self):
-        if self.config.overlap_mode == self.step_mode:
-            step = min(self.wnd_time, self.config.overlap_step)
-        elif self.config.overlap_mode == self.percent_mode:
-            step = max(
-                0, 
-                (1-self.config.overlap_percent) * self.wnd_time 
-            )
-        else:
-            step = self.wnd_time
-        return step
-        
     def update_event(self, inp=-1):
         
-        data_inp: StreamSignal | Sequence[StreamSignal] = self.input(inp)
-        if not data_inp:
+        signals: StreamSignal | Sequence[StreamSignal] = self.input(inp)
+        if not signals:
             return
         
-        mode = self.config.mode
-        if mode == self.input_mode:
-            self.update_input_mode(data_inp)
-        elif mode == self.buffer_mode:
-            self.update_buffer_mode(data_inp)    
-    
-    def update_buffer_mode(self, data_inp: StreamSignal):
-        if not self.buffer:
-            # create the window buffer
-            self.buffer = CircularBuffer(
-                data_inp.info.nominal_srate,
-                self.config.window_length + self.config.extra_buffer,
-                data_inp.timestamps[0],
-                len(data_inp.labels)
-            )
+        wnd_finder = self.port_ind_to_finder[inp]
+        if not wnd_finder:
+            return
+        wnds_list, wnds_map = wnd_finder.extract_windows(signals)
+        if not wnds_map:
+            return
         
-        data_dur = data_inp.duration
-        self.current_time += data_dur
-        # the buffer is not large enough to hold all the incoming
-        # data, so we attempt to expand it
-        self.buffer.append_expand(
-            data_inp.data,
-            data_inp.timestamps
-        )
+        # a sequence of signals will output a sequence of windows
+        self.set_output(inp, wnds_list)
         
-        result: list[StreamSignal] = []
-        # check for a first window
-        if self.first_window and self.current_time >= self.wnd_time:
-            extra = self.current_time - self.wnd_time
-            segment, tmps = self.buffer.segment_current(
-                (-self.wnd_time-extra, -extra),
-                self.config.error_margin,
-                self.config.dts_error_scale
-            )
-            if segment is not None:
-                result.append(
-                    StreamSignal(
-                        tmps,
-                        data_inp.labels,
-                        segment,
-                        data_inp.info
-                    )
-                )
-            
-            self.current_time -= self.wnd_time + extra
-            self.first_window = False
+        if not self.config.debug:
+            return
         
-        # check for any residual windows by applying overlap
-        
-        step = self.step
-        
-        if not self.first_window and self.current_time >= step:
-            
-            offset = self.current_time - step
-            self.current_time -= offset
-        
-            while True:
-                seg, tms = self.buffer.segment_current(
-                    (-offset-self.wnd_time, -offset),
-                    self.config.error_margin,
-                    self.config.dts_error_scale
-                )
-                if seg is not None:
-                    result.insert(
-                        1,
-                        StreamSignal(
-                            tms,
-                            data_inp.labels,
-                            seg,
-                            data_inp.info,
-                        )              
-                    )
-                    
-                offset += step
-                self.current_time -= offset
-                
-                if self.current_time <= 0:
-                    break
-        
-        if result:
-            if self.config.debug:
-                msg = ''
-                for s in result:
-                    msg += f"WINDOW: [{s.tms[0]}-{s.tms[-1]} : {s.duration}\n"
-                self.logger.debug(msg)
-            self.set_output(0, result)
-                
-    def update_input_mode(self, data_inp: StreamSignal | Sequence[StreamSignal]):
-        if isinstance(data_inp, StreamSignal):
-            data_inp = [data_inp]
-        
-        result: list[StreamSignal] = []
-        buffer = CircularBuffer.empty()
-        
-        step = self.step
         msg = ''
-        debug = self.config.debug
-        for signal in data_inp:
-            if debug:
-                debug_arr: list[StreamSignal] = []
-                msg += f'Signal of duration: {signal.duration}\nBegin:{signal.tms[0]}\nEnd:{signal.tms[-1]}\n\n'
-                
-            buffer.reset(signal.data, signal.timestamps)
-            time = 0
-            sig_start = signal.tms[0]
-            while time <= (signal.duration - self.wnd_time + self.config.error_margin):
-                
-                seg, tms = buffer.segment(
-                    time + sig_start,  
-                    (0, self.wnd_time),
-                    self.config.error_margin,
-                    self.config.dts_error_scale
-                )
-                
-                if seg is not None:
-                    s_sig = StreamSignal(
-                        tms,
-                        signal.labels,
-                        seg,
-                        signal.info
-                    )
-                    if debug:
-                        debug_arr.append(s_sig)   
-                    result.append(s_sig)
-                time += step
+        if isinstance(signals, StreamSignal):
+            signals = [signals]
+        
+        for sig in signals:
+            msg += f"SIGNAL: [{sig.tms[0]} - {sig.tms[-1]}], DUR: {sig.duration}\n"
+            wnds = wnds_map.get(sig.unique_key)
+            msg += f"WINDOWS EXTRACTED: {len(wnds)}\n"
             
-            if debug:
-                msg += f'NUMBER OF WINDOWS: {len(debug_arr)}\n\n'
-                for s in debug_arr:
-                    msg += f"WINDOW: [{s.tms[0]}-{s.tms[-1]} : {s.duration}]\n"
-                msg += "\n"
-            
-        if result:
-            if self.config.debug:
-                self.logger.debug(msg)
-            self.set_output(0, result) 
+            for wnd in wnds:
+                msg += f"WINDOW: [{wnd.tms[0]} - {wnd.tms[-1]}], DUR: {wnd.duration}\n"
+            msg += "\n"
+        
+        self.logger.info(msg)
+
+                
  
 class StreamSignalSelectionNode(Node):
     """

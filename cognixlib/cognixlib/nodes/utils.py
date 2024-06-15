@@ -66,7 +66,7 @@ class PortList(NodeTraitsConfig):
                 self._node.delete_input,
                 self._node.create_input,
                 self._node.rename_input,
-                self.out_params
+                self.inp_params
             )
                
         if self.mods_outputs():
