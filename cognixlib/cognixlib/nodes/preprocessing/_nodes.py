@@ -392,6 +392,8 @@ class StreamSignalSelectionNode(Node):
         if not self.selected_labels:
             self.selected_labels = signal.labels
         # find the indices
+        
+        print(signal.ldm._label_to_index)
         self.chan_inds = [
             signal.ldm._label_to_index[label] 
             for label in self.selected_labels 
@@ -472,16 +474,22 @@ class FIRFilterNode(Node):
         if not self.fir_filter:
             first_signal = signals[0]
             info = first_signal.info
+            guard_signal = FIRFilter.ensure_correct_type(first_signal)
+            if first_signal.unique_key != guard_signal.unique_key:
+                self.logger.warn(
+                    f"Incompatible Numpy Type: Converting from {first_signal.data.dtype} to {guard_signal.data.dtype}"
+                )
+            
             self.fir_filter = FIRFilter(
                 info.nominal_srate,
                 self.fir_params,
                 self.config.window,
-                first_signal,
+                guard_signal,
             )
             
         filtered_sigs: Sequence = []
         for sig in signals:
-            
+            sig = FIRFilter.ensure_correct_type(sig)
             f_sig = self.fir_filter.filter(sig)
             filtered_sigs.append(f_sig)
         

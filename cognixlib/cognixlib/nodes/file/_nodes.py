@@ -143,7 +143,7 @@ class XDFWriterNode(Node):
 
 from ..utils import PortList
           
-class XDFImporerNode(Node):
+class XDFImporterNode(Node):
     title = 'XDF Import'
     version = '0.1'
     
@@ -170,7 +170,7 @@ class XDFImporerNode(Node):
     init_outputs = [PortConfig(label='streams',allowed_data=Mapping[str, StreamSignal])]
         
     @property
-    def config(self) -> XDFImporerNode.Config:
+    def config(self) -> XDFImporterNode.Config:
         return self._config
     
     def init(self):

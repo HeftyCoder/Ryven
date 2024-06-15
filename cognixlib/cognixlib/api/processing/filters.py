@@ -13,8 +13,9 @@ from mne.filter import (
     _iir_filter,
 )
 from dataclasses import dataclass
-
 from enum import StrEnum
+
+import numpy as np
 
 class Phase(StrEnum):
     ZERO="zero"
@@ -44,11 +45,25 @@ class FilterParams:
 class Filter(ABC):
     """The basic definition of a filter"""
         
+    @classmethod
     @abstractmethod
-    def filter(self, data: Signal, copy=True) -> Signal:
+    def ensure_correct_type(cls, signal: Signal) -> Signal:
+        pass
+    
+    @abstractmethod
+    def filter(self, signal: Signal, copy=True) -> Signal:
         pass
 
-class FIRFilter(Filter):
+class MNEFilter(Filter):
+    
+    @classmethod
+    def ensure_correct_type(cls, signal: Signal) -> Signal:
+        if signal.data.dtype != np.float64:
+            signal = signal.copy(False)
+            signal.data = signal.data.astype(np.float64)
+        return signal 
+    
+class FIRFilter(MNEFilter):
     """
     An implementation of an FIR filter that handles
     the typical cases of lowpass, highpass, bandpass
@@ -67,7 +82,12 @@ class FIRFilter(Filter):
         if isinstance(sfreq, StreamSignalInfo):
             self.sfreq = sfreq.nominal_srate
         
-        data_check = data_valid.data.T if data_valid else None
+        if data_valid:
+            data_valid = self.ensure_correct_type(data_valid) 
+            data_check = data_valid.data.T if data_valid else None
+        else:
+            data_check = None
+        
         self._fir = create_filter(
             data=data_check,
             sfreq=self.sfreq,
@@ -79,9 +99,11 @@ class FIRFilter(Filter):
             fir_window=wnd,
             fir_design="firwin"
         )
-    
+        
     def filter(self, signal: Signal, copy=True):
         result_signal = signal.copy(False)
+        result_signal = self.ensure_correct_type(result_signal)
+                
         filt_data = _overlap_add_filter(
             result_signal.data.T,
             self._fir,
@@ -92,7 +114,7 @@ class FIRFilter(Filter):
         result_signal.data = filt_data.T
         return result_signal
 
-class IIRFilter(Filter):
+class IIRFilter(MNEFilter):
     """An implementation of an IIR Filter"""
     
     def __init__(
@@ -108,7 +130,11 @@ class IIRFilter(Filter):
         if isinstance(sfreq, StreamSignalInfo):
             self.sfreq = sfreq.nominal_srate
         
-        data_check = data_valid.data.T if data_valid else None
+        if data_valid:
+            data_valid = self.ensure_correct_type(data_valid) 
+            data_check = data_valid.data.T
+        else:
+            data_check = None
         
         self._irr = create_filter(
             data=data_check,
@@ -121,6 +147,8 @@ class IIRFilter(Filter):
         
     def filter(self, signal: Signal, copy=True):
         result = signal.copy(False)
+        result = self.ensure_correct_type(result)
+        
         filt_data = _iir_filter(
             result.data.T,
             self._irr,
