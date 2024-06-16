@@ -782,22 +782,18 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
             self.update()
 
     def on_node_input_removed(self, index, inp: NodeInput):
-        self.remove_input(inp)
+        self.remove_input(index, inp)
 
     def on_node_input_renamed(self, index: int, inp: NodeInput, old_name: str):
         self.inputs[index].update()
         self.update()
         
-    def remove_input(self, inp: NodeInput):
-        item = None
-        for inp_item in self.inputs:
-            if inp_item.port == inp:
-                item = inp_item
-                break
-
-        # index = self.node.inputs.index(inp)
-        # item = self.inputs[index]
-
+    def remove_input(self, index: int, inp: NodeInput):
+        item = self.inputs[index]
+        if not item:
+            print(inp)
+            return
+        
         # for some reason, I have to remove all widget items manually from the scene too. setting the items to
         # ownedByLayout(True) does not work, I don't know why.
         self.scene().removeItem(item.pin)
