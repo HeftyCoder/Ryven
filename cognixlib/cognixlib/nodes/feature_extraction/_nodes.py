@@ -312,7 +312,106 @@ class FBCSPTransformRealTimeNode(Node):
             
             self.set_output(0,signal_features)
             
-     
+    
+class FBCSPTransformNodeForOneSignal(Node):
+    title = 'FBCSP Transform Per Window'
+    version = '0.1'
+    
+    class Config(NodeTraitsConfig):
+        directory: str = Directory(desc='the saving directory')
+        varname: str = CX_Str(
+            "model", 
+            desc="the file name will be extracted from this if there is a string variable"
+        )
+    
+    init_inputs = [
+        PortConfig(label='data',allowed_data=Sequence[LabeledSignal] | LabeledSignal),
+        PortConfig(label='spatial filters',allowed_data=Mapping)
+    ]
+    init_outputs = [PortConfig(label='features',allowed_data=FeatureSignal)]
+    
+    @property
+    def config(self) -> FBCSPTransformNodeForOneSignal.Config:
+        return self._config 
+        
+    def init(self):
+        self.fbank = None
+        self.fbcsp_feature_extractor = None
+        self.signal = None
+        self.dict = None
+        self.file_exists = False
+        
+        self.path_file = None
+        self.dict_file = None
+        self.dict_node = None
+        
+        dir = self.config.directory
+        filename = self.var_val_get(self.config.varname) 
+        
+        if filename and dir and isinstance(filename, str)!=False:
+            self.path_file = f'{dir}/{filename}'
+        
+        if self.path_file and os.path.exists(self.path_file + '.joblib'):
+            self.file_exists = True
+            self.dict_file = joblib.load(self.path_file + '.joblib')
+        else:
+            self.logger.error(msg='The path doenst exist')
+        
+    def update_event(self, inp=-1):
+        if inp==0: 
+            self.signal: Sequence[LabeledSignal] = self.input(inp)
+            if isinstance(self.signal,LabeledSignal):
+                self.signal = [self.signal]
+        
+        if inp==1: 
+            self.dict_node: Mapping = self.input(inp)
+
+        if self.signal and (self.dict_file or self.dict_node):
+                        
+            self.dict = self.dict_node if self.dict_node else self.dict_file
+                             
+            self.fbank = self.dict['fbank']
+            
+            self.fbcsp_feature_extractor = self.dict['fbcsp_filters']
+
+            min_size = min([sig.data.shape[0] for sig in self.signal])
+            
+            data = [_ for sig in self.signal for _ in (sig.data.transpose()[:,:min_size] if sig.data.ndim == 3 else [sig.data.transpose()[:,:min_size]])]                  
+            data = np.array(data)          
+            
+            sum_of_data_class = (
+                self.signal[0].data.shape[0] if self.signal[0].data.ndim == 3 else 1
+                    if len(self.signal) == 1 
+                    else sum([sig.data.shape[0] if sig.data.ndim == 3 else 1 for sig in self.signal])
+                )
+            
+            classes = {
+                '0' : (0,sum_of_data_class),
+            }
+
+            class_labels = []
+            
+            for class_label, (start_idx, end_idx) in classes.items():
+                for i in range(start_idx,end_idx):
+                    class_labels.append(class_label)
+            
+            filtered_data = self.fbank.filter_data(data)
+            
+            features = self.fbcsp_feature_extractor.transform(filtered_data)
+            label_features = [f'feature_{i}' for i in range(features.shape[1])]
+            
+            signal_features = FeatureSignal(
+                labels=label_features,
+                class_dict = classes,
+                data = features,
+                signal_info = None
+            )
+            
+            print(features.shape)
+
+            self.signal,self.dict_node = None,None
+            
+            self.set_output(0,signal_features)
      
      
      
