@@ -790,9 +790,6 @@ class NodeItem(GUIBase, QGraphicsObject):  # QGraphicsItem, QObject):
         
     def remove_input(self, index: int, inp: NodeInput):
         item = self.inputs[index]
-        if not item:
-            print(inp)
-            return
         
         # for some reason, I have to remove all widget items manually from the scene too. setting the items to
         # ownedByLayout(True) does not work, I don't know why.

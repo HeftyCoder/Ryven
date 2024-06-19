@@ -410,7 +410,38 @@ class StreamSignalSelectionNode(Node):
         else:
             self.start_ind = ''
             self.stop_ind = ''
-             
+
+class BadConfidenceRemoval(Node):
+    title = 'Confidence Guard'
+    version = '0.1'
+    
+    class Config(NodeTraitsConfig):
+        conf_label: str = CX_Str("confidence")
+        conf_level: float = Range(0.0, 1.0, 0.9, desc="all samples below this confidence will be removed")
+    
+    @property
+    def config(self) -> BadConfidenceRemoval.Config:
+        return self._config
+    
+    init_inputs = [
+        PortConfig("in", allowed_data=StreamSignal)
+    ]
+    init_outputs = [
+        PortConfig("out", allowed_data=StreamSignal)
+    ]
+    
+    def update_event(self, inp=-1):
+        sig: StreamSignal = self.input(inp)
+        if not sig:
+            return
+        conf_label = self.config.conf_label
+        if conf_label not in sig.ldm:
+            self.logger.warn(f"No {conf_label} found in incoming signal")
+            return
+        
+        conf_data = sig.ldm[conf_label]
+        print(conf_data)
+        
 class FIRFilterNode(Node):
     title = 'FIR Filter'
     version = '0.1'

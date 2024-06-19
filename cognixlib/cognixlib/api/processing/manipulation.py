@@ -11,6 +11,7 @@ from abc import ABC, abstractmethod
 from enum import IntEnum
 
 # SEGMENTS
+
 class SegmentFinder(ABC):
     """
     Extracts segments from a signal based on marker timestamps relative to
