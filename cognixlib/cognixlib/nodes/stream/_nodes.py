@@ -58,7 +58,10 @@ class LSLSignalInfo(StreamSignalInfo):
         )
 
 class LSLInputNode(FrameNode):
-    """An LSL Input Stream"""
+    """
+    A node that awaits for an LSL stream to be found 
+    and then passes the data to its output ports.
+    """
     
     class Config(NodeTraitsConfig):
         

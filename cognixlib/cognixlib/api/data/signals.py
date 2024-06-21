@@ -42,7 +42,7 @@ class SignalInfo:
         
 class Signal:
     """
-    Represents the data being passed over nodes for signal processing
+    Represents the data for signal processing
     
     The data is a numpy array of any shape. What the shape describes 
     is left to the metadata. Some nodes may require a signal of 
@@ -541,7 +541,7 @@ class StreamSignal(TimeSignal, LabeledSignal):
 
 class FeatureSignal(LabeledSignal):
     """
-    Represents a signal whose rows correspond to a feature
+    Represents a signal whose rows correspond to a feature class
     and whose columns correspond to a feature label 
     """
     
