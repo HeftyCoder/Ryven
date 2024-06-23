@@ -1,4 +1,4 @@
-from cognixcore.api import Node, PortConfig 
+from cognixcore import Node, PortConfig 
 
 class UtilNode(Node):
     

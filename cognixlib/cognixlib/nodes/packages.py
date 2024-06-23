@@ -1,5 +1,5 @@
 """Contains utilities and structures for loading all the nodes as a package hierarchy"""
-from cognixcore.api import Node
+from cognixcore import Node
 from cognixcore.node import get_versioned_nodes
 
 def get_package_nodes(module) -> list[Node]:

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from cognixcore.api import (
+from cognixcore import (
     Flow, 
     Node, 
     FrameNode, 
@@ -7,9 +7,9 @@ from cognixcore.api import (
 )
 from cognixcore.config.traits import *
 from traitsui.api import CheckListEditor
-from ...api.data import FeatureSignal, LabeledSignal
-from ...api.features.filter_bank import FilterBank
-from ...api.features.csp import FBCSP
+from ...scripting.data import FeatureSignal, LabeledSignal
+from ...scripting.features.filter_bank import FilterBank
+from ...scripting.features.csp import FBCSP
 
 import joblib
 import os

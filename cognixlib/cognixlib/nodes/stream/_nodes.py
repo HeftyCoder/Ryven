@@ -12,7 +12,7 @@ from pylsl import (
     proc_threadsafe ,
 )
 
-from cognixcore.api import (
+from cognixcore import (
     Node,
     FrameNode,
     ProgressState, 
@@ -23,14 +23,14 @@ from threading import Thread
 from traitsui.api import CheckListEditor
 
 import numpy as np
-from ...api.data import (
+from ...scripting.data import (
     StreamSignal, 
     StreamSignalInfo, 
     LabeledSignal,
     TimeSignal,
     Signal
 )
-from ...api.data.conversions import np_to_lsl, lsl_to_np, lsl_to_str
+from ...scripting.data.conversions import np_to_lsl, lsl_to_np, lsl_to_str
 
 class LSLSignalInfo(StreamSignalInfo):
     

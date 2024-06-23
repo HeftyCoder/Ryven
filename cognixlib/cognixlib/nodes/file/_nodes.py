@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from cognixcore.api import (
+from cognixcore import (
     Node,
     Flow,
     PortConfig,
@@ -23,9 +23,9 @@ import json
 
 from collections.abc import Mapping
 
-from ...api.file.xdf import XDFWriter
-from ...api.data import StreamSignal
-from ...api.data.conversions import get_lsl_format, lsl_to_str
+from ...scripting.file.xdf import XDFWriter
+from ...scripting.data import StreamSignal
+from ...scripting.data.conversions import get_lsl_format, lsl_to_str
 from ..stream import LSLSignalInfo
 
 class XDFWriterNode(Node):

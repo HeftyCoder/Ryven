@@ -18,9 +18,9 @@ from pylsl import (
     cf_string
 )
 from ..stream import LSLSignalInfo
-from ...api.data import StreamSignal
+from ...scripting.data import StreamSignal
 
-from ...api.data import Signal, TimeSignal, LabeledSignal, FeatureSignal
+from ...scripting.data import Signal, TimeSignal, LabeledSignal, FeatureSignal
 
 class TestStreamNode(FrameNode):
     

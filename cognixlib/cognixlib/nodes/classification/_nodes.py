@@ -1,15 +1,15 @@
 from __future__ import annotations
-from cognixcore.api import Flow, Node, PortConfig
+from cognixcore import Flow, Node, PortConfig
 from cognixcore.config import NodeConfig
 from cognixcore.config.traits import *
 
 import os
 import numpy as np
 
-from ...api.data import LabeledSignal,FeatureSignal
+from ...scripting.data import LabeledSignal,FeatureSignal
 
-from ...api.prediction.core import BasePredictor
-from ...api.prediction.scikit import (
+from ...scripting.prediction.core import BasePredictor
+from ...scripting.prediction.scikit import (
     SVMClassifier,
     RFClassifier,
     SciKitClassifier,

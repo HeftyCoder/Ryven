@@ -1,5 +1,5 @@
 from cognixcore.config.traits import *
-from cognixcore.api import PortConfig, NodePort
+from cognixcore import PortConfig, NodePort
 from enum import IntEnum
 from dataclasses import dataclass
 

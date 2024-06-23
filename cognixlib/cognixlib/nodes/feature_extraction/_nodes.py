@@ -5,7 +5,7 @@ import numpy as np
 import mne
 import os,joblib
 
-from ...api.data import (
+from ...scripting.data import (
     Signal,
     TimeSignal,
     LabeledSignal,
@@ -13,7 +13,7 @@ from ...api.data import (
     StreamSignal
 )
 
-from cognixcore.api import (
+from cognixcore import (
     Flow, 
     Node, 
     FrameNode, 
@@ -23,9 +23,9 @@ from cognixcore.config.traits import *
 from traitsui.api import CheckListEditor
 
 from collections.abc import Sequence, Mapping
-from ...api.statistics import *
-from ...api.features.csp import FBCSP
-from ...api.features.filter_bank import FilterBank
+from ...scripting.statistics import *
+from ...scripting.features.csp import FBCSP
+from ...scripting.features.filter_bank import FilterBank
 
 class MergeFeaturesNode(Node):
     """A node that merges features signals together."""

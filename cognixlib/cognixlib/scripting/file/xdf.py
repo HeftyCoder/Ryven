@@ -4,7 +4,7 @@ import io, time, struct, threading
 import numpy as np
 import xmltodict
 
-from ...api.file.conversions import *
+from ...scripting.file.conversions import *
 from pylsl import local_clock
 
 def write_ts(out:io.StringIO,ts:float,specific_format):

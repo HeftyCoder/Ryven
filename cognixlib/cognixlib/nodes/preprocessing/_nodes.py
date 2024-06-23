@@ -11,15 +11,15 @@ from traitsui.api import *
 
 from collections.abc import Sequence
 
-from ...api.data import (
+from ...scripting.data import (
     Signal, 
     StreamSignal, 
     LabeledSignal,
     CircularBuffer
 )
-from ...api.processing.manipulation import *
+from ...scripting.processing.manipulation import *
 
-from ...api.processing.filters import (
+from ...scripting.processing.filters import (
     FilterParams,
     Phase,
     FIRFilter,
@@ -29,7 +29,7 @@ from ...api.processing.filters import (
 )
 from ..utils import PortList
 
-from ...api.mne.prep import (
+from ...scripting.mne.prep import (
     remove_trend_data,
     line_noise_removal_prep,
     referencing_prep,
